@@ -312,50 +312,79 @@ local function createUI()
 	title.Text = "Created by pusingbat"
 	title.Parent = header
 
-	-- Header controls (Search / Minimize / Close)
-	local searchBox = Instance.new("TextBox")
-	searchBox.Size = UDim2.fromOffset(140, 26)
-	searchBox.Position = UDim2.new(1, -210, 0.5, -13)
-	searchBox.Text = "Search..."
-	searchBox.ClearTextOnFocus = true
-	searchBox.BackgroundColor3 = Color3.fromRGB(45,45,50)
-	searchBox.TextColor3 = Color3.fromRGB(230,230,230)
-	searchBox.PlaceholderText = "search feature"
-	searchBox.Font = Enum.Font.Gotham
-	searchBox.TextSize = 14
-	searchBox.Parent = header
-	Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 8)
+	-- Header controls (Search icon / Minimize / Close)
+    local searchBtn = Instance.new("ImageButton")
+    searchBtn.Size = UDim2.fromOffset(26, 26)
+    searchBtn.Position = UDim2.new(1, -96, 0.5, -13)
+    searchBtn.BackgroundTransparency = 1
+    searchBtn.BorderSizePixel = 0
+    searchBtn.ZIndex = 3
+    -- Gambar kaca pembesar (ganti ID kalau tidak muncul)
+    searchBtn.Image = "rbxassetid://6031075938"
+    searchBtn.ImageColor3 = Color3.fromRGB(220,220,220)
+    searchBtn.Parent = header
 
-	local btnMin = Instance.new("TextButton")
-	btnMin.Size = UDim2.fromOffset(26, 26)
-	btnMin.Position = UDim2.new(1, -64, 0.5, -13)
-	btnMin.Text = "–"
-	btnMin.Font = Enum.Font.GothamBlack
-	btnMin.TextSize = 18
-	btnMin.TextColor3 = Color3.fromRGB(255,255,255)
-	btnMin.BackgroundColor3 = Color3.fromRGB(70,70,80)
-	btnMin.BorderSizePixel = 0
-	btnMin.Parent = header
-	Instance.new("UICorner", btnMin).CornerRadius = UDim.new(1,0)
+    local btnMin = Instance.new("TextButton")
+    btnMin.Size = UDim2.fromOffset(26, 26)
+    btnMin.Position = UDim2.new(1, -64, 0.5, -13)
+    btnMin.Text = "–"
+    btnMin.Font = Enum.Font.GothamBlack
+    btnMin.TextSize = 18
+    btnMin.TextColor3 = Color3.fromRGB(255,255,255)
+    btnMin.BackgroundColor3 = Color3.fromRGB(70,70,80)
+    btnMin.BorderSizePixel = 0
+    btnMin.ZIndex = 3
+    btnMin.Parent = header
+    Instance.new("UICorner", btnMin).CornerRadius = UDim.new(1,0)
 
-	local btnClose = Instance.new("TextButton")
-	btnClose.Size = UDim2.fromOffset(26, 26)
-	btnClose.Position = UDim2.new(1, -32, 0.5, -13)
-	btnClose.Text = "x"
-	btnClose.Font = Enum.Font.GothamBlack
-	btnClose.TextSize = 16
-	btnClose.TextColor3 = Color3.fromRGB(255,255,255)
-	btnClose.BackgroundColor3 = Color3.fromRGB(90,50,50)
-	btnClose.BorderSizePixel = 0
-	btnClose.Parent = header
-	Instance.new("UICorner", btnClose).CornerRadius = UDim.new(1,0)
+    local btnClose = Instance.new("TextButton")
+    btnClose.Size = UDim2.fromOffset(26, 26)
+    btnClose.Position = UDim2.new(1, -32, 0.5, -13)
+    btnClose.Text = "x"
+    btnClose.Font = Enum.Font.GothamBlack
+    btnClose.TextSize = 16
+    btnClose.TextColor3 = Color3.fromRGB(255,255,255)
+    btnClose.BackgroundColor3 = Color3.fromRGB(90,50,50)
+    btnClose.BorderSizePixel = 0
+    btnClose.ZIndex = 3
+    btnClose.Parent = header
+    Instance.new("UICorner", btnClose).CornerRadius = UDim.new(1,0)
 
-	-- Drag area
-	local drag = Instance.new("TextButton")
-	drag.BackgroundTransparency = 1
-	drag.Size = UDim2.new(1, 0, 0, 40)
-	drag.Text = ""
-	drag.Parent = header
+    -- Search panel (muncul saat klik icon)
+    local searchPanel = Instance.new("Frame")
+    searchPanel.Size = UDim2.fromOffset(180, 36)
+    searchPanel.Position = UDim2.new(1, -286, 0, 42)
+    searchPanel.BackgroundColor3 = Color3.fromRGB(45,45,50)
+    searchPanel.Visible = false
+    searchPanel.Parent = frame
+    searchPanel.ZIndex = 4
+    Instance.new("UICorner", searchPanel).CornerRadius = UDim.new(0, 8)
+
+    local searchBox = Instance.new("TextBox")
+    searchBox.Size = UDim2.new(1, -12, 1, -12)
+    searchBox.Position = UDim2.new(0, 6, 0, 6)
+    searchBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
+    searchBox.PlaceholderText = "Search feature"
+    searchBox.Text = ""
+    searchBox.Font = Enum.Font.Gotham
+    searchBox.TextSize = 14
+    searchBox.TextColor3 = Color3.fromRGB(230,230,230)
+    searchBox.ClearTextOnFocus = false
+    searchBox.Parent = searchPanel
+    searchBox.ZIndex = 5
+    Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 6)
+
+    searchBtn.MouseButton1Click:Connect(function()
+        searchPanel.Visible = not searchPanel.Visible
+        if searchPanel.Visible then searchBox:CaptureFocus() end
+    end)
+
+    -- Drag area (hanya sisi kiri, supaya tombol bisa diklik)
+    local drag = Instance.new("Frame")
+    drag.BackgroundTransparency = 1
+    drag.Size = UDim2.new(1, -180, 1, 0)
+    drag.Position = UDim2.new(0, 0, 0, 0)
+    drag.Parent = header
 
 	-- Scrolling content
 	local scroll = Instance.new("ScrollingFrame")
@@ -538,34 +567,29 @@ local function createUI()
 	local nfdSw = createSwitch("No Fall Damage", false, function(v) noFallDamage = v end)
 
 	-- Search filter
-	local function applySearch()
-		local q = string.lower(searchBox.Text or "")
-		if q == "" or q == "search..." then
-			for _,row in ipairs(allRows) do row.Visible = true end
-		else
-			for _,row in ipairs(allRows) do
-				local label = string.lower(tostring(row:GetAttribute("label") or ""))
-				row.Visible = string.find(label, q, 1, true) ~= nil
-			end
-		end
-		-- force relayout
-		recalcCanvas()
-	end
-	searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
-	searchBox.Focused:Connect(function() if searchBox.Text == "Search..." then searchBox.Text = "" end end)
+    local function applySearch()
+        local q = string.lower(searchBox.Text or "")
+        for _,row in ipairs(allRows) do
+            local label = string.lower(tostring(row:GetAttribute("label") or ""))
+            row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
+        end
+        recalcCanvas()
+    end
+    searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
-	-- Minimize / Close
-	local minimized = false
-	btnMin.MouseButton1Click:Connect(function()
-		minimized = not minimized
-		scroll.Visible = not minimized
-		frame.Size = minimized and UDim2.fromOffset(360, 56) or UDim2.fromOffset(360, 360)
-	end)
 
-	btnClose.MouseButton1Click:Connect(function()
-		MainGUI.Enabled = false
-		showPill()
-	end)
+    -- Minimize / Close
+    local minimized = false
+    btnMin.MouseButton1Click:Connect(function()
+        minimized = not minimized
+        scroll.Visible = not minimized
+        frame.Size = minimized and UDim2.fromOffset(360, 56) or UDim2.fromOffset(360, 360)
+    end)
+
+    btnClose.MouseButton1Click:Connect(function()
+        MainGUI.Enabled = false
+        showPill()
+    end)
 
 	-- Drag window
 	local draggingFrame = false
