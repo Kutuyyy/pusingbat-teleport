@@ -2,18 +2,24 @@
     Fly + Utility Controller (UI Bawaan) — by pusingbat request
     Fitur:
       • Loading overlay 5 detik (50% transparansi) "Created by Pusingbat" + panel teks ber-background 50%
-      • Panel UI dengan header "Created by pusingbat" + tombol Search / Minimize / Close
-      • Search memfilter fitur (nama mengandung teks)
+      • Panel UI dengan header "Created by pusingbat" + tombol Search (ikon) / Minimize / Close
+      • Tab: Player & Teleport (ikon). Search memfilter konten tab aktif.
       • Close: sembunyikan panel, munculkan tombol pill "Show Pusing"
       • Minimize: tampilkan header saja (klik lagi untuk restore)
-      • ScrollingFrame untuk konten (panel tidak terlalu besar)
-      • Fly Toggle (default OFF)
-      • NoClip Toggle
-      • Walk Speed Slider (studs) — pengaruhi jalan & kecepatan fly
-      • Jump Power Slider (studs)
-      • Inf Jump (Mobile) Toggle
-      • Inf Jump (PC) Toggle
-      • No Fall Damage Toggle
+      • ScrollingFrame untuk konten
+      • Player tab:
+          - Fly Toggle (default OFF)
+          - NoClip Toggle
+          - Walk Speed Slider (studs) — pengaruhi jalan & kecepatan fly
+          - Jump Power Slider (studs)
+          - Inf Jump (Mobile) Toggle
+          - Inf Jump (PC) Toggle
+          - No Fall Damage Toggle
+      • Teleport tab (integrasi dari kode kamu):
+          - Daftar lokasi (scroll)
+          - Add Current Location (prompt nama)
+          - Delete Selected
+          - Klik entry untuk teleport
     Letakkan sebagai LocalScript di StarterPlayer > StarterPlayerScripts
 ]]--
 
@@ -42,6 +48,9 @@ local align    -- AlignOrientation (lock rotation)
 local lastFreefallHealth
 local fellFromY
 local lastFreefallT
+
+-- Teleport state
+local savedLocations = {}
 
 -- ====== Character helpers ======
 local function getCharacter()
@@ -204,8 +213,8 @@ local function hookFallDamage()
 end
 
 -- ====== UI (Bawaan) ======
-local MainGUI -- reference panel
-local ShowPillGUI -- reference pill button
+local MainGUI -- panel utama
+local ShowPillGUI -- tombol pill "Show Pusing"
 
 local function showPill()
 	if ShowPillGUI then ShowPillGUI:Destroy() end
@@ -239,7 +248,7 @@ end
 local function createUI()
 	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-	-- Loading overlay 5 detik
+	-- Loading overlay 5 detik (panel utama muncul setelah ini selesai)
 	local overlay = Instance.new("ScreenGui")
 	overlay.Name = "PusingbatLoading"
 	overlay.ResetOnSpawn = false
@@ -249,7 +258,7 @@ local function createUI()
 	local dim = Instance.new("Frame")
 	dim.Size = UDim2.fromScale(1,1)
 	dim.BackgroundColor3 = Color3.new(0,0,0)
-	dim.BackgroundTransparency = 0.5 -- 50% background
+	dim.BackgroundTransparency = 0.5
 	dim.BorderSizePixel = 0
 	dim.Parent = overlay
 
@@ -258,7 +267,7 @@ local function createUI()
 	textBg.Position = UDim2.fromScale(0.5,0.5)
 	textBg.Size = UDim2.fromOffset(520,100)
 	textBg.BackgroundColor3 = Color3.fromRGB(0,0,0)
-	textBg.BackgroundTransparency = 0.5 -- 50% panel bg
+	textBg.BackgroundTransparency = 0.5
 	textBg.BorderSizePixel = 0
 	textBg.Parent = overlay
 	Instance.new("UICorner", textBg).CornerRadius = UDim.new(0,18)
@@ -272,23 +281,18 @@ local function createUI()
 	text.TextColor3 = Color3.fromRGB(255,255,255)
 	text.Parent = textBg
 
-	task.delay(5, function()
-    overlay:Destroy()
-    if MainGUI then MainGUI.Enabled = true end  -- <- tampilkan panel setelah loading
-    end)
-
-	-- Panel utama
+	-- Panel utama (disabled dulu)
 	if MainGUI then MainGUI:Destroy() end
 	MainGUI = Instance.new("ScreenGui")
 	MainGUI.Name = "PusingbatController"
 	MainGUI.ResetOnSpawn = false
 	MainGUI.IgnoreGuiInset = true
 	MainGUI.Parent = PlayerGui
-    MainGUI.Enabled = false  -- <- panel disembunyikan dulu sampai loading selesai
+	MainGUI.Enabled = false
 
 	local frame = Instance.new("Frame")
 	frame.Name = "MainFrame"
-	frame.Size = UDim2.fromOffset(360, 360)
+	frame.Size = UDim2.fromOffset(420, 420)
 	frame.Position = UDim2.new(0, 24, 0, 120)
 	frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 	frame.BackgroundTransparency = 0.15
@@ -305,7 +309,7 @@ local function createUI()
 
 	local title = Instance.new("TextLabel")
 	title.BackgroundTransparency = 1
-	title.Size = UDim2.new(1, -160, 1, 0)
+	title.Size = UDim2.new(1, -200, 1, 0)
 	title.Position = UDim2.new(0, 10, 0, 0)
 	title.Font = Enum.Font.GothamBold
 	title.TextSize = 18
@@ -315,118 +319,158 @@ local function createUI()
 	title.Parent = header
 
 	-- Header controls (Search icon / Minimize / Close)
-    local searchBtn = Instance.new("ImageButton")
-    searchBtn.Size = UDim2.fromOffset(26, 26)
-    searchBtn.Position = UDim2.new(1, -96, 0.5, -13)
-    searchBtn.BackgroundTransparency = 1
-    searchBtn.BorderSizePixel = 0
-    searchBtn.ZIndex = 3
-    -- Gambar kaca pembesar (ganti ID kalau tidak muncul)
-    searchBtn.Image = "rbxassetid://6031075938"
-    searchBtn.ImageColor3 = Color3.fromRGB(220,220,220)
-    searchBtn.Parent = header
+	local searchBtn = Instance.new("ImageButton")
+	searchBtn.Size = UDim2.fromOffset(26, 26)
+	searchBtn.Position = UDim2.new(1, -96, 0.5, -13)
+	searchBtn.BackgroundTransparency = 1
+	searchBtn.BorderSizePixel = 0
+	searchBtn.ZIndex = 3
+	searchBtn.Image = "rbxassetid://6031075938"
+	searchBtn.ImageColor3 = Color3.fromRGB(220,220,220)
+	searchBtn.Parent = header
 
-    local btnMin = Instance.new("TextButton")
-    btnMin.Size = UDim2.fromOffset(26, 26)
-    btnMin.Position = UDim2.new(1, -64, 0.5, -13)
-    btnMin.Text = "–"
-    btnMin.Font = Enum.Font.GothamBlack
-    btnMin.TextSize = 18
-    btnMin.TextColor3 = Color3.fromRGB(255,255,255)
-    btnMin.BackgroundColor3 = Color3.fromRGB(70,70,80)
-    btnMin.BorderSizePixel = 0
-    btnMin.ZIndex = 3
-    btnMin.Parent = header
-    Instance.new("UICorner", btnMin).CornerRadius = UDim.new(1,0)
+	local btnMin = Instance.new("TextButton")
+	btnMin.Size = UDim2.fromOffset(26, 26)
+	btnMin.Position = UDim2.new(1, -64, 0.5, -13)
+	btnMin.Text = "–"
+	btnMin.Font = Enum.Font.GothamBlack
+	btnMin.TextSize = 18
+	btnMin.TextColor3 = Color3.fromRGB(255,255,255)
+	btnMin.BackgroundColor3 = Color3.fromRGB(70,70,80)
+	btnMin.BorderSizePixel = 0
+	btnMin.ZIndex = 3
+	btnMin.Parent = header
+	Instance.new("UICorner", btnMin).CornerRadius = UDim.new(1,0)
 
-    local btnClose = Instance.new("TextButton")
-    btnClose.Size = UDim2.fromOffset(26, 26)
-    btnClose.Position = UDim2.new(1, -32, 0.5, -13)
-    btnClose.Text = "x"
-    btnClose.Font = Enum.Font.GothamBlack
-    btnClose.TextSize = 16
-    btnClose.TextColor3 = Color3.fromRGB(255,255,255)
-    btnClose.BackgroundColor3 = Color3.fromRGB(90,50,50)
-    btnClose.BorderSizePixel = 0
-    btnClose.ZIndex = 3
-    btnClose.Parent = header
-    Instance.new("UICorner", btnClose).CornerRadius = UDim.new(1,0)
+	local btnClose = Instance.new("TextButton")
+	btnClose.Size = UDim2.fromOffset(26, 26)
+	btnClose.Position = UDim2.new(1, -32, 0.5, -13)
+	btnClose.Text = "x"
+	btnClose.Font = Enum.Font.GothamBlack
+	btnClose.TextSize = 16
+	btnClose.TextColor3 = Color3.fromRGB(255,255,255)
+	btnClose.BackgroundColor3 = Color3.fromRGB(90,50,50)
+	btnClose.BorderSizePixel = 0
+	btnClose.ZIndex = 3
+	btnClose.Parent = header
+	Instance.new("UICorner", btnClose).CornerRadius = UDim.new(1,0)
 
-    -- Search panel (muncul saat klik icon)
-    local searchPanel = Instance.new("Frame")
-    searchPanel.Size = UDim2.fromOffset(180, 36)
-    searchPanel.Position = UDim2.new(1, -286, 0, 42)
-    searchPanel.BackgroundColor3 = Color3.fromRGB(45,45,50)
-    searchPanel.Visible = false
-    searchPanel.Parent = frame
-    searchPanel.ZIndex = 4
-    Instance.new("UICorner", searchPanel).CornerRadius = UDim.new(0, 8)
+	-- Search panel
+	local searchPanel = Instance.new("Frame")
+	searchPanel.Size = UDim2.fromOffset(200, 36)
+	searchPanel.Position = UDim2.new(1, -326, 0, 42)
+	searchPanel.BackgroundColor3 = Color3.fromRGB(45,45,50)
+	searchPanel.Visible = false
+	searchPanel.Parent = frame
+	searchPanel.ZIndex = 4
+	Instance.new("UICorner", searchPanel).CornerRadius = UDim.new(0, 8)
 
-    local searchBox = Instance.new("TextBox")
-    searchBox.Size = UDim2.new(1, -12, 1, -12)
-    searchBox.Position = UDim2.new(0, 6, 0, 6)
-    searchBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
-    searchBox.PlaceholderText = "Search feature"
-    searchBox.Text = ""
-    searchBox.Font = Enum.Font.Gotham
-    searchBox.TextSize = 14
-    searchBox.TextColor3 = Color3.fromRGB(230,230,230)
-    searchBox.ClearTextOnFocus = false
-    searchBox.Parent = searchPanel
-    searchBox.ZIndex = 5
-    Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 6)
+	local searchBox = Instance.new("TextBox")
+	searchBox.Size = UDim2.new(1, -12, 1, -12)
+	searchBox.Position = UDim2.new(0, 6, 0, 6)
+	searchBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
+	searchBox.PlaceholderText = "Search feature"
+	searchBox.Text = ""
+	searchBox.Font = Enum.Font.Gotham
+	searchBox.TextSize = 14
+	searchBox.TextColor3 = Color3.fromRGB(230,230,230)
+	searchBox.ClearTextOnFocus = false
+	searchBox.Parent = searchPanel
+	searchBox.ZIndex = 5
+	Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 6)
 
-    searchBtn.MouseButton1Click:Connect(function()
-        searchPanel.Visible = not searchPanel.Visible
-        if searchPanel.Visible then searchBox:CaptureFocus() end
-    end)
+	searchBtn.MouseButton1Click:Connect(function()
+		searchPanel.Visible = not searchPanel.Visible
+		if searchPanel.Visible then searchBox:CaptureFocus() end
+	end)
 
-    -- Drag area (hanya sisi kiri, supaya tombol bisa diklik)
-    local drag = Instance.new("Frame")
-    drag.BackgroundTransparency = 1
-    drag.Size = UDim2.new(1, -180, 1, 0)
-    drag.Position = UDim2.new(0, 0, 0, 0)
-    drag.Parent = header
+	-- Drag area (kiri agar tombol bisa diklik)
+	local drag = Instance.new("Frame")
+	drag.BackgroundTransparency = 1
+	drag.Size = UDim2.new(1, -220, 1, 0)
+	drag.Position = UDim2.new(0, 0, 0, 0)
+	drag.Parent = header
 
-	-- Scrolling content
-	local scroll = Instance.new("ScrollingFrame")
-	scroll.Name = "Content"
-	scroll.Size = UDim2.new(1, -16, 1, -56)
-	scroll.Position = UDim2.new(0, 8, 0, 48)
-	scroll.BackgroundTransparency = 1
-	scroll.BorderSizePixel = 0
-	scroll.CanvasSize = UDim2.new(0,0,0,0)
-	scroll.ScrollBarThickness = 6
-	scroll.Parent = frame
+	-- Tab bar (Player / Teleport)
+	local tabs = Instance.new("Frame")
+	tabs.Size = UDim2.new(1, -16, 0, 30)
+	tabs.Position = UDim2.new(0, 8, 0, 44)
+	tabs.BackgroundTransparency = 1
+	tabs.Parent = frame
 
-	local layout = Instance.new("UIListLayout")
-	layout.FillDirection = Enum.FillDirection.Vertical
-	layout.Padding = UDim.new(0, 8)
-	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Parent = scroll
-
-	local function recalcCanvas()
-		scroll.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 20)
+	local function makeTabButton(text, iconId, xOffset)
+		local b = Instance.new("TextButton")
+		b.Size = UDim2.fromOffset(120, 28)
+		b.Position = UDim2.new(0, xOffset, 0, 0)
+		b.BackgroundColor3 = Color3.fromRGB(45,45,50)
+		b.TextColor3 = Color3.fromRGB(230,230,230)
+		b.Text = text
+		b.Font = Enum.Font.GothamBold
+		b.TextSize = 14
+		b.BorderSizePixel = 0
+		b.Parent = tabs
+		Instance.new("UICorner", b).CornerRadius = UDim.new(1,0)
+		if iconId then
+			local img = Instance.new("ImageLabel")
+			img.Size = UDim2.fromOffset(18,18)
+			img.Position = UDim2.new(0, 8, 0.5, -9)
+			img.BackgroundTransparency = 1
+			img.Image = iconId
+			img.ImageColor3 = Color3.fromRGB(230,230,230)
+			img.Parent = b
+			b.TextXAlignment = Enum.TextXAlignment.Left
+			b.Text = "   "..text
+		end
+		return b
 	end
-	layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(recalcCanvas)
 
-	-- Builder helpers
+	local tabPlayerBtn = makeTabButton("Player", "rbxassetid://6031068426", 0) -- player silhouette
+	local tabTpBtn = makeTabButton("Teleport", "rbxassetid://6034407067", 130) -- map pin
+
+	-- Scrolling content container per tab
+	local function makeScroll()
+		local scroll = Instance.new("ScrollingFrame")
+		scroll.Size = UDim2.new(1, -16, 1, -88)
+		scroll.Position = UDim2.new(0, 8, 0, 78)
+		scroll.BackgroundTransparency = 1
+		scroll.BorderSizePixel = 0
+		scroll.CanvasSize = UDim2.new(0,0,0,0)
+		scroll.ScrollBarThickness = 6
+		scroll.Visible = false
+		scroll.Parent = frame
+
+		local layout = Instance.new("UIListLayout")
+		layout.FillDirection = Enum.FillDirection.Vertical
+		layout.Padding = UDim.new(0, 8)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Parent = scroll
+
+		local function recalc()
+			scroll.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 20)
+		end
+		layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(recalc)
+		return scroll, layout, recalc
+	end
+
+	local playerScroll, playerLayout, recalcPlayer = makeScroll()
+	local tpScroll, tpLayout, recalcTp = makeScroll()
+
+	-- ===== Build Player tab controls =====
 	local allRows = {}
-
-	local function createRow(height)
+	local function createRow(parent, height)
 		local row = Instance.new("Frame")
 		row.Size = UDim2.new(1, 0, 0, height)
 		row.BackgroundColor3 = Color3.fromRGB(38,38,42)
 		row.BackgroundTransparency = 0.2
 		row.BorderSizePixel = 0
-		row.Parent = scroll
+		row.Parent = parent
 		Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
 		allRows[#allRows+1] = row
 		return row
 	end
 
-	local function createSwitch(labelText, initial, callback)
-		local row = createRow(40)
+	local function createSwitch(parent, labelText, initial, callback)
+		local row = createRow(parent, 40)
 		local lbl = Instance.new("TextLabel")
 		lbl.BackgroundTransparency = 1
 		lbl.Size = UDim2.new(1, -120, 1, 0)
@@ -470,19 +514,11 @@ local function createUI()
 
 		row:SetAttribute("label", labelText)
 		row:SetAttribute("type", "switch")
-
-		return {
-			Set = function(v)
-				value = v and true or false
-				redraw()
-				if callback then task.spawn(callback, value) end
-			end,
-			Row = row
-		}
+		return {Row=row, Set=function(v) value = v and true or false; redraw(); if callback then task.spawn(callback, value) end end}
 	end
 
-	local function createSlider(labelText, minV, maxV, initial, callback)
-		local row = createRow(58)
+	local function createSlider(parent, labelText, minV, maxV, initial, callback)
+		local row = createRow(parent, 58)
 		local lbl = Instance.new("TextLabel")
 		lbl.BackgroundTransparency = 1
 		lbl.Size = UDim2.new(1, 0, 0, 20)
@@ -549,49 +585,234 @@ local function createUI()
 
 		row:SetAttribute("label", labelText)
 		row:SetAttribute("type", "slider")
-
-		return {
-			Set = function(v)
-				local pct = (math.clamp(v, minV, maxV) - minV) / (maxV - minV)
-				setFromPct(pct)
-			end,
-			Row = row
-		}
+		return {Row=row, Set=function(v) local pct=(math.clamp(v,minV,maxV)-minV)/(maxV-minV); setFromPct(pct) end}
 	end
 
-	-- Build controls
-	local flySw = createSwitch("Fly", false, function(v) setFly(v) end)
-	local ncSw = createSwitch("NoClip (tembus)", false, function(v) setNoclip(v) end)
-	local wsSl = createSlider("Walk Speed (studs)", MIN_WALK, MAX_WALK, walkSpeed, function(v) walkSpeed = v; ensurePhysics() end)
-	local jpSl = createSlider("Jump Power (studs)", MIN_JUMP, MAX_JUMP, jumpPower, function(v) jumpPower = v; ensurePhysics() end)
-	local ijmSw = createSwitch("Inf Jump (Mobile)", false, function(v) infJumpMobile = v end)
-	local ijpSw = createSwitch("Inf Jump (PC)", false, function(v) infJumpPC = v end)
-	local nfdSw = createSwitch("No Fall Damage", false, function(v) noFallDamage = v end)
+	-- Controls on Player tab
+	local flySw = createSwitch(playerScroll, "Fly", false, function(v) setFly(v) end)
+	local ncSw = createSwitch(playerScroll, "NoClip (tembus)", false, function(v) setNoclip(v) end)
+	local wsSl = createSlider(playerScroll, "Walk Speed (studs)", MIN_WALK, MAX_WALK, walkSpeed, function(v) walkSpeed = v; ensurePhysics() end)
+	local jpSl = createSlider(playerScroll, "Jump Power (studs)", MIN_JUMP, MAX_JUMP, jumpPower, function(v) jumpPower = v; ensurePhysics() end)
+	local ijmSw = createSwitch(playerScroll, "Inf Jump (Mobile)", false, function(v) infJumpMobile = v end)
+	local ijpSw = createSwitch(playerScroll, "Inf Jump (PC)", false, function(v) infJumpPC = v end)
+	local nfdSw = createSwitch(playerScroll, "No Fall Damage", false, function(v) noFallDamage = v end)
 
-	-- Search filter
-    local function applySearch()
-        local q = string.lower(searchBox.Text or "")
-        for _,row in ipairs(allRows) do
-            local label = string.lower(tostring(row:GetAttribute("label") or ""))
-            row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
-        end
-        recalcCanvas()
-    end
-    searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
+	-- Search filter for Player tab
+	local function applySearchPlayer()
+		local q = string.lower(searchBox.Text or "")
+		for _,row in ipairs(playerScroll:GetChildren()) do
+			if row:IsA("Frame") then
+				local label = string.lower(tostring(row:GetAttribute("label") or ""))
+				row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
+			end
+		end
+		recalcPlayer()
+	end
 
+	-- ===== Build Teleport tab =====
+	local function createTpRow(height)
+		local row = Instance.new("Frame")
+		row.Size = UDim2.new(1, 0, 0, height)
+		row.BackgroundColor3 = Color3.fromRGB(38,38,42)
+		row.BackgroundTransparency = 0.2
+		row.BorderSizePixel = 0
+		row.Parent = tpScroll
+		Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
+		return row
+	end
 
-    -- Minimize / Close
-    local minimized = false
-    btnMin.MouseButton1Click:Connect(function()
-        minimized = not minimized
-        scroll.Visible = not minimized
-        frame.Size = minimized and UDim2.fromOffset(360, 56) or UDim2.fromOffset(360, 360)
-    end)
+	-- Buttons bar
+	local btnBar = createTpRow(40)
+	btnBar.BackgroundTransparency = 1
+	local addBtn = Instance.new("TextButton")
+	addBtn.Size = UDim2.new(0.5, -6, 1, 0)
+	addBtn.Position = UDim2.new(0, 0, 0, 0)
+	addBtn.Text = "Add Current Location"
+	addBtn.Font = Enum.Font.GothamBold
+	addBtn.TextSize = 14
+	addBtn.TextColor3 = Color3.fromRGB(255,255,255)
+	addBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+	addBtn.BorderSizePixel = 0
+	addBtn.Parent = btnBar
+	Instance.new("UICorner", addBtn).CornerRadius = UDim.new(0, 8)
 
-    btnClose.MouseButton1Click:Connect(function()
-        MainGUI.Enabled = false
-        showPill()
-    end)
+	local delBtn = Instance.new("TextButton")
+	delBtn.Size = UDim2.new(0.5, -6, 1, 0)
+	delBtn.Position = UDim2.new(0.5, 6, 0, 0)
+	delBtn.Text = "Delete Selected"
+	delBtn.Font = Enum.Font.GothamBold
+	delBtn.TextSize = 14
+	delBtn.TextColor3 = Color3.fromRGB(255,255,255)
+	delBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
+	delBtn.BorderSizePixel = 0
+	delBtn.Parent = btnBar
+	Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 8)
+
+	-- Locations list follows (entries are rows)
+	local function createLocationEntry(locationData)
+		local entry = createTpRow(56)
+		local checkbox = Instance.new("TextButton")
+		checkbox.Size = UDim2.fromOffset(26, 26)
+		checkbox.Position = UDim2.new(0, 10, 0.5, -13)
+		checkbox.Text = ""
+		checkbox.BackgroundColor3 = Color3.fromRGB(80,80,80)
+		checkbox.BorderSizePixel = 0
+		checkbox.Parent = entry
+		Instance.new("UICorner", checkbox).CornerRadius = UDim.new(0, 6)
+		locationData.checkbox = checkbox
+
+		local tpBtn = Instance.new("TextButton")
+		tpBtn.Size = UDim2.new(1, -56, 0.5, -4)
+		tpBtn.Position = UDim2.new(0, 46, 0, 6)
+		tpBtn.Text = locationData.name
+		tpBtn.Font = Enum.Font.GothamBold
+		tpBtn.TextSize = 14
+		tpBtn.TextColor3 = Color3.fromRGB(255,255,255)
+		tpBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
+		tpBtn.BorderSizePixel = 0
+		tpBtn.Parent = entry
+		Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+
+		local info = Instance.new("TextLabel")
+		info.Size = UDim2.new(1, -56, 0.5, -4)
+		info.Position = UDim2.new(0, 46, 0.5, 2)
+		info.Text = string.format("X: %.1f, Y: %.1f, Z: %.1f", locationData.position.X, locationData.position.Y, locationData.position.Z)
+		info.BackgroundTransparency = 1
+		info.TextColor3 = Color3.fromRGB(200,200,200)
+		info.TextXAlignment = Enum.TextXAlignment.Left
+		info.Font = Enum.Font.Gotham
+		info.TextSize = 13
+		info.Parent = entry
+
+		checkbox.MouseButton1Click:Connect(function()
+			locationData.selected = not locationData.selected
+			checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+		end)
+
+		tpBtn.MouseButton1Click:Connect(function()
+			local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+			local hrp = character:WaitForChild("HumanoidRootPart")
+			hrp.CFrame = CFrame.new(locationData.position)
+		end)
+
+		entry:SetAttribute("label", string.lower(locationData.name))
+		return entry
+	end
+
+	addBtn.MouseButton1Click:Connect(function()
+		local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hrp = character:WaitForChild("HumanoidRootPart")
+		local defaultName = "Location "..tostring(#savedLocations + 1)
+
+		-- simple input prompt
+		local prompt = Instance.new("ScreenGui")
+		prompt.Name = "LocationNameInput"
+		prompt.Parent = PlayerGui
+		local f = Instance.new("Frame")
+		f.Size = UDim2.fromOffset(300, 150)
+		f.Position = UDim2.new(0.5, -150, 0.5, -75)
+		f.BackgroundColor3 = Color3.fromRGB(50,50,50)
+		f.BorderSizePixel = 0
+		f.Parent = prompt
+		Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+		local titleLbl = Instance.new("TextLabel")
+		titleLbl.Size = UDim2.new(1, 0, 0, 30)
+		titleLbl.BackgroundColor3 = Color3.fromRGB(70,70,70)
+		titleLbl.Text = "Name this location:"
+		titleLbl.TextColor3 = Color3.new(1,1,1)
+		titleLbl.Parent = f
+		local tb = Instance.new("TextBox")
+		tb.Size = UDim2.new(1, -20, 0, 30)
+		tb.Position = UDim2.new(0, 10, 0, 40)
+		tb.Text = defaultName
+		tb.BackgroundColor3 = Color3.fromRGB(30,30,30)
+		tb.TextColor3 = Color3.new(1,1,1)
+		tb.Parent = f
+		local save = Instance.new("TextButton")
+		save.Size = UDim2.new(0.5, -15, 0, 30)
+		save.Position = UDim2.new(0, 10, 1, -40)
+		save.Text = "Save"
+		save.BackgroundColor3 = Color3.fromRGB(0,120,0)
+		save.TextColor3 = Color3.new(1,1,1)
+		save.Parent = f
+		local cancel = Instance.new("TextButton")
+		cancel.Size = UDim2.new(0.5, -15, 0, 30)
+		cancel.Position = UDim2.new(0.5, 5, 1, -40)
+		cancel.Text = "Cancel"
+		cancel.BackgroundColor3 = Color3.fromRGB(120,0,0)
+		cancel.TextColor3 = Color3.new(1,1,1)
+		cancel.Parent = f
+
+		save.MouseButton1Click:Connect(function()
+			local name = (tb.Text ~= "" and tb.Text) or defaultName
+			local locationData = {name=name, position=hrp.Position, selected=false}
+			table.insert(savedLocations, locationData)
+			createLocationEntry(locationData)
+			prompt:Destroy()
+			recalcTp()
+		end)
+		cancel.MouseButton1Click:Connect(function() prompt:Destroy() end)
+	end)
+
+	delBtn.MouseButton1Click:Connect(function()
+		for i = #savedLocations, 1, -1 do
+			if savedLocations[i].selected then
+				local chk = savedLocations[i].checkbox
+				if chk and chk.Parent then chk.Parent:Destroy() end
+				table.remove(savedLocations, i)
+			end
+		end
+		recalcTp()
+	end)
+
+	-- Search filter for Teleport tab
+	local function applySearchTp()
+		local q = string.lower(searchBox.Text or "")
+		for _,row in ipairs(tpScroll:GetChildren()) do
+			if row:IsA("Frame") and row ~= btnBar then
+				local label = tostring(row:GetAttribute("label") or "")
+				row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
+			end
+		end
+		recalcTp()
+	end
+
+	-- Hook search to active tab
+	local activeTab = "Player"
+	local function applySearch()
+		if activeTab == "Player" then
+			applySearchPlayer()
+		else
+			applySearchTp()
+		end
+	end
+	searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
+
+	-- Tab switching
+	local function showTab(name)
+		activeTab = name
+		playerScroll.Visible = (name == "Player")
+		tpScroll.Visible = (name == "Teleport")
+		applySearch()
+	end
+	tabPlayerBtn.MouseButton1Click:Connect(function() showTab("Player") end)
+	tabTpBtn.MouseButton1Click:Connect(function() showTab("Teleport") end)
+	showTab("Player")
+
+	-- Minimize / Close
+	local minimized = false
+	btnMin.MouseButton1Click:Connect(function()
+		minimized = not minimized
+		playerScroll.Visible = not minimized and activeTab == "Player"
+		tpScroll.Visible = not minimized and activeTab == "Teleport"
+		tabs.Visible = not minimized
+		frame.Size = minimized and UDim2.fromOffset(420, 56) or UDim2.fromOffset(420, 420)
+	end)
+
+	btnClose.MouseButton1Click:Connect(function()
+		MainGUI.Enabled = false
+		showPill()
+	end)
 
 	-- Drag window
 	local draggingFrame = false
@@ -614,6 +835,12 @@ local function createUI()
 		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 			draggingFrame = false
 		end
+	end)
+
+	-- Aktifkan panel setelah 5 detik
+	task.delay(5, function()
+		overlay:Destroy()
+		MainGUI.Enabled = true
 	end)
 end
 
