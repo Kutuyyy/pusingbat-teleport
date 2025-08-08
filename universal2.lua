@@ -273,8 +273,9 @@ local function createUI()
 	text.Parent = textBg
 
 	task.delay(5, function()
-		overlay:Destroy()
-	end)
+    overlay:Destroy()
+    if MainGUI then MainGUI.Enabled = true end  -- <- tampilkan panel setelah loading
+    end)
 
 	-- Panel utama
 	if MainGUI then MainGUI:Destroy() end
@@ -283,6 +284,7 @@ local function createUI()
 	MainGUI.ResetOnSpawn = false
 	MainGUI.IgnoreGuiInset = true
 	MainGUI.Parent = PlayerGui
+    MainGUI.Enabled = false  -- <- panel disembunyikan dulu sampai loading selesai
 
 	local frame = Instance.new("Frame")
 	frame.Name = "MainFrame"
