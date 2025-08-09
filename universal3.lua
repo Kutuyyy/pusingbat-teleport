@@ -1,43 +1,41 @@
---[[
-    Pusingbat Hub (LocalScript UI Bawaan)
-    Tabs: Main • Misc • Teleport • Config
-    Fitur:
-      • Loading overlay 5 detik (50% transparansi) "Created by Pusingbat" + panel teks ber-background 50%
-      • Header: "Created by pusingbat" + Search (ikon) / Minimize / Close
-      • Search memfilter konten di tab aktif
-      • Close: sembunyikan panel, munculkan tombol pill "Show Pusing"
-      • Minimize: tampilkan header saja (klik lagi untuk restore)
-      • ScrollingFrame per tab
+# Generate the updated full Lua script with mobile-friendly UI (smaller height, center position, drag clamp),
+# cloud sync (GET/PUT + usage ping), and local FS fallback.
 
-      • MAIN (Player):
-          - Fly Toggle (default OFF)
-          - NoClip Toggle
-          - Walk Speed Slider (studs) — pengaruhi jalan & kecepatan fly
-          - Jump Power Slider (studs)
-          - Inf Jump (Mobile) Toggle
-          - Inf Jump (PC) Toggle
-          - No Fall Damage Toggle
+--[[
+    Pusingbat Hub (LocalScript UI Bawaan) — Cloud + Local Fallback
+    Tabs: Main • Misc • Teleport • Config
+    Highlights:
+      • Loading overlay 5s "Created by Pusingbat" (50% bg + panel 50%)
+      • Header: "Created by pusingbat" + Search (icon) / Minimize / Close
+      • Search filters current tab
+      • Close => show pill "Show Pusing"; Minimize => header only
+      • Scroll per tab; panel tinggi diperkecil + drag clamp (ramah mobile)
+      • Cloud sync ke server kamu (usage ping + config/export save/load), fallback ke local FS, lalu in-memory
+
+      • MAIN:
+          - Fly toggle
+          - NoClip toggle
+          - WalkSpeed slider (jalan + fly)
+          - JumpPower slider
+          - Inf Jump (Mobile/PC) toggles
+          - No Fall Damage toggle
 
       • MISC:
-          - Fullbright (Terang Terus) Toggle
-          - Field of View Slider (60-120)
-          - Remove Fog Toggle
+          - Fullbright toggle
+          - Field of View slider
+          - Remove Fog toggle
 
       • TELEPORT:
-          - Add Current Location (prompt nama)
-          - Delete Selected
-          - Klik entry untuk teleport
-          - Export Locations (minta nama)
-          - Import Locations (list exports)
+          - Add/Delete/Teleport
+          - Export/Import (pakai cloud + fallback FS)
 
       • CONFIG:
-          - Input nama config
-          - Save config (menyimpan semua toggle/slider)
-          - Daftar config (Load / Delete)
-          - Set Auto Load (pilih satu); saat script start akan auto-apply
+          - Save/Load/Delete config
+          - Auto Load picker (persist)
+          - Autoload applied on start
 
-    Letakkan sebagai LocalScript di StarterPlayer > StarterPlayerScripts
-]]--
+    Tempatkan sebagai LocalScript di StarterPlayer > StarterPlayerScripts
+]]--'''
 
 -- Services
 local Players = game:GetService("Players")
@@ -50,8 +48,8 @@ local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ====== State ======
-local MIN_WALK, MAX_WALK = 8, 200     -- WalkSpeed range
-local MIN_JUMP, MAX_JUMP = 25, 300    -- JumpPower range
+local MIN_WALK, MAX_WALK = 8, 200
+local MIN_JUMP, MAX_JUMP = 25, 300
 local walkSpeed = 16
 local jumpPower = 50
 
@@ -73,8 +71,8 @@ local lastFreefallHealth
 local lastFreefallT
 
 -- Lighting originals (untuk restore)
-local savedLighting -- table of original values saat Fullbright ON pertama kali
-local savedAtmos -- original Atmosphere
+local savedLighting
+local savedAtmos
 
 -- Teleport
 local savedLocations = {}
@@ -135,14 +133,12 @@ local function writeJSON(path, tbl)
     local ok = pcall(function() fs.write(path, jsonEncode(tbl)) end)
     return ok
 end
-
 local function readJSON(path)
     if not fs.available or not fs.exists(path) then return nil end
     local ok, data = pcall(function() return fs.read(path) end)
     if not ok then return nil end
     return jsonDecode(data)
 end
-
 local function listJSON(dir)
     local out = {}
     if not fs.available or not fs.list then return out end
@@ -153,7 +149,6 @@ local function listJSON(dir)
     end)
     return out
 end
-
 local function sanitizeName(name)
     name = tostring(name or "")
     name = name:gsub("[^%w%-%._]", "-")
@@ -164,10 +159,8 @@ end
 local function loadAllFromDisk()
     if not fs.available then return end
     ensureDirs()
-    -- settings
     local s = readJSON(SETTINGS_FILE)
     if s and type(s.autoload)=="string" then autoloadName = s.autoload end
-    -- configs
     for _,p in ipairs(listJSON(CFG_DIR)) do
         local data = readJSON(p)
         if data then
@@ -175,7 +168,6 @@ local function loadAllFromDisk()
             configs[nm] = data
         end
     end
-    -- exports
     for _,p in ipairs(listJSON(EXP_DIR)) do
         local data = readJSON(p)
         if data then
@@ -184,31 +176,98 @@ local function loadAllFromDisk()
         end
     end
 end
-
 local function saveSettings()
     if not fs.available then return end
     ensureDirs()
     writeJSON(SETTINGS_FILE, {autoload = autoloadName})
 end
-
 local function saveConfigFile(name, tbl)
     if not fs.available then return end
     ensureDirs()
     local fn = CFG_DIR.."/"..sanitizeName(name)..".json"
     writeJSON(fn, tbl)
 end
-
 local function deleteConfigFile(name)
     if not fs.available or not fs.remove then return end
     local fn = CFG_DIR.."/"..sanitizeName(name)..".json"
     pcall(function() fs.remove(fn) end)
 end
-
 local function saveExport(name, setTbl)
     if not fs.available then return end
     ensureDirs()
     local fn = EXP_DIR.."/"..sanitizeName(name)..".json"
     writeJSON(fn, setTbl)
+end
+
+-- ====== CLOUD API (server kamu) ======
+-- executor harus support salah satu: syn.request / http_request / request / fluxus.request
+local http = (syn and syn.request) or http_request or request or (fluxus and fluxus.request) or nil
+
+-- Ganti sesuai server kamu:
+local API_BASE = "http://YOUR_SERVER_IP_OR_DOMAIN:3087"  -- TODO: set oleh kamu
+local API_KEY  = "asdasdasdasdasdasdasdasd"              -- TODO: samakan dengan server
+
+local function httpJson(method, url, tbl)
+    if not http then return nil, "no_http" end
+    local body = tbl and HttpService:JSONEncode(tbl) or ""
+    local res = http({
+        Url = url,
+        Method = method,
+        Headers = {
+            ["Content-Type"] = "application/json",
+            ["X-API-Key"] = API_KEY,
+        },
+        Body = body,
+    })
+    if not res or not res.StatusCode then return nil, "bad_response" end
+    if res.StatusCode >= 200 and res.StatusCode < 300 then
+        if res.Body and res.Body ~= "" then
+            local ok, parsed = pcall(function() return HttpService:JSONDecode(res.Body) end)
+            return ok and parsed or {}, nil
+        end
+        return {}, nil
+    end
+    return nil, "http_"..tostring(res.StatusCode)
+end
+
+local function cloudLoadUser(hwid)
+    return httpJson("GET", API_BASE.."/v1/users/"..hwid, nil)
+end
+local function cloudSaveUser(hwid, data)
+    data = data or {}
+    data.meta = data.meta or {}
+    data.meta.username = Players.LocalPlayer and Players.LocalPlayer.Name or "Unknown"
+    return httpJson("PUT", API_BASE.."/v1/users/"..hwid, data)
+end
+local function cloudUsage(username, hwid)
+    return httpJson("POST", API_BASE.."/v1/usage", {username=username, hwid=hwid})
+end
+
+-- ====== UserData cloud mirror ======
+local userData = {autoload=nil, configs={}, exports={}}
+
+local function deepCopy(t)
+    local o = {}
+    for k,v in pairs(t) do o[k] = type(v)=="table" and deepCopy(v) or v end
+    return o
+end
+local function applyUserDataToLocal(data)
+    userData = data
+    autoloadName = data.autoload
+    configs = data.configs or {}
+    exportedSets = data.exports or {}
+end
+local function pushCloud()
+    userData.autoload = autoloadName
+    userData.configs  = deepCopy(configs)
+    userData.exports  = deepCopy(exportedSets)
+    local _, err = cloudSaveUser(HWID, userData)
+    if err then
+        -- fallback: simpan lokal
+        saveSettings()
+        for name, cfg in pairs(configs) do saveConfigFile(name, cfg) end
+        for name, set in pairs(exportedSets) do saveExport(name, set) end
+    end
 end
 
 -- ====== Character helpers ======
@@ -314,7 +373,6 @@ end)
 local function setNoclip(state)
     noclip = state and true or false
 end
-
 RunService.Stepped:Connect(function()
     if not char or not root then return end
     for _, part in ipairs(char:GetDescendants()) do
@@ -466,6 +524,17 @@ local function showPill()
     ShowPillGUI = sg
 end
 
+-- clamp panel agar tidak menempel tepi layar (ramah mobile)
+local function clampToViewport(frame)
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+    local vp = cam.ViewportSize
+    local fw, fh = frame.AbsoluteSize.X, frame.AbsoluteSize.Y
+    local x = math.clamp(frame.Position.X.Offset, 8 - fw, vp.X - 8)
+    local y = math.clamp(frame.Position.Y.Offset, 8, math.max(8, vp.Y - fh - 8))
+    frame.Position = UDim2.new(0, x, 0, y)
+end
+
 local function createUI()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -513,8 +582,10 @@ local function createUI()
 
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.fromOffset(480, 480)
-    frame.Position = UDim2.new(0, 24, 0, 120)
+    -- Tinggi diperkecil agar nyaman di HP, dan nanti ada clamp
+    frame.Size = UDim2.fromOffset(430, 420)
+    -- Mulai di tengah layar (lebih enak untuk iPhone)
+    frame.Position = UDim2.new(0.5, -215, 0.5, -210)
     frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
     frame.BackgroundTransparency = 0.15
     frame.BorderSizePixel = 0
@@ -621,7 +692,7 @@ local function createUI()
 
     local function makeTabButton(text, xOffset)
         local b = Instance.new("TextButton")
-        b.Size = UDim2.fromOffset(110, 28)
+        b.Size = UDim2.fromOffset(98, 28)
         b.Position = UDim2.new(0, xOffset, 0, 0)
         b.BackgroundColor3 = Color3.fromRGB(45,45,50)
         b.TextColor3 = Color3.fromRGB(230,230,230)
@@ -635,9 +706,9 @@ local function createUI()
     end
 
     local tabMainBtn   = makeTabButton("Main", 0)
-    local tabMiscBtn   = makeTabButton("Misc", 116)
-    local tabTpBtn     = makeTabButton("Teleport", 232)
-    local tabCfgBtn    = makeTabButton("Config", 348)
+    local tabMiscBtn   = makeTabButton("Misc", 104)
+    local tabTpBtn     = makeTabButton("Teleport", 208)
+    local tabCfgBtn    = makeTabButton("Config", 312)
 
     -- Scrolling content per tab
     local function makeScroll()
@@ -973,6 +1044,7 @@ local function createUI()
             table.insert(savedLocations, locationData)
             createLocationEntry(locationData)
             recalcTp()
+            pushCloud() -- optional: langsung sync lokasi terbaru
         end)
     end)
 
@@ -985,6 +1057,7 @@ local function createUI()
             end
         end
         recalcTp()
+        pushCloud()
     end)
 
     exportBtn.MouseButton1Click:Connect(function()
@@ -996,14 +1069,23 @@ local function createUI()
                 copy[#copy+1] = {name=loc.name, position=loc.position}
             end
             exportedSets[name] = copy
-            -- persist ke file kalau FS tersedia
-            saveExport(name, copy)
+            saveExport(name, copy) -- fallback
+            pushCloud()
         end)
     end)
 
     importBtn.MouseButton1Click:Connect(function()
-        -- rebuild exportedSets dari disk kalau ada (biar up to date)
-        loadAllFromDisk()
+        -- refresh dari cloud dulu (kalau bisa), lalu lokal
+        do
+            local data, err = cloudLoadUser(HWID)
+            if data and not err then
+                if data.exports then exportedSets = data.exports end
+            else
+                -- fallback lokal
+                loadAllFromDisk()
+            end
+        end
+
         -- popup list
         local popup = Instance.new("ScreenGui")
         popup.Name = "PB_ImportList"
@@ -1053,6 +1135,7 @@ local function createUI()
                 end
                 recalcTp()
                 popup:Destroy()
+                pushCloud()
             end)
         end
         local closeB = Instance.new("TextButton")
@@ -1227,13 +1310,14 @@ local function createUI()
             loadB.MouseButton1Click:Connect(function() applySettings(s) end)
             autoB.MouseButton1Click:Connect(function()
                 autoloadName = (autoloadName==name) and nil or name
-                saveSettings()
+                saveSettings() -- fallback
+                pushCloud()
                 rebuildCfgList()
             end)
             delB.MouseButton1Click:Connect(function()
                 configs[name] = nil
-                deleteConfigFile(name)
-                if autoloadName == name then autoloadName = nil; saveSettings() end
+                deleteConfigFile(name) -- fallback
+                if autoloadName == name then autoloadName = nil; saveSettings(); pushCloud() end
                 rebuildCfgList()
             end)
         end
@@ -1242,17 +1326,18 @@ local function createUI()
     saveBtn.MouseButton1Click:Connect(function()
         local nm = nameBox.Text ~= "" and nameBox.Text or ("config-"..tostring(os.time()))
         configs[nm] = getCurrentSettings()
-        saveConfigFile(nm, configs[nm])
+        saveConfigFile(nm, configs[nm]) -- fallback
+        pushCloud()
         rebuildCfgList()
     end)
 
     -- Tab switching
     local function showTab(name)
-        activeTab = name
         mainScroll.Visible = (name == "Main")
         miscScroll.Visible = (name == "Misc")
         tpScroll.Visible   = (name == "Teleport")
         cfgScroll.Visible  = (name == "Config")
+        activeTab = name
         applySearch()
     end
     tabMainBtn.MouseButton1Click:Connect(function() showTab("Main") end)
@@ -1270,15 +1355,15 @@ local function createUI()
         tpScroll.Visible   = not minimized and activeTab == "Teleport"
         cfgScroll.Visible  = not minimized and activeTab == "Config"
         tabs.Visible = not minimized
-        frame.Size = minimized and UDim2.fromOffset(480, 56) or UDim2.fromOffset(480, 480)
+        frame.Size = minimized and UDim2.fromOffset(430, 56) or UDim2.fromOffset(430, 420)
+        clampToViewport(frame)
     end)
-
     btnClose.MouseButton1Click:Connect(function()
         MainGUI.Enabled = false
         showPill()
     end)
 
-    -- Drag window
+    -- Drag window + clamp
     local draggingFrame = false
     local dragStart
     local startPos
@@ -1293,11 +1378,13 @@ local function createUI()
         if draggingFrame and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            clampToViewport(frame)
         end
     end)
     drag.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             draggingFrame = false
+            clampToViewport(frame)
         end
     end)
 
@@ -1307,23 +1394,37 @@ local function createUI()
         MainGUI.Enabled = true
         -- Auto-load config jika ada
         if autoloadName and configs[autoloadName] then
-            -- apply melalui setter agar state & UI sinkron
-            local s = configs[autoloadName]
-            -- Manfaatkan fungsi applySettings:
-            local function deferApply() applySettings(s) end
-            task.defer(deferApply)
+            task.defer(function() applySettings(configs[autoloadName]) end)
         end
         -- Set FOV awal
         setFOV(defaultFOV)
+        -- clamp lokasi awal
+        clampToViewport(frame)
     end)
 
-    -- Build awal list config dari disk
+    -- Build awal list config
     rebuildCfgList()
 end
 
 -- ====== Init ======
--- Load persisted data first (FS based)
-loadAllFromDisk()
+-- cloud usage ping (abaikan error)
+pcall(function()
+    local uname = Players.LocalPlayer and Players.LocalPlayer.Name or "Unknown"
+    cloudUsage(uname, HWID)
+end)
+
+-- Prefer cloud; fallback local; terakhir memory
+do
+    local data, err = cloudLoadUser(HWID)
+    if data and not err then
+        applyUserDataToLocal(data)
+    else
+        loadAllFromDisk()
+        userData.autoload = autoloadName
+        userData.configs = configs
+        userData.exports = exportedSets
+    end
+end
 
 getCharacter()
 attachFly()
