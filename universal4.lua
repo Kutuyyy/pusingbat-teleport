@@ -6,17 +6,17 @@
 ]]--
 
 -- ========== KONFIG SERVER ==========
-local SERVER_BASE = "https://deep-factual-goat.ngrok-free.app"  -- GANTI dengan URL ngrok kamu
-local API_KEY     = "asdasdasdasdasdasdasdasd"             -- GANTI dengan API key server.js kamu
+local SERVER_BASE = "https://c437232dda4d.ngrok-free.app"  -- GANTI dengan URL ngrok kamu
+local API_KEY     = "asdasdasdasdasdasdasdasd"             -- GANTI dengan API key server.py kamu
 
 -- ========== Services ==========
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
 local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 local USERNAME = LocalPlayer and LocalPlayer.Name or "unknown"
@@ -139,7 +139,7 @@ local function apiGetUser(hwid)
         Headers = { ["X-API-Key"] = API_KEY }
     })
     if res and res.StatusCode == 200 then return true, jsonDecode(res.Body) end
-    return false, nil
+    return false, res
 end
 local function apiPutUser(hwid, bodyTbl)
     local res = rawRequest({
@@ -161,11 +161,12 @@ local function apiPostUsage(username, hwid)
 end
 
 local function tryLoadFromServer()
-    local ok, data = apiGetUser(HWID)
-    if not ok or not data then
+    local ok, dataOrRes = apiGetUser(HWID)
+    if not ok then
         serverOnline = false
         return
     end
+    local data = dataOrRes
     serverOnline = true
     autoloadName = data.autoload
     configs = data.configs or {}
@@ -389,6 +390,44 @@ end
 local MainGUI
 local ShowPillGUI
 
+-- ========= Shared Teleport Settings (mode, duration, easing) =========
+-- dipakai oleh teleport ke Player dan teleport ke Location
+local tpMode = "Instant"
+local tweenDuration = 1.0
+local easeStyles = {
+    {"QuadOut",  Enum.EasingStyle.Quad,    Enum.EasingDirection.Out},
+    {"QuadIn",   Enum.EasingStyle.Quad,    Enum.EasingDirection.In},
+    {"SineOut",  Enum.EasingStyle.Sine,    Enum.EasingDirection.Out},
+    {"Linear",   Enum.EasingStyle.Linear,  Enum.EasingDirection.InOut},
+    {"BackOut",  Enum.EasingStyle.Back,    Enum.EasingDirection.Out},
+    {"CubicOut", Enum.EasingStyle.Cubic,   Enum.EasingDirection.Out},
+}
+local easeIdx = 1
+local teleporting = false
+local function teleportToPosition(dest)
+    if not root then return end
+    if tpMode == "Instant" then
+        root.CFrame = CFrame.new(dest)
+        return
+    end
+    if teleporting then return end
+    teleporting = true
+    local wasFly = fly
+    if wasFly then setFly(false) end
+    local info = TweenInfo.new(
+        math.max(0.05, tweenDuration),
+        easeStyles[easeIdx][2],
+        easeStyles[easeIdx][3],
+        0,false,0
+    )
+    local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
+    tw:Play()
+    tw.Completed:Connect(function()
+        teleporting = false
+        if wasFly then setFly(true) end
+    end)
+end
+
 local function showPill()
     if ShowPillGUI then ShowPillGUI:Destroy() end
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -420,46 +459,6 @@ end
 
 local function createUI()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-    -- ===== TELEPORT =====
-    local function createTpRow(h) return createRow(tpScroll, h) end
-    Shared Teleport Settings (Mode, Duration, Easing)
-    local tpMode = "Instant"
-    local tweenDuration = 1.0
-    local easeStyles = {
-        {"QuadOut",  Enum.EasingStyle.Quad,    Enum.EasingDirection.Out},
-        {"QuadIn",   Enum.EasingStyle.Quad,    Enum.EasingDirection.In},
-        {"SineOut",  Enum.EasingStyle.Sine,    Enum.EasingDirection.Out},
-        {"Linear",   Enum.EasingStyle.Linear,  Enum.EasingDirection.InOut},
-        {"BackOut",  Enum.EasingStyle.Back,    Enum.EasingDirection.Out},
-        {"CubicOut", Enum.EasingStyle.Cubic,   Enum.EasingDirection.Out},
-    }
-    local easeIdx = 1
-
-    local teleporting = false
-    local function teleportToPosition(dest)
-        if not root then return end
-        if tpMode == "Instant" then
-            root.CFrame = CFrame.new(dest)
-            return
-        end
-        -- Tween
-        if teleporting then return end
-        teleporting = true
-        local wasFly = fly
-        if wasFly then setFly(false) end
-        local info = TweenInfo.new(
-            math.max(0.05, tweenDuration),
-            easeStyles[easeIdx][2],
-            easeStyles[easeIdx][3],
-            0,false,0
-        )
-        local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
-        tw:Play()
-        tw.Completed:Connect(function()
-            teleporting = false
-            if wasFly then setFly(true) end
-        end)
-    end
 
     -- Loading overlay 5 detik
     local overlay = Instance.new("ScreenGui")
@@ -494,25 +493,25 @@ local function createUI()
     text.TextColor3 = Color3.fromRGB(255,255,255)
     text.Parent = textBg
 
-    -- Panel utama (kompak + clip)
+    -- Panel utama
     if MainGUI then MainGUI:Destroy() end
     MainGUI = Instance.new("ScreenGui")
     MainGUI.Name = "PusingbatController"
     MainGUI.ResetOnSpawn = false
     MainGUI.IgnoreGuiInset = true
-    MainGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling -- UI FIX: layering stabil
+    MainGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     MainGUI.Parent = PlayerGui
     MainGUI.Enabled = false
 
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.fromOffset(420, 360)              -- sedikit lebih pendek biar aman di iPhone
+    frame.Size = UDim2.fromOffset(420, 360)
     frame.Position = UDim2.new(0, 24, 0, 120)
     frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
     frame.BackgroundTransparency = 0.15
     frame.BorderSizePixel = 0
     frame.Active = true
-    frame.ClipsDescendants = true                        -- UI FIX: cegah konten keluar panel
+    frame.ClipsDescendants = true
     frame.Parent = MainGUI
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
@@ -626,7 +625,7 @@ local function createUI()
     local tabTpBtn   = makeTabButton("Teleport", 216)
     local tabCfgBtn  = makeTabButton("Config", 324)
 
-    -- Scroll builder (UI FIX: clips + padding)
+    -- Scroll builder
     local function makeScroll()
         local scroll = Instance.new("ScrollingFrame")
         scroll.Size = UDim2.new(1, -16, 1, -88)
@@ -636,7 +635,7 @@ local function createUI()
         scroll.CanvasSize = UDim2.new(0,0,0,0)
         scroll.ScrollBarThickness = 6
         scroll.Visible = false
-        scroll.ClipsDescendants = true            -- UI FIX
+        scroll.ClipsDescendants = true
         scroll.AutomaticCanvasSize = Enum.AutomaticSize.None
         scroll.Parent = frame
 
@@ -648,7 +647,7 @@ local function createUI()
 
         local pad = Instance.new("UIPadding")
         pad.PaddingTop = UDim.new(0, 6)
-        pad.PaddingBottom = UDim.new(0, 12)      -- UI FIX: cegah spill bawah
+        pad.PaddingBottom = UDim.new(0, 12)
         pad.PaddingLeft = UDim.new(0, 4)
         pad.PaddingRight = UDim.new(0, 4)
         pad.Parent = scroll
@@ -792,7 +791,7 @@ local function createUI()
         return {Row=row, Set=function(v) local pct=(math.clamp(v,minV,maxV)-minV)/(maxV-minV); setFromPct(pct) end}
     end
 
-    -- ===== MAIN =====
+-- ===== MAIN =====
     local flySw = makeSwitch(mainScroll, "Fly", false, function(v) setFly(v) end)
     local ncSw  = makeSwitch(mainScroll, "NoClip (tembus)", false, function(v) setNoclip(v) end)
     local wsSl  = makeSlider(mainScroll, "Walk Speed (studs)", MIN_WALK, MAX_WALK, walkSpeed, function(v) walkSpeed = v; ensurePhysics() end)
@@ -807,9 +806,13 @@ local function createUI()
     local rfSw  = makeSwitch(miscScroll, "Remove Fog", false, function(v) setRemoveFog(v) end)
 
     -- ===== TELEPORT =====
-    local function createTpRow(h) return createRow(tpScroll, h) end
+    local function createTpRow(h) 
+        return createRow(tpScroll, h) 
+    end
 
-    -- ▼▼▼ Teleport to Player (Instant/Tween) ▼▼▼
+    ----------------------------------------------------------------
+    -- Teleport to Player (Picker + Distance + Mode/Duration/Easing)
+    ----------------------------------------------------------------
     local tpToPlayerTitle = createTpRow(28)
     tpToPlayerTitle.BackgroundTransparency = 1
     local tptpLabel = Instance.new("TextLabel")
@@ -823,7 +826,6 @@ local function createUI()
     tptpLabel.TextSize = 14
     tptpLabel.Parent = tpToPlayerTitle
 
-    -- Row: Player Picker + Refresh
     local pickerRow = createTpRow(56)
     pickerRow:SetAttribute("label","Teleport to Player")
 
@@ -869,7 +871,6 @@ local function createUI()
     refreshBtn.Parent = pickerRow
     Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0,6)
 
-    -- Popup list pemain
     local selectedPlayerName = nil
     local function openPlayerPopup()
         local pg = LocalPlayer:WaitForChild("PlayerGui")
@@ -950,7 +951,6 @@ local function createUI()
         end
     end)
 
-    -- Update distance realtime (ketika tab Teleport aktif)
     RunService.RenderStepped:Connect(function()
         if not tpScroll.Visible then return end
         if selectedPlayerName and root then
@@ -966,7 +966,7 @@ local function createUI()
         end
     end)
 
-    -- Row: Mode (Instant / Tween)
+    -- Mode Instant / Tween
     local modeRow = createTpRow(40)
     local modeLbl = Instance.new("TextLabel")
     modeLbl.BackgroundTransparency = 1
@@ -997,18 +997,15 @@ local function createUI()
     modeTween.Parent = modeRow
     Instance.new("UICorner", modeTween).CornerRadius = UDim.new(0,6)
 
-    local tpMode = "Instant"
     local function setMode(m)
         tpMode = m
         modeInstant.BackgroundColor3 = (m=="Instant") and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
         modeTween.BackgroundColor3   = (m=="Tween")   and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
     end
+    modeInstant.MouseButton1Click:Connect(function() setMode("Instant") end)
+    modeTween.MouseButton1Click:Connect(function() setMode("Tween") end)
 
-    local function setDurPct(p)
-    p = math.clamp(p,0,1)
-    tweenDuration = math.floor(((0.2 + 4.8*p)*10)+0.5)/10
-
-    -- Row: Durasi Tween + Easing
+    -- Duration + Easing
     local tweenRow = createTpRow(58)
     tweenRow:SetAttribute("label","Tween Settings")
     local durLbl = Instance.new("TextLabel")
@@ -1031,7 +1028,7 @@ local function createUI()
     Instance.new("UICorner", bar).CornerRadius = UDim.new(0,8)
 
     local fill = Instance.new("Frame")
-    fill.Size = UDim2.new(0.2, 0, 1, 0) -- 20% = 1.0s dari rentang 0.2..5.0
+    fill.Size = UDim2.new(0.2, 0, 1, 0)
     fill.BackgroundColor3 = Color3.fromRGB(0,170,255)
     fill.BorderSizePixel = 0
     fill.Parent = bar
@@ -1045,11 +1042,9 @@ local function createUI()
     knob.Parent = bar
     Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 
-    local tweenDuration = 1.0
     local dragging = false
     local function setDurPct(p)
         p = math.clamp(p, 0, 1)
-        -- rentang 0.2s .. 5.0s (logik: 0 => 0.2, 1 => 5.0)
         tweenDuration = math.floor(((0.2 + 4.8 * p) * 10) + 0.5) / 10
         fill.Size = UDim2.new(p, 0, 1, 0)
         knob.Position = UDim2.new(p, -9, 0.5, -9)
@@ -1084,41 +1079,24 @@ local function createUI()
     easeBtn.Parent = tweenRow
     Instance.new("UICorner", easeBtn).CornerRadius = UDim.new(0,6)
 
-    local easeStyles = {
-        {"QuadOut",  Enum.EasingStyle.Quad,    Enum.EasingDirection.Out},
-        {"QuadIn",   Enum.EasingStyle.Quad,    Enum.EasingDirection.In},
-        {"SineOut",  Enum.EasingStyle.Sine,    Enum.EasingDirection.Out},
-        {"Linear",   Enum.EasingStyle.Linear,  Enum.EasingDirection.InOut},
-        {"BackOut",  Enum.EasingStyle.Back,    Enum.EasingDirection.Out},
-        {"CubicOut", Enum.EasingStyle.Cubic,   Enum.EasingDirection.Out},
-    }
-    local easeIdx = 1
     local function cycleEase()
         easeIdx = easeIdx % #easeStyles + 1
         easeBtn.Text = "Easing: "..easeStyles[easeIdx][1]
     end
     easeBtn.MouseButton1Click:Connect(cycleEase)
 
-    -- Row: Tombol Teleport
+    -- Tombol Teleport Now (target player)
     local goRow = createTpRow(40)
     local goBtn = Instance.new("TextButton")
     goBtn.Size = UDim2.new(1, -20, 1, -10)
     goBtn.Position = UDim2.new(0,10,0,5)
-    goBtn.Text = "Teleport Now"
+    goBtn.Text = "Teleport to Target Player"
     goBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
     goBtn.TextColor3 = Color3.new(1,1,1)
     goBtn.BorderSizePixel = 0
     goBtn.Parent = goRow
     Instance.new("UICorner", goBtn).CornerRadius = UDim.new(0,8)
 
-    local function getTargetHRP()
-        if not selectedPlayerName then return nil end
-        local plr = Players:FindFirstChild(selectedPlayerName)
-        if not plr or not plr.Character then return nil end
-        return plr.Character:FindFirstChild("HumanoidRootPart")
-    end
-
-    local teleporting = false
     local function teleportToTarget()
         if not root then return end
         if not selectedPlayerName then return end
@@ -1128,43 +1106,10 @@ local function createUI()
         if not hrp then return end
         teleportToPosition(hrp.Position + Vector3.new(0,3,0))
     end
-
-
-        -- posisi target + offset kecil (supaya tidak clip)
-        local dest = targetHRP.Position + Vector3.new(0, 3, 0)
-
-        if tpMode == "Instant" then
-            root.CFrame = CFrame.new(dest)
-            return
-        end
-
-        -- Tween mode
-        teleporting = true
-        -- matikan fly saat tween agar tidak melawan kecepatan
-        local oldFly = fly
-        if oldFly then setFly(false) end
-
-        local tweenInfo = TweenInfo.new(
-            math.max(0.05, tweenDuration),
-            easeStyles[easeIdx][2],
-            easeStyles[easeIdx][3],
-            0, false, 0
-        )
-
-        -- Tween CFrame root
-        local tween = TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(dest)})
-        tween:Play()
-        tween.Completed:Connect(function()
-            teleporting = false
-            if oldFly then setFly(true) end
-        end)
-    end
-
     goBtn.MouseButton1Click:Connect(teleportToTarget)
 
-    -- Auto update list & label jika player join/leave
+    -- Auto update target jika keluar/masuk
     local function onRosterChange()
-        -- kalau target keluar, kosongkan pilihan
         if selectedPlayerName then
             local still = Players:FindFirstChild(selectedPlayerName)
             if not still then
@@ -1175,9 +1120,10 @@ local function createUI()
     end
     Players.PlayerAdded:Connect(onRosterChange)
     Players.PlayerRemoving:Connect(onRosterChange)
-    -- ▲▲▲ End Teleport to Player ▲▲▲
 
-    -- Bar Add/Delete
+    -----------------------------------------------------
+    -- Bar Add/Delete Saved Locations
+    -----------------------------------------------------
     local btnBar = createTpRow(40)
     btnBar.BackgroundTransparency = 1
     local addBtn = Instance.new("TextButton")
@@ -1203,7 +1149,9 @@ local function createUI()
     delBtn.Parent = btnBar
     Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0,8)
 
+    -----------------------------------------------------
     -- Bar Export/Import
+    -----------------------------------------------------
     local eximBar = createTpRow(40)
     eximBar.BackgroundTransparency = 1
     local exportBtn = Instance.new("TextButton")
@@ -1229,7 +1177,361 @@ local function createUI()
     importBtn.Parent = eximBar
     Instance.new("UICorner", importBtn).CornerRadius = UDim.new(0,8)
 
-        -- ======= Auto Tour (teleport berurutan) =======
+    -----------------------------------------------------
+    -- List Entry Builder (tiap lokasi)
+    -----------------------------------------------------
+    local function createLocationEntry(locationData)
+        local entry = createTpRow(56)
+
+        local checkbox = Instance.new("TextButton")
+        checkbox.Size = UDim2.fromOffset(26, 26)
+        checkbox.Position = UDim2.new(0, 10, 0.5, -13)
+        checkbox.Text = ""
+        checkbox.BackgroundColor3 = Color3.fromRGB(80,80,80)
+        checkbox.BorderSizePixel = 0
+        checkbox.Parent = entry
+        Instance.new("UICorner", checkbox).CornerRadius = UDim.new(0, 6)
+        locationData.checkbox = checkbox
+
+        local tpBtn = Instance.new("TextButton")
+        tpBtn.Size = UDim2.new(1, -56, 0.5, -4)
+        tpBtn.Position = UDim2.new(0, 46, 0, 6)
+        tpBtn.Text = locationData.name
+        tpBtn.Font = Enum.Font.GothamBold
+        tpBtn.TextSize = 14
+        tpBtn.TextColor3 = Color3.new(1,1,1)
+        tpBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
+        tpBtn.BorderSizePixel = 0
+        tpBtn.Parent = entry
+        Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+
+        local info = Instance.new("TextLabel")
+        info.Size = UDim2.new(1, -56, 0.5, -4)
+        info.Position = UDim2.new(0, 46, 0.5, 2)
+        info.BackgroundTransparency = 1
+        info.TextColor3 = Color3.fromRGB(200,200,200)
+        info.TextXAlignment = Enum.TextXAlignment.Left
+        info.Font = Enum.Font.Gotham
+        info.TextSize = 13
+        info.Parent = entry
+
+        local function setInfoFromPos(pos)
+            local v = (typeof(pos)=="Vector3") and pos or unpackVec3(pos)
+            if v then
+                info.Text = string.format("X: %.1f, Y: %.1f, Z: %.1f", v.X, v.Y, v.Z)
+            else
+                info.Text = "Invalid position"
+            end
+        end
+        setInfoFromPos(locationData.position)
+
+        checkbox.MouseButton1Click:Connect(function()
+            locationData.selected = not locationData.selected
+            checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+        end)
+
+        tpBtn.MouseButton1Click:Connect(function()
+            local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+            local hrp = character:WaitForChild("HumanoidRootPart")
+            local v = (typeof(locationData.position)=="Vector3") and locationData.position or unpackVec3(locationData.position)
+            if v then
+                teleportToPosition(Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0))
+            else
+                dprint("teleport failed: invalid position for", locationData.name)
+            end
+        end)
+
+        entry:SetAttribute("label", string.lower(locationData.name))
+        return entry
+    end
+
+    -----------------------------------------------------
+    -- Prompt nama (reusable)
+    -----------------------------------------------------
+    local function promptName(defaultText, titleText, onSave)
+        local prompt = Instance.new("ScreenGui")
+        prompt.Name = "PB_Prompt"
+        prompt.Parent = PlayerGui
+        local f = Instance.new("Frame")
+        f.Size = UDim2.fromOffset(300, 150)
+        f.Position = UDim2.new(0.5, -150, 0.5, -75)
+        f.BackgroundColor3 = Color3.fromRGB(50,50,50)
+        f.BorderSizePixel = 0
+        f.Parent = prompt
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+        local titleLbl = Instance.new("TextLabel")
+        titleLbl.Size = UDim2.new(1, 0, 0, 30)
+        titleLbl.BackgroundColor3 = Color3.fromRGB(70,70,70)
+        titleLbl.Text = titleText
+        titleLbl.TextColor3 = Color3.new(1,1,1)
+        titleLbl.Parent = f
+        local tb = Instance.new("TextBox")
+        tb.Size = UDim2.new(1, -20, 0, 30)
+        tb.Position = UDim2.new(0, 10, 0, 40)
+        tb.Text = defaultText
+        tb.BackgroundColor3 = Color3.fromRGB(30,30,30)
+        tb.TextColor3 = Color3.new(1,1,1)
+        tb.Parent = f
+        local save = Instance.new("TextButton")
+        save.Size = UDim2.new(0.5, -15, 0, 30)
+        save.Position = UDim2.new(0, 10, 1, -40)
+        save.Text = "Save"
+        save.BackgroundColor3 = Color3.fromRGB(0,120,0)
+        save.TextColor3 = Color3.new(1,1,1)
+        save.Parent = f
+        local cancel = Instance.new("TextButton")
+        cancel.Size = UDim2.new(0.5, -15, 0, 30)
+        cancel.Position = UDim2.new(0.5, 5, 1, -40)
+        cancel.Text = "Cancel"
+        cancel.BackgroundColor3 = Color3.fromRGB(120,0,0)
+        cancel.TextColor3 = Color3.new(1,1,1)
+        cancel.Parent = f
+
+        save.MouseButton1Click:Connect(function()
+            local name = (tb.Text ~= "" and tb.Text) or defaultText
+            prompt:Destroy()
+            onSave(name)
+        end)
+        cancel.MouseButton1Click:Connect(function() prompt:Destroy() end)
+    end
+
+    -----------------------------------------------------
+    -- Add/Delete handlers
+    -----------------------------------------------------
+    addBtn.MouseButton1Click:Connect(function()
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = character:WaitForChild("HumanoidRootPart")
+        local defaultName = "Location "..tostring(#savedLocations + 1)
+        promptName(defaultName, "Name this location:", function(name)
+            local locationData = {name=name, position=hrp.Position, selected=false}
+            table.insert(savedLocations, locationData)
+            createLocationEntry(locationData)
+            recalcTp()
+        end)
+    end)
+
+    delBtn.MouseButton1Click:Connect(function()
+        for i = #savedLocations, 1, -1 do
+            if savedLocations[i].selected then
+                local chk = savedLocations[i].checkbox
+                if chk and chk.Parent then chk.Parent:Destroy() end
+                table.remove(savedLocations, i)
+            end
+        end
+        recalcTp()
+    end)
+
+    -----------------------------------------------------
+    -- Export ke server (ikut mode data server.py)
+    -----------------------------------------------------
+    exportBtn.MouseButton1Click:Connect(function()
+        if #savedLocations == 0 then return end
+        if not serverOnline then dprint("export: server offline"); return end
+
+        local defaultName = "Export "..tostring(os.time())
+        promptName(defaultName, "Export as:", function(name)
+            local copy = {}
+            for _, loc in ipairs(savedLocations) do
+                local p = packVec3(loc.position)
+                if p then
+                    copy[#copy+1] = { name = loc.name, position = p }
+                else
+                    dprint("skip export; invalid position on", loc.name)
+                end
+            end
+            exportedSets[name] = copy
+
+            local body = {
+                autoload = autoloadName,
+                configs  = configs,
+                exports  = normalizeExportsForSend(exportedSets),
+                meta     = { username = USERNAME }
+            }
+            apiPutUser(HWID, body)
+        end)
+    end)
+
+    -----------------------------------------------------
+    -- Import popup (Load/Delete)
+    -----------------------------------------------------
+    importBtn.MouseButton1Click:Connect(function()
+        if serverOnline then
+            local ok,data = apiGetUser(HWID)
+            if ok and data then
+                exportedSets = data.exports or exportedSets
+            end
+        end
+
+        local popup = Instance.new("ScreenGui")
+        popup.Name = "PB_ImportList"
+        popup.ResetOnSpawn = false
+        popup.Parent = PlayerGui
+
+        local f = Instance.new("Frame")
+        f.Size = UDim2.fromOffset(360, 320)
+        f.Position = UDim2.new(0.5, -180, 0.5, -160)
+        f.BackgroundColor3 = Color3.fromRGB(45,45,50)
+        f.BorderSizePixel = 0
+        f.Parent = popup
+        f.ClipsDescendants = true
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -12, 0, 30)
+        lbl.Position = UDim2.new(0, 6, 0, 6)
+        lbl.BackgroundColor3 = Color3.fromRGB(70,70,70)
+        lbl.Text = "Choose export to import"
+        lbl.TextColor3 = Color3.new(1,1,1)
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 14
+        lbl.Parent = f
+        Instance.new("UICorner", lbl).CornerRadius = UDim.new(0,6)
+
+        local list = Instance.new("ScrollingFrame")
+        list.Size = UDim2.new(1, -12, 1, -106)
+        list.Position = UDim2.new(0, 6, 0, 42)
+        list.BackgroundTransparency = 1
+        list.ScrollBarThickness = 6
+        list.ClipsDescendants = true
+        list.Parent = f
+
+        local lay = Instance.new("UIListLayout")
+        lay.Parent = list
+        lay.Padding = UDim.new(0,6)
+
+        local btnRow = Instance.new("Frame")
+        btnRow.Size = UDim2.new(1, -12, 0, 36)
+        btnRow.Position = UDim2.new(0, 6, 1, -42)
+        btnRow.BackgroundTransparency = 1
+        btnRow.Parent = f
+
+        local function styleBtn(b)
+            b.AutoButtonColor = true
+            b.BorderSizePixel = 0
+            Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+            return b
+        end
+
+        local loadBtn = styleBtn(Instance.new("TextButton"))
+        loadBtn.Size = UDim2.new(0.4, -4, 1, 0)
+        loadBtn.Position = UDim2.new(0, 0, 0, 0)
+        loadBtn.Text = "Load"
+        loadBtn.TextColor3 = Color3.new(1,1,1)
+        loadBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+        loadBtn.Parent = btnRow
+
+        local deleteBtn = styleBtn(Instance.new("TextButton"))
+        deleteBtn.Size = UDim2.new(0.4, -4, 1, 0)
+        deleteBtn.Position = UDim2.new(0.4, 8, 0, 0)
+        deleteBtn.Text = "Delete"
+        deleteBtn.TextColor3 = Color3.new(1,1,1)
+        deleteBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
+        deleteBtn.Parent = btnRow
+
+        local closeB = styleBtn(Instance.new("TextButton"))
+        closeB.Size = UDim2.new(0.2, -4, 1, 0)
+        closeB.Position = UDim2.new(0.8, 8, 0, 0)
+        closeB.Text = "Close"
+        closeB.TextColor3 = Color3.new(1,1,1)
+        closeB.BackgroundColor3 = Color3.fromRGB(90,60,60)
+        closeB.Parent = btnRow
+
+        local function setEnabled(btn, enabled, activeColor, disabledColor)
+            btn.Active = enabled
+            btn.AutoButtonColor = enabled
+            btn.BackgroundColor3 = enabled and activeColor or disabledColor
+            btn.TextTransparency = enabled and 0 or 0.35
+        end
+
+        setEnabled(loadBtn, false, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
+        setEnabled(deleteBtn, false, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
+
+        local selectedName, selectedBtn
+
+        local function rebuildList()
+            for _,ch in ipairs(list:GetChildren()) do
+                if ch:IsA("TextButton") then ch:Destroy() end
+            end
+            selectedName, selectedBtn = nil, nil
+            setEnabled(loadBtn, false, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
+            setEnabled(deleteBtn, false, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
+
+            for name,_set in pairs(exportedSets) do
+                local b = Instance.new("TextButton")
+                b.Size = UDim2.new(1, -4, 0, 28)
+                b.Text = name
+                b.BackgroundColor3 = Color3.fromRGB(60,60,70)
+                b.TextColor3 = Color3.new(1,1,1)
+                b.Parent = list
+                Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+
+                b.MouseButton1Click:Connect(function()
+                    if selectedBtn and selectedBtn ~= b then
+                        selectedBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
+                    end
+                    selectedBtn = b
+                    selectedName = name
+                    b.BackgroundColor3 = Color3.fromRGB(0,140,200)
+                    setEnabled(loadBtn, true, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
+                    setEnabled(deleteBtn, true, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
+                end)
+            end
+        end
+
+        rebuildList()
+
+        loadBtn.MouseButton1Click:Connect(function()
+            if not selectedName then return end
+            local set = exportedSets[selectedName]
+            if not set then return end
+
+            for i=#savedLocations,1,-1 do
+                local chk = savedLocations[i].checkbox
+                if chk and chk.Parent then chk.Parent:Destroy() end
+                table.remove(savedLocations,i)
+            end
+
+            for _,loc in ipairs(set) do
+                local v = unpackVec3(loc.position)
+                if v then
+                    local nd = { name=loc.name, position=v, selected=false }
+                    table.insert(savedLocations, nd)
+                    createLocationEntry(nd)
+                else
+                    dprint("skip import; invalid packed position on", tostring(loc.name))
+                end
+            end
+            recalcTp()
+            popup:Destroy()
+        end)
+
+        deleteBtn.MouseButton1Click:Connect(function()
+            if not selectedName then return end
+            if not serverOnline then dprint("delete export: server offline"); return end
+
+            exportedSets[selectedName] = nil
+
+            local body = {
+                autoload = autoloadName,
+                configs  = configs,
+                exports  = normalizeExportsForSend(exportedSets),
+                meta     = { username = USERNAME }
+            }
+            local ok,_ = apiPutUser(HWID, body)
+            if not ok then
+                dprint("delete export PUT failed")
+                return
+            end
+
+            rebuildList()
+        end)
+
+        closeB.MouseButton1Click:Connect(function() popup:Destroy() end)
+    end)
+
+    -----------------------------------------------------
+    -- Auto Tour (atas → bawah) dengan interval detik
+    -----------------------------------------------------
     local tourRow = createTpRow(58)
     tourRow:SetAttribute("label","Auto Tour")
     local tourLbl = Instance.new("TextLabel")
@@ -1246,7 +1548,7 @@ local function createUI()
     local intervalBox = Instance.new("TextBox")
     intervalBox.Size = UDim2.new(0.4, -20, 0, 26)
     intervalBox.Position = UDim2.new(0,10,0,30)
-    intervalBox.Text = "3" -- default 3 detik
+    intervalBox.Text = "3"
     intervalBox.PlaceholderText = "Interval detik"
     intervalBox.TextColor3 = Color3.new(1,1,1)
     intervalBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
@@ -1325,357 +1627,9 @@ local function createUI()
         statusLbl.Text = "Status: Stopping..."
     end)
 
-    local function createLocationEntry(locationData)
-        local entry = createTpRow(56)
-
-        local checkbox = Instance.new("TextButton")
-        checkbox.Size = UDim2.fromOffset(26, 26)
-        checkbox.Position = UDim2.new(0, 10, 0.5, -13)
-        checkbox.Text = ""
-        checkbox.BackgroundColor3 = Color3.fromRGB(80,80,80)
-        checkbox.BorderSizePixel = 0
-        checkbox.Parent = entry
-        Instance.new("UICorner", checkbox).CornerRadius = UDim.new(0, 6)
-        locationData.checkbox = checkbox
-
-        local tpBtn = Instance.new("TextButton")
-        tpBtn.Size = UDim2.new(1, -56, 0.5, -4)
-        tpBtn.Position = UDim2.new(0, 46, 0, 6)
-        tpBtn.Text = locationData.name
-        tpBtn.Font = Enum.Font.GothamBold
-        tpBtn.TextSize = 14
-        tpBtn.TextColor3 = Color3.new(1,1,1)
-        tpBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
-        tpBtn.BorderSizePixel = 0
-        tpBtn.Parent = entry
-        Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
-
-        local info = Instance.new("TextLabel")
-        info.Size = UDim2.new(1, -56, 0.5, -4)
-        info.Position = UDim2.new(0, 46, 0.5, 2)
-        info.BackgroundTransparency = 1
-        info.TextColor3 = Color3.fromRGB(200,200,200)
-        info.TextXAlignment = Enum.TextXAlignment.Left
-        info.Font = Enum.Font.Gotham
-        info.TextSize = 13
-        info.Parent = entry
-
-        local function setInfoFromPos(pos)
-            local v = (typeof(pos)=="Vector3") and pos or unpackVec3(pos)
-            if v then
-                info.Text = string.format("X: %.1f, Y: %.1f, Z: %.1f", v.X, v.Y, v.Z)
-            else
-                info.Text = "Invalid position"
-            end
-        end
-        setInfoFromPos(locationData.position)
-
-        checkbox.MouseButton1Click:Connect(function()
-            locationData.selected = not locationData.selected
-            checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
-        end)
-
-        tpBtn.MouseButton1Click:Connect(function()
-            local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-            local hrp = character:WaitForChild("HumanoidRootPart")
-            local v = (typeof(locationData.position)=="Vector3") and locationData.position or unpackVec3(locationData.position)
-            if v then
-                teleportToPosition(Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0, 3, 0))
-            else
-                dprint("teleport failed: invalid position for", locationData.name)
-            end
-        end)
-
-        entry:SetAttribute("label", string.lower(locationData.name))
-        return entry
-    end
-
-    local function promptName(defaultText, titleText, onSave)
-        local prompt = Instance.new("ScreenGui")
-        prompt.Name = "PB_Prompt"
-        prompt.Parent = PlayerGui
-        local f = Instance.new("Frame")
-        f.Size = UDim2.fromOffset(300, 150)
-        f.Position = UDim2.new(0.5, -150, 0.5, -75)
-        f.BackgroundColor3 = Color3.fromRGB(50,50,50)
-        f.BorderSizePixel = 0
-        f.Parent = prompt
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
-        local titleLbl = Instance.new("TextLabel")
-        titleLbl.Size = UDim2.new(1, 0, 0, 30)
-        titleLbl.BackgroundColor3 = Color3.fromRGB(70,70,70)
-        titleLbl.Text = titleText
-        titleLbl.TextColor3 = Color3.new(1,1,1)
-        titleLbl.Parent = f
-        local tb = Instance.new("TextBox")
-        tb.Size = UDim2.new(1, -20, 0, 30)
-        tb.Position = UDim2.new(0, 10, 0, 40)
-        tb.Text = defaultText
-        tb.BackgroundColor3 = Color3.fromRGB(30,30,30)
-        tb.TextColor3 = Color3.new(1,1,1)
-        tb.Parent = f
-        local save = Instance.new("TextButton")
-        save.Size = UDim2.new(0.5, -15, 0, 30)
-        save.Position = UDim2.new(0, 10, 1, -40)
-        save.Text = "Save"
-        save.BackgroundColor3 = Color3.fromRGB(0,120,0)
-        save.TextColor3 = Color3.new(1,1,1)
-        save.Parent = f
-        local cancel = Instance.new("TextButton")
-        cancel.Size = UDim2.new(0.5, -15, 0, 30)
-        cancel.Position = UDim2.new(0.5, 5, 1, -40)
-        cancel.Text = "Cancel"
-        cancel.BackgroundColor3 = Color3.fromRGB(120,0,0)
-        cancel.TextColor3 = Color3.new(1,1,1)
-        cancel.Parent = f
-
-        save.MouseButton1Click:Connect(function()
-            local name = (tb.Text ~= "" and tb.Text) or defaultText
-            prompt:Destroy()
-            onSave(name)
-        end)
-        cancel.MouseButton1Click:Connect(function() prompt:Destroy() end)
-    end
-
-    addBtn.MouseButton1Click:Connect(function()
-        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hrp = character:WaitForChild("HumanoidRootPart")
-        local defaultName = "Location "..tostring(#savedLocations + 1)
-        promptName(defaultName, "Name this location:", function(name)
-            local locationData = {name=name, position=hrp.Position, selected=false}
-            table.insert(savedLocations, locationData)
-            createLocationEntry(locationData)
-            recalcTp()
-        end)
-    end)
-
-    delBtn.MouseButton1Click:Connect(function()
-        for i = #savedLocations, 1, -1 do
-            if savedLocations[i].selected then
-                local chk = savedLocations[i].checkbox
-                if chk and chk.Parent then chk.Parent:Destroy() end
-                table.remove(savedLocations, i)
-            end
-        end
-        recalcTp()
-    end)
-
-    exportBtn.MouseButton1Click:Connect(function()
-        if #savedLocations == 0 then return end
-        if not serverOnline then dprint("export: server offline"); return end
-
-        local defaultName = "Export "..tostring(os.time())
-        promptName(defaultName, "Export as:", function(name)
-            local copy = {}
-            for _, loc in ipairs(savedLocations) do
-                local p = packVec3(loc.position)
-                if p then
-                    copy[#copy+1] = { name = loc.name, position = p }
-                else
-                    dprint("skip export; invalid position on", loc.name)
-                end
-            end
-            exportedSets[name] = copy
-
-            local body = {
-                autoload = autoloadName,
-                configs  = configs,
-                exports  = normalizeExportsForSend(exportedSets),
-                meta     = { username = USERNAME }
-            }
-            apiPutUser(HWID, body)
-        end)
-    end)
-
-    -- ======= IMPORT POPUP (Server) — with Load & Delete buttons =======
-    importBtn.MouseButton1Click:Connect(function()
-        -- refresh dari server dulu
-        if serverOnline then
-            local ok,data = apiGetUser(HWID)
-            if ok and data then
-                exportedSets = data.exports or exportedSets
-            end
-        end
-
-        local popup = Instance.new("ScreenGui")
-        popup.Name = "PB_ImportList"
-        popup.ResetOnSpawn = false
-        popup.Parent = PlayerGui
-
-        local f = Instance.new("Frame")
-        f.Size = UDim2.fromOffset(360, 320)
-        f.Position = UDim2.new(0.5, -180, 0.5, -160)
-        f.BackgroundColor3 = Color3.fromRGB(45,45,50)
-        f.BorderSizePixel = 0
-        f.Parent = popup
-        f.ClipsDescendants = true                  -- UI FIX: panel popup juga clip
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
-
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, -12, 0, 30)
-        lbl.Position = UDim2.new(0, 6, 0, 6)
-        lbl.BackgroundColor3 = Color3.fromRGB(70,70,70)
-        lbl.Text = "Choose export to import"
-        lbl.TextColor3 = Color3.new(1,1,1)
-        lbl.Font = Enum.Font.GothamBold
-        lbl.TextSize = 14
-        lbl.Parent = f
-        Instance.new("UICorner", lbl).CornerRadius = UDim.new(0,6)
-
-        local list = Instance.new("ScrollingFrame")
-        list.Size = UDim2.new(1, -12, 1, -106)
-        list.Position = UDim2.new(0, 6, 0, 42)
-        list.BackgroundTransparency = 1
-        list.ScrollBarThickness = 6
-        list.ClipsDescendants = true               -- UI FIX
-        list.Parent = f
-
-        local lay = Instance.new("UIListLayout")
-        lay.Parent = list
-        lay.Padding = UDim.new(0,6)
-
-        -- Bottom buttons: Load / Delete / Close
-        local btnRow = Instance.new("Frame")
-        btnRow.Size = UDim2.new(1, -12, 0, 36)
-        btnRow.Position = UDim2.new(0, 6, 1, -42)
-        btnRow.BackgroundTransparency = 1
-        btnRow.Parent = f
-
-        local function styleBtn(b)
-            b.AutoButtonColor = true
-            b.BorderSizePixel = 0
-            Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
-            return b
-        end
-
-        local loadBtn = styleBtn(Instance.new("TextButton"))
-        loadBtn.Size = UDim2.new(0.4, -4, 1, 0)
-        loadBtn.Position = UDim2.new(0, 0, 0, 0)
-        loadBtn.Text = "Load"
-        loadBtn.TextColor3 = Color3.new(1,1,1)
-        loadBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
-        loadBtn.Parent = btnRow
-
-        local deleteBtn = styleBtn(Instance.new("TextButton"))
-        deleteBtn.Size = UDim2.new(0.4, -4, 1, 0)
-        deleteBtn.Position = UDim2.new(0.4, 8, 0, 0)
-        deleteBtn.Text = "Delete"
-        deleteBtn.TextColor3 = Color3.new(1,1,1)
-        deleteBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
-        deleteBtn.Parent = btnRow
-
-        local closeB = styleBtn(Instance.new("TextButton"))
-        closeB.Size = UDim2.new(0.2, -4, 1, 0)
-        closeB.Position = UDim2.new(0.8, 8, 0, 0)
-        closeB.Text = "Close"
-        closeB.TextColor3 = Color3.new(1,1,1)
-        closeB.BackgroundColor3 = Color3.fromRGB(90,60,60)
-        closeB.Parent = btnRow
-
-        -- Disable helper
-        local function setEnabled(btn, enabled, activeColor, disabledColor)
-            btn.Active = enabled
-            btn.AutoButtonColor = enabled
-            btn.BackgroundColor3 = enabled and activeColor or disabledColor
-            btn.TextTransparency = enabled and 0 or 0.35
-        end
-
-        -- Initial disabled
-        setEnabled(loadBtn, false, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
-        setEnabled(deleteBtn, false, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
-
-        local selectedName = nil
-        local selectedBtn = nil
-
-        -- Build list
-        local function rebuildList()
-            for _,ch in ipairs(list:GetChildren()) do
-                if ch:IsA("TextButton") then ch:Destroy() end
-            end
-            selectedName = nil
-            selectedBtn = nil
-            setEnabled(loadBtn, false, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
-            setEnabled(deleteBtn, false, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
-
-            for name,_set in pairs(exportedSets) do
-                local b = Instance.new("TextButton")
-                b.Size = UDim2.new(1, -4, 0, 28)
-                b.Text = name
-                b.BackgroundColor3 = Color3.fromRGB(60,60,70)
-                b.TextColor3 = Color3.new(1,1,1)
-                b.Parent = list
-                Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
-
-                b.MouseButton1Click:Connect(function()
-                    if selectedBtn and selectedBtn ~= b then
-                        selectedBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
-                    end
-                    selectedBtn = b
-                    selectedName = name
-                    b.BackgroundColor3 = Color3.fromRGB(0,140,200) -- highlight
-                    setEnabled(loadBtn, true, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
-                    setEnabled(deleteBtn, true, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
-                end)
-            end
-        end
-
-        rebuildList()
-
-        -- Actions
-        loadBtn.MouseButton1Click:Connect(function()
-            if not selectedName then return end
-            local set = exportedSets[selectedName]
-            if not set then return end
-
-            -- clear current list
-            for i=#savedLocations,1,-1 do
-                local chk = savedLocations[i].checkbox
-                if chk and chk.Parent then chk.Parent:Destroy() end
-                table.remove(savedLocations,i)
-            end
-            -- add from chosen set
-            for _,loc in ipairs(set) do
-                local v = unpackVec3(loc.position)
-                if v then
-                    local nd = { name=loc.name, position=v, selected=false }
-                    table.insert(savedLocations, nd)
-                    createLocationEntry(nd)
-                else
-                    dprint("skip import; invalid packed position on", tostring(loc.name))
-                end
-            end
-            recalcTp()
-            popup:Destroy()
-        end)
-
-        deleteBtn.MouseButton1Click:Connect(function()
-            if not selectedName then return end
-            if not serverOnline then dprint("delete export: server offline"); return end
-
-            -- hapus dari memory
-            exportedSets[selectedName] = nil
-
-            -- push ke server
-            local body = {
-                autoload = autoloadName,
-                configs  = configs,
-                exports  = normalizeExportsForSend(exportedSets),
-                meta     = { username = USERNAME }
-            }
-            local ok,_ = apiPutUser(HWID, body)
-            if not ok then
-                dprint("delete export PUT failed")
-                return
-            end
-
-            -- refresh UI list
-            rebuildList()
-        end)
-
-        closeB.MouseButton1Click:Connect(function() popup:Destroy() end)
-    end)
-
+    -----------------------------------------------------
     -- Search (filter tab aktif)
+    -----------------------------------------------------
     local function applySearchToScroll(scroll, recalc)
         local q = string.lower(searchBox.Text or "")
         for _,row in ipairs(scroll:GetChildren()) do
@@ -1696,7 +1650,7 @@ local function createUI()
         elseif activeTab == "Teleport" then
             local q = string.lower(searchBox.Text or "")
             for _,row in ipairs(tpScroll:GetChildren()) do
-                if row:IsA("Frame") and (row ~= btnBar and row ~= eximBar) then
+                if row:IsA("Frame") and (row ~= nil) then
                     local label = tostring(row:GetAttribute("label") or "")
                     row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
                 end
@@ -1708,7 +1662,9 @@ local function createUI()
     end
     searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
+    -----------------------------------------------------
     -- ===== CONFIG (Server) =====
+    -----------------------------------------------------
     local function getCurrentSettings()
         return {
             fly=fly, noclip=noclip, infJumpMobile=infJumpMobile, infJumpPC=infJumpPC, noFallDamage=noFallDamage,
@@ -1732,15 +1688,15 @@ local function createUI()
 
     local nameRow = createRow(cfgScroll, 58)
     nameRow:SetAttribute("label","Config Name")
-    local nameLbl = Instance.new("TextLabel")
-    nameLbl.BackgroundTransparency = 1
-    nameLbl.Size = UDim2.new(1, 0, 0, 20)
-    nameLbl.Position = UDim2.new(0,10,0,6)
-    nameLbl.Text = "Config Name"
-    nameLbl.TextColor3 = Color3.fromRGB(235,235,235)
-    nameLbl.Font = Enum.Font.Gotham
-    nameLbl.TextSize = 16
-    nameLbl.Parent = nameRow
+    local nameLbl2 = Instance.new("TextLabel")
+    nameLbl2.BackgroundTransparency = 1
+    nameLbl2.Size = UDim2.new(1, 0, 0, 20)
+    nameLbl2.Position = UDim2.new(0,10,0,6)
+    nameLbl2.Text = "Config Name"
+    nameLbl2.TextColor3 = Color3.fromRGB(235,235,235)
+    nameLbl2.Font = Enum.Font.Gotham
+    nameLbl2.TextSize = 16
+    nameLbl2.Parent = nameRow
     local nameBox = Instance.new("TextBox")
     nameBox.Size = UDim2.new(1, -20, 0, 28)
     nameBox.Position = UDim2.new(0,10,0,28)
@@ -1783,7 +1739,7 @@ local function createUI()
     cfgScrollInner.Position = UDim2.new(0,6,0,0)
     cfgScrollInner.BackgroundTransparency = 1
     cfgScrollInner.ScrollBarThickness = 6
-    cfgScrollInner.ClipsDescendants = true       -- UI FIX
+    cfgScrollInner.ClipsDescendants = true
     cfgScrollInner.Parent = cfgList
     local cfgLay = Instance.new("UIListLayout")
     cfgLay.Parent = cfgScrollInner
@@ -1800,14 +1756,14 @@ local function createUI()
             row.Parent = cfgScrollInner
             Instance.new("UICorner", row).CornerRadius = UDim.new(0,6)
 
-            local nameLbl2 = Instance.new("TextLabel")
-            nameLbl2.BackgroundTransparency = 1
-            nameLbl2.Size = UDim2.new(0.5, -10, 1, 0)
-            nameLbl2.Position = UDim2.new(0,10,0,0)
-            nameLbl2.Text = name .. (autoloadName==name and "  (Auto)" or "")
-            nameLbl2.TextXAlignment = Enum.TextXAlignment.Left
-            nameLbl2.TextColor3 = Color3.new(1,1,1)
-            nameLbl2.Parent = row
+            local nLbl = Instance.new("TextLabel")
+            nLbl.BackgroundTransparency = 1
+            nLbl.Size = UDim2.new(0.5, -10, 1, 0)
+            nLbl.Position = UDim2.new(0,10,0,0)
+            nLbl.Text = name .. (autoloadName==name and "  (Auto)" or "")
+            nLbl.TextXAlignment = Enum.TextXAlignment.Left
+            nLbl.TextColor3 = Color3.new(1,1,1)
+            nLbl.Parent = row
 
             local loadB = Instance.new("TextButton")
             loadB.Size = UDim2.new(0.2, -6, 0, 26)
@@ -1933,12 +1889,11 @@ local function createUI()
         end
     end)
 
-    -- Aktifkan panel setelah 5 detik
+    -- Aktifkan panel setelah 5 detik + autoload
     task.delay(5, function()
         overlay:Destroy()
         MainGUI.Enabled = true
 
-        -- Auto-load dari server
         if autoloadName and configs[autoloadName] then
             task.defer(function() applySettings(configs[autoloadName]) end)
         end
@@ -1949,7 +1904,7 @@ local function createUI()
 end
 
 -- ========== Init ==========
-tryLoadFromServer() -- load initial (configs & exports)
+tryLoadFromServer()
 
 getCharacter()
 attachFly()
