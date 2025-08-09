@@ -284,13 +284,13 @@ end)
 -- ========== Noclip ==========
 local function setNoclip(state) noclip = state and true or false end
 RunService.Stepped:Connect(function()
-    if not noclip and char then
+    if not char then return end
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") then
-            part.CanCollide = true
+            part.CanCollide = not noclip  -- false kalau noclip ON, true kalau OFF
         end
     end
-end
+end)
 
 -- ========== Inf Jump ==========
 UIS.JumpRequest:Connect(function()
