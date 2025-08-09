@@ -470,7 +470,6 @@ local function teleportToPositionAndWait(dest)
 end
 
 
-
 local function showPill()
     if ShowPillGUI then ShowPillGUI:Destroy() end
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -1633,6 +1632,52 @@ local function createUI()
     statusLbl.TextSize = 13
     statusLbl.Parent = tourRow
 
+    -- === PANEL LOG AUTOTOUR ===
+    local logFrame = Instance.new("Frame")
+    logFrame.Size = UDim2.new(0, 300, 0, 150)
+    logFrame.Position = UDim2.new(1, -310, 1, -160)
+    logFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    logFrame.BackgroundTransparency = 0.3
+    logFrame.BorderSizePixel = 1
+    logFrame.Parent = game:GetService("CoreGui") -- atau PlayerGui kalau mau ikut reset
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1, 0, 0, 20)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLbl.Text = "AutoTour Log"
+    titleLbl.Font = Enum.Font.SourceSansBold
+    titleLbl.TextSize = 16
+    titleLbl.Parent = logFrame
+
+    local logBox = Instance.new("TextLabel")
+    logBox.Size = UDim2.new(1, -5, 1, -25)
+    logBox.Position = UDim2.new(0, 5, 0, 22)
+    logBox.BackgroundTransparency = 1
+    logBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+    logBox.Text = ""
+    logBox.Font = Enum.Font.Code
+    logBox.TextSize = 14
+    logBox.TextXAlignment = Enum.TextXAlignment.Left
+    logBox.TextYAlignment = Enum.TextYAlignment.Top
+    logBox.TextWrapped = true
+    logBox.TextStrokeTransparency = 0.8
+    logBox.TextScaled = false
+    logBox.TextTruncate = Enum.TextTruncate.AtEnd
+    logBox.RichText = false
+    logBox.Parent = logFrame
+
+    local function appendAutoTourLog(msg)
+        logBox.Text = logBox.Text .. os.date("[%H:%M:%S] ") .. msg .. "\n"
+        -- scroll otomatis ke bawah
+        logBox.Text = string.sub(logBox.Text, -1000)
+    end
+
+    -- === Button Auto Tour ===
+    startBtn.MouseButton1Click:Connect(function()
+        -- ... logic Auto Tour
+    end)
+
     local tourRunning = false
     local function parseInterval()
         local n = tonumber((intervalBox.Text or ""):gsub("[^%d%.]",""))
@@ -1640,44 +1685,84 @@ local function createUI()
         return n
     end
 
-    startBtn.MouseButton1Click:Connect(function()
-        if tourRunning then return end
-        if #savedLocations == 0 then
-            statusLbl.Text = "Status: tidak ada lokasi"
-            return
-        end
-        tourRunning = true
-        statusLbl.Text = "Status: Running"
-        task.spawn(function()
-            while tourRunning do
-                for i = 1, #savedLocations do
-                if not tourRunning then break end
-                local loc = savedLocations[i]
-                local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
-                if v then
-                    local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0, 3, 0)
+startBtn.MouseButton1Click:Connect(function()
+    if tourRunning then return end
+    if #savedLocations == 0 then
+        statusLbl.Text = "Status: tidak ada lokasi"
+        return
+    end
 
-                    -- 🚀 paksa Instant untuk Auto Tour
-                    local oldMode = tpMode
-                    tpMode = "Instant"
-                    teleportToPositionAndWait(dest)
-                    tpMode = oldMode
+    tourRunning = true
+    task.spawn(function()
+        while tourRunning do
+            for i = 1, #savedLocations do
+                if not tourRunning then break end
+
+                -- lindungi 1 langkah dengan xpcall biar thread tidak mati
+                local ok, err = xpcall(function()
+                    -- re-grab karakter/HRP setiap langkah (atasi respawn/checkpoint)
+                    if (not char) or (not char.Parent) or (not hum) or hum.Health <= 0 then
+                        pcall(getCharacter)
+                    end
+                    if (not root) or (not root.Parent) then
+                        -- cari HRP lagi dengan timeout kecil (tanpa hang)
+                        local c = LocalPlayer.Character
+                        if c then
+                            root = c:FindFirstChild("HumanoidRootPart") or c:WaitForChild("HumanoidRootPart", 2)
+                            hum  = c:FindFirstChildOfClass("Humanoid") or c:WaitForChild("Humanoid", 2)
+                        end
+                    end
+
+                    statusLbl.Text = ("Status: Running (%d/%d)"):format(i, #savedLocations)
+
+                    local loc = savedLocations[i]
+                    local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
+                    if v and root then
+                        local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0, 3, 0)
+
+                        -- Teleport instant yang robust (tanpa bergantung tpMode)
+                        root.Anchored = false
+                        root.AssemblyLinearVelocity = Vector3.zero
+                        root.AssemblyAngularVelocity = Vector3.zero
+                        root.CFrame = CFrame.new(dest)
+                        if hum then hum:ChangeState(Enum.HumanoidStateType.Running) end
+
+                        -- jika HRP diganti oleh checkpoint, coba sekali lagi setelah 0.1s
+                        if (not root) or (not root.Parent) then
+                            task.wait(0.1)
+                            pcall(getCharacter)
+                            if root then
+                                root.Anchored = false
+                                root.AssemblyLinearVelocity = Vector3.zero
+                                root.AssemblyAngularVelocity = Vector3.zero
+                                root.CFrame = CFrame.new(dest)
+                                if hum then hum:ChangeState(Enum.HumanoidStateType.Running) end
+                            end
+                        end
+                    end
+
+                end, function(e)
+                    return debug.traceback(tostring(e), 2)
+                end)
+
+                if not ok then
+                    statusLbl.Text = "Status: Error, lanjut…"
+                    appendAutoTourLog("Step " .. i .. ": " .. tostring(err))
                 end
 
-                -- jeda antar lokasi sesuai input
+
+                -- jeda antar lokasi
                 local waitSec = parseInterval()
                 local t0 = tick()
                 while tourRunning and (tick() - t0) < waitSec do
                     task.wait(0.05)
                 end
             end
-                -- jeda kecil antar putaran biar nggak 100% CPU
-                if tourRunning then task.wait(0.1) end
-            end
-            statusLbl.Text = "Status: Stopped"
-        end)
+            if tourRunning then task.wait(0.1) end
+        end
+        statusLbl.Text = "Status: Stopped"
     end)
-
+end)
 
     stopBtn.MouseButton1Click:Connect(function()
         tourRunning = false
