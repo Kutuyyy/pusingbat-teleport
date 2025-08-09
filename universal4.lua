@@ -647,6 +647,14 @@ local function createUI()
     tabs.BackgroundTransparency = 1
     tabs.Parent = frame
 
+    local function onClick(btn, handler)
+        -- Aman untuk PC & Mobile
+        if btn.Activated then btn.Activated:Connect(handler) end
+        -- fallback kalau Activated nggak ada (executor lama)
+        if btn.MouseButton1Click then btn.MouseButton1Click:Connect(handler) end
+        if btn.TouchTap then btn.TouchTap:Connect(handler) end
+    end
+
     local function makeTabButton(text, xOffset)
         local b = Instance.new("TextButton")
         b.Size = UDim2.fromOffset(100, 28)
@@ -931,60 +939,60 @@ local function createUI()
         Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
 
         local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -12, 0, 30)
-    title.Position = UDim2.new(0,6,0,6)
-    title.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    title.Text = "Pilih Player"
-    title.TextColor3 = Color3.new(1,1,1)
-    title.Font = Enum.Font.GothamBold
-    title.TextSize = 14
-    title.Parent = f
-    Instance.new("UICorner", title).CornerRadius = UDim.new(0,6)
+        title.Size = UDim2.new(1, -12, 0, 30)
+        title.Position = UDim2.new(0,6,0,6)
+        title.BackgroundColor3 = Color3.fromRGB(70,70,70)
+        title.Text = "Pilih Player"
+        title.TextColor3 = Color3.new(1,1,1)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 14
+        title.Parent = f
+        Instance.new("UICorner", title).CornerRadius = UDim.new(0,6)
 
-    local list = Instance.new("ScrollingFrame")
-    list.Size = UDim2.new(1, -12, 1, -80)
-    list.Position = UDim2.new(0,6,0,42)
-    list.BackgroundTransparency = 1
-    list.ScrollBarThickness = 6
-    list.ClipsDescendants = true
-    list.Parent = f
-    local lay = Instance.new("UIListLayout")
-    lay.Padding = UDim.new(0,6)
-    lay.Parent = list
+        local list = Instance.new("ScrollingFrame")
+        list.Size = UDim2.new(1, -12, 1, -80)
+        list.Position = UDim2.new(0,6,0,42)
+        list.BackgroundTransparency = 1
+        list.ScrollBarThickness = 6
+        list.ClipsDescendants = true
+        list.Parent = f
+        local lay = Instance.new("UIListLayout")
+        lay.Padding = UDim.new(0,6)
+        lay.Parent = list
 
-    local close = Instance.new("TextButton")
-    close.Size = UDim2.new(1, -12, 0, 30)
-    close.Position = UDim2.new(0,6,1,-36)
-    close.Text = "Tutup"
-    close.BackgroundColor3 = Color3.fromRGB(90,60,60)
-    close.TextColor3 = Color3.new(1,1,1)
-    close.Parent = f
-    Instance.new("UICorner", close).CornerRadius = UDim.new(0,6)
+        local close = Instance.new("TextButton")
+        close.Size = UDim2.new(1, -12, 0, 30)
+        close.Position = UDim2.new(0,6,1,-36)
+        close.Text = "Tutup"
+        close.BackgroundColor3 = Color3.fromRGB(90,60,60)
+        close.TextColor3 = Color3.new(1,1,1)
+        close.Parent = f
+        Instance.new("UICorner", close).CornerRadius = UDim.new(0,6)
 
-    local function build()
-        for _,ch in ipairs(list:GetChildren()) do
-            if ch:IsA("TextButton") then ch:Destroy() end
-        end
-        for _,plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then
-                local b = Instance.new("TextButton")
-                b.Size = UDim2.new(1, -4, 0, 28)
-                b.Text = plr.Name
-                b.BackgroundColor3 = Color3.fromRGB(60,60,70)
-                b.TextColor3 = Color3.new(1,1,1)
-                b.Parent = list
-                Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
-                b.MouseButton1Click:Connect(function()
-                    selectedPlayerName = plr.Name
-                    playerNameLbl.Text = "Target: "..selectedPlayerName
-                    pop:Destroy()
-                end)
+        local function build()
+            for _,ch in ipairs(list:GetChildren()) do
+                if ch:IsA("TextButton") then ch:Destroy() end
+            end
+            for _,plr in ipairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer then
+                    local b = Instance.new("TextButton")
+                    b.Size = UDim2.new(1, -4, 0, 28)
+                    b.Text = plr.Name
+                    b.BackgroundColor3 = Color3.fromRGB(60,60,70)
+                    b.TextColor3 = Color3.new(1,1,1)
+                    b.Parent = list
+                    Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+                    b.MouseButton1Click:Connect(function()
+                        selectedPlayerName = plr.Name
+                        playerNameLbl.Text = "Target: "..selectedPlayerName
+                        pop:Destroy()
+                    end)
+                end
             end
         end
+        build()
+        close.MouseButton1Click:Connect(function() pop:Destroy() end)
     end
-    build()
-    close.MouseButton1Click:Connect(function() pop:Destroy() end)
-end
 
     pickBtn.MouseButton1Click:Connect(openPlayerPopup)
     refreshBtn.MouseButton1Click:Connect(function()
@@ -1462,7 +1470,7 @@ end
         loadBtn.Position = UDim2.new(0, 0, 0, 0)
         loadBtn.Text = "Load"
         loadBtn.TextColor3 = Color3.new(1,1,1)
-        loadBtn.BackgroundColor3 = Color3.fromRGB(0,90,140)
+        loadBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
         loadBtn.Parent = btnRow
 
         local deleteBtn = styleBtn(Instance.new("TextButton"))
@@ -1639,7 +1647,7 @@ end
     logFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     logFrame.BackgroundTransparency = 0.3
     logFrame.BorderSizePixel = 1
-    logFrame.Parent = MainGUI -- Parent ke MainGUI agar ikut ketika minimize/close
+    logFrame.Parent = game:GetService("CoreGui") -- atau PlayerGui kalau mau ikut reset
 
     local titleLbl = Instance.new("TextLabel")
     titleLbl.Size = UDim2.new(1, 0, 0, 20)
@@ -1668,160 +1676,106 @@ end
     logBox.Parent = logFrame
 
     local function appendAutoTourLog(msg)
-        if #logBox.Text > 2000 then
-            logBox.Text = string.sub(logBox.Text, -1000)
-        end
         logBox.Text = logBox.Text .. os.date("[%H:%M:%S] ") .. msg .. "\n"
-        -- Auto-scroll
-        local textBounds = logBox.TextBounds
-        if textBounds.Y > logBox.AbsoluteSize.Y then
-            logBox.CanvasPosition = Vector2.new(0, textBounds.Y)
-        end
+        -- scroll otomatis ke bawah
+        logBox.Text = string.sub(logBox.Text, -1000)
     end
 
-    -- === PATCHED AUTO TOUR SYSTEM ===
-    local IS_MOBILE = UIS.TouchEnabled
-    local TOUR_INTERVAL_MOBILE = 1.5  -- Default interval lebih lama untuk mobile
-
-    local tourRunning = false
-    local tourThread = nil
-
-    local function optimizedTeleport(destination)
-        if IS_MOBILE then
-            -- Method sederhana untuk mobile
-            local character = LocalPlayer.Character
-            if not character then return end
-            local hrp = character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                hrp.CFrame = CFrame.new(destination)
-                if hum then
-                    hum:ChangeState(Enum.HumanoidStateType.Running)
-                end
-            end
-        else
-            -- Gunakan method teleport sesuai setting user
-            if tpMode == "Instant" then
-                teleportToPosition(destination)
-            else
-                teleportToPositionAndWait(destination)
-            end
-        end
-    end
-
-    local function parseInterval()
-        local n = tonumber((intervalBox.Text or ""):gsub("[^%d%.]", ""))
-        return math.clamp(n or (IS_MOBILE and TOUR_INTERVAL_MOBILE or 3), 0.5, 60)  -- Clamp between 0.5-60 seconds
-    end
-
-    local function startAutoTour()
-        if tourRunning then return end
-        if #savedLocations == 0 then
-            statusLbl.Text = "Status: Tidak ada lokasi"
-            return
-        end
-
-        tourRunning = true
-        tourThread = task.spawn(function()
-            for i = 1, #savedLocations do
-                if not tourRunning then break end
-                
-                -- Handle karakter mati/respawn
-                if not LocalPlayer.Character or (hum and hum.Health <= 0) then
-                    LocalPlayer.CharacterAdded:Wait()
-                    task.wait(IS_MOBILE and 1.5 or 0.5)  -- Beri waktu ekstra untuk mobile
-                    -- Update references
-                    char = LocalPlayer.Character
-                    root = char and char:FindFirstChild("HumanoidRootPart")
-                    hum = char and char:FindFirstChildOfClass("Humanoid")
-                end
-
-                -- Update UI
-                statusLbl.Text = ("Status: Berjalan (%d/%d)"):format(i, #savedLocations)
-                local loc = savedLocations[i]
-                
-                -- Teleport ke lokasi
-                local v = (typeof(loc.position) == "Vector3" and loc.position or unpackVec3(loc.position))
-                if v then
-                    local dest = v + Vector3.new(0, 3, 0)
-                    pcall(optimizedTeleport, dest)
-                    appendAutoTourLog(("Pindah ke: %s"):format(loc.name))
-                else
-                    appendAutoTourLog(("Error: Posisi tidak valid di %s"):format(loc.name))
-                end
-
-                -- Hitung interval
-                local interval = parseInterval()
-                local waited = 0
-                
-                -- Tunggu dengan interval yang bisa diinterupsi
-                while tourRunning and waited < interval do
-                    local waitChunk = IS_MOBILE and 0.3 or 0.1
-                    task.wait(waitChunk)
-                    waited = waited + waitChunk
-                    
-                    -- Update UI
-                    statusLbl.Text = ("Status: Tunggu %.1fs (%d/%d)"):format(
-                        math.max(0, interval - waited), 
-                        i, 
-                        #savedLocations
-                    )
-                end
-            end
-            
-            -- Reset status setelah selesai
-            tourRunning = false
-            statusLbl.Text = "Status: Selesai"
-        end)
-    end
-
-    local function stopAutoTour()
-        tourRunning = false
-        if tourThread then
-            task.cancel(tourThread)
-            tourThread = nil
-        end
-        statusLbl.Text = "Status: Dihentikan"
-    end
-
+    -- === Button Auto Tour ===
     startBtn.MouseButton1Click:Connect(function()
-        logBox.Text = ""  -- Reset log
-        startAutoTour()
+        -- ... logic Auto Tour
     end)
 
-    stopBtn.MouseButton1Click:Connect(stopAutoTour)
-
-    -- Input Handling untuk Mobile
-    if IS_MOBILE then
-        -- Sistem touch yang lebih baik
-        local function createTouchHandler(button, callback)
-            local touchStart = 0
-            local function handleInput(input)
-                if input.UserInputType == Enum.UserInputType.Touch then
-                    if input.UserInputState == Enum.UserInputState.Begin then
-                        touchStart = os.clock()
-                    elseif input.UserInputState == Enum.UserInputState.End then
-                        if os.clock() - touchStart < 0.5 then
-                            callback()
-                        end
-                    end
-                end
-            end
-            
-            button.InputBegan:Connect(handleInput)
-            button.InputEnded:Connect(handleInput)
-        end
-
-        -- Terapkan ke tombol tour
-        createTouchHandler(startBtn, function() 
-            if not tourRunning then
-                logBox.Text = ""
-                startAutoTour()
-            end
-        end)
-        createTouchHandler(stopBtn, stopAutoTour)
+    local tourRunning = false
+    local function parseInterval()
+        local n = tonumber((intervalBox.Text or ""):gsub("[^%d%.]",""))
+        if not n or n < 0.1 then n = 0.1 end
+        return n
     end
 
-    -- ====== END OF AUTO TOUR PATCH ======
+startBtn.MouseButton1Click:Connect(function()
+    if tourRunning then return end
+    if #savedLocations == 0 then
+        statusLbl.Text = "Status: tidak ada lokasi"
+        return
+    end
+
+    tourRunning = true
+    task.spawn(function()
+        while tourRunning do
+            for i = 1, #savedLocations do
+                if not tourRunning then break end
+
+                -- lindungi 1 langkah dengan xpcall biar thread tidak mati
+                local ok, err = xpcall(function()
+                    -- re-grab karakter/HRP setiap langkah (atasi respawn/checkpoint)
+                    if (not char) or (not char.Parent) or (not hum) or hum.Health <= 0 then
+                        pcall(getCharacter)
+                    end
+                    if (not root) or (not root.Parent) then
+                        -- cari HRP lagi dengan timeout kecil (tanpa hang)
+                        local c = LocalPlayer.Character
+                        if c then
+                            root = c:FindFirstChild("HumanoidRootPart") or c:WaitForChild("HumanoidRootPart", 2)
+                            hum  = c:FindFirstChildOfClass("Humanoid") or c:WaitForChild("Humanoid", 2)
+                        end
+                    end
+
+                    statusLbl.Text = ("Status: Running (%d/%d)"):format(i, #savedLocations)
+
+                    local loc = savedLocations[i]
+                    local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
+                    if v and root then
+                        local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0, 3, 0)
+
+                        -- Teleport instant yang robust (tanpa bergantung tpMode)
+                        root.Anchored = false
+                        root.AssemblyLinearVelocity = Vector3.zero
+                        root.AssemblyAngularVelocity = Vector3.zero
+                        root.CFrame = CFrame.new(dest)
+                        if hum then hum:ChangeState(Enum.HumanoidStateType.Running) end
+
+                        -- jika HRP diganti oleh checkpoint, coba sekali lagi setelah 0.1s
+                        if (not root) or (not root.Parent) then
+                            task.wait(0.1)
+                            pcall(getCharacter)
+                            if root then
+                                root.Anchored = false
+                                root.AssemblyLinearVelocity = Vector3.zero
+                                root.AssemblyAngularVelocity = Vector3.zero
+                                root.CFrame = CFrame.new(dest)
+                                if hum then hum:ChangeState(Enum.HumanoidStateType.Running) end
+                            end
+                        end
+                    end
+
+                end, function(e)
+                    return debug.traceback(tostring(e), 2)
+                end)
+
+                if not ok then
+                    statusLbl.Text = "Status: Error, lanjut…"
+                    appendAutoTourLog("Step " .. i .. ": " .. tostring(err))
+                end
+
+
+                -- jeda antar lokasi
+                local waitSec = parseInterval()
+                local t0 = tick()
+                while tourRunning and (tick() - t0) < waitSec do
+                    task.wait(0.05)
+                end
+            end
+            if tourRunning then task.wait(0.1) end
+        end
+        statusLbl.Text = "Status: Stopped"
+    end)
+end)
+
+    stopBtn.MouseButton1Click:Connect(function()
+        tourRunning = false
+        statusLbl.Text = "Status: Stopping..."
+    end)
 
     -----------------------------------------------------
     -- Search (filter tab aktif)
