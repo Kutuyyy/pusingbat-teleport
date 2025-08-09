@@ -422,7 +422,45 @@ local function createUI()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
     -- ===== TELEPORT =====
     local function createTpRow(h) return createRow(tpScroll, h) end
-    
+    Shared Teleport Settings (Mode, Duration, Easing)
+    local tpMode = "Instant"
+    local tweenDuration = 1.0
+    local easeStyles = {
+        {"QuadOut",  Enum.EasingStyle.Quad,    Enum.EasingDirection.Out},
+        {"QuadIn",   Enum.EasingStyle.Quad,    Enum.EasingDirection.In},
+        {"SineOut",  Enum.EasingStyle.Sine,    Enum.EasingDirection.Out},
+        {"Linear",   Enum.EasingStyle.Linear,  Enum.EasingDirection.InOut},
+        {"BackOut",  Enum.EasingStyle.Back,    Enum.EasingDirection.Out},
+        {"CubicOut", Enum.EasingStyle.Cubic,   Enum.EasingDirection.Out},
+    }
+    local easeIdx = 1
+
+    local teleporting = false
+    local function teleportToPosition(dest)
+        if not root then return end
+        if tpMode == "Instant" then
+            root.CFrame = CFrame.new(dest)
+            return
+        end
+        -- Tween
+        if teleporting then return end
+        teleporting = true
+        local wasFly = fly
+        if wasFly then setFly(false) end
+        local info = TweenInfo.new(
+            math.max(0.05, tweenDuration),
+            easeStyles[easeIdx][2],
+            easeStyles[easeIdx][3],
+            0,false,0
+        )
+        local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
+        tw:Play()
+        tw.Completed:Connect(function()
+            teleporting = false
+            if wasFly then setFly(true) end
+        end)
+    end
+
     -- Loading overlay 5 detik
     local overlay = Instance.new("ScreenGui")
     overlay.Name = "PusingbatLoading"
@@ -965,8 +1003,10 @@ local function createUI()
         modeInstant.BackgroundColor3 = (m=="Instant") and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
         modeTween.BackgroundColor3   = (m=="Tween")   and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
     end
-    modeInstant.MouseButton1Click:Connect(function() setMode("Instant") end)
-    modeTween.MouseButton1Click:Connect(function() setMode("Tween") end)
+
+    local function setDurPct(p)
+    p = math.clamp(p,0,1)
+    tweenDuration = math.floor(((0.2 + 4.8*p)*10)+0.5)/10
 
     -- Row: Durasi Tween + Easing
     local tweenRow = createTpRow(58)
@@ -1080,13 +1120,15 @@ local function createUI()
 
     local teleporting = false
     local function teleportToTarget()
-        if teleporting then return end
         if not root then return end
-        local targetHRP = getTargetHRP()
-        if not targetHRP then
-            distanceLbl.Text = "Distance: - (target tidak valid)"
-            return
-        end
+        if not selectedPlayerName then return end
+        local plr = Players:FindFirstChild(selectedPlayerName)
+        if not plr or not plr.Character then return end
+        local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        teleportToPosition(hrp.Position + Vector3.new(0,3,0))
+    end
+
 
         -- posisi target + offset kecil (supaya tidak clip)
         local dest = targetHRP.Position + Vector3.new(0, 3, 0)
@@ -1187,6 +1229,102 @@ local function createUI()
     importBtn.Parent = eximBar
     Instance.new("UICorner", importBtn).CornerRadius = UDim.new(0,8)
 
+        -- ======= Auto Tour (teleport berurutan) =======
+    local tourRow = createTpRow(58)
+    tourRow:SetAttribute("label","Auto Tour")
+    local tourLbl = Instance.new("TextLabel")
+    tourLbl.BackgroundTransparency = 1
+    tourLbl.Size = UDim2.new(1, 0, 0, 20)
+    tourLbl.Position = UDim2.new(0,10,0,6)
+    tourLbl.Text = "Auto Tour (atas → bawah)"
+    tourLbl.TextColor3 = Color3.fromRGB(235,235,235)
+    tourLbl.TextXAlignment = Enum.TextXAlignment.Left
+    tourLbl.Font = Enum.Font.Gotham
+    tourLbl.TextSize = 16
+    tourLbl.Parent = tourRow
+
+    local intervalBox = Instance.new("TextBox")
+    intervalBox.Size = UDim2.new(0.4, -20, 0, 26)
+    intervalBox.Position = UDim2.new(0,10,0,30)
+    intervalBox.Text = "3" -- default 3 detik
+    intervalBox.PlaceholderText = "Interval detik"
+    intervalBox.TextColor3 = Color3.new(1,1,1)
+    intervalBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
+    intervalBox.BorderSizePixel = 0
+    intervalBox.Parent = tourRow
+    Instance.new("UICorner", intervalBox).CornerRadius = UDim.new(0,6)
+
+    local startBtn = Instance.new("TextButton")
+    startBtn.Size = UDim2.new(0.25, -8, 0, 26)
+    startBtn.Position = UDim2.new(0.42, 0, 0, 30)
+    startBtn.Text = "Start"
+    startBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+    startBtn.TextColor3 = Color3.new(1,1,1)
+    startBtn.BorderSizePixel = 0
+    startBtn.Parent = tourRow
+    Instance.new("UICorner", startBtn).CornerRadius = UDim.new(0,6)
+
+    local stopBtn = Instance.new("TextButton")
+    stopBtn.Size = UDim2.new(0.25, -8, 0, 26)
+    stopBtn.Position = UDim2.new(0.69, 8, 0, 30)
+    stopBtn.Text = "Stop"
+    stopBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
+    stopBtn.TextColor3 = Color3.new(1,1,1)
+    stopBtn.BorderSizePixel = 0
+    stopBtn.Parent = tourRow
+    Instance.new("UICorner", stopBtn).CornerRadius = UDim.new(0,6)
+
+    local statusLbl = Instance.new("TextLabel")
+    statusLbl.BackgroundTransparency = 1
+    statusLbl.Size = UDim2.new(1, -20, 0, 18)
+    statusLbl.Position = UDim2.new(0,10,0, 30+26+6)
+    statusLbl.Text = "Status: Idle"
+    statusLbl.TextColor3 = Color3.fromRGB(200,200,200)
+    statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+    statusLbl.Font = Enum.Font.Gotham
+    statusLbl.TextSize = 13
+    statusLbl.Parent = tourRow
+
+    local tourRunning = false
+    local function parseInterval()
+        local n = tonumber((intervalBox.Text or ""):gsub("[^%d%.]",""))
+        if not n or n < 0.1 then n = 0.1 end
+        return n
+    end
+
+    startBtn.MouseButton1Click:Connect(function()
+        if tourRunning then return end
+        if #savedLocations == 0 then
+            statusLbl.Text = "Status: tidak ada lokasi"
+            return
+        end
+        tourRunning = true
+        statusLbl.Text = "Status: Running"
+        task.spawn(function()
+            while tourRunning do
+                for i=1, #savedLocations do
+                    if not tourRunning then break end
+                    local loc = savedLocations[i]
+                    local v = (typeof(loc.position)=="Vector3") and loc.position or unpackVec3(loc.position)
+                    if v then
+                        teleportToPosition(Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0))
+                    end
+                    local waitSec = parseInterval()
+                    local t0 = tick()
+                    while tourRunning and (tick()-t0) < waitSec do
+                        task.wait(0.05)
+                    end
+                end
+            end
+            statusLbl.Text = "Status: Stopped"
+        end)
+    end)
+
+    stopBtn.MouseButton1Click:Connect(function()
+        tourRunning = false
+        statusLbl.Text = "Status: Stopping..."
+    end)
+
     local function createLocationEntry(locationData)
         local entry = createTpRow(56)
 
@@ -1242,7 +1380,7 @@ local function createUI()
             local hrp = character:WaitForChild("HumanoidRootPart")
             local v = (typeof(locationData.position)=="Vector3") and locationData.position or unpackVec3(locationData.position)
             if v then
-                hrp.CFrame = CFrame.new(v)
+                teleportToPosition(Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0, 3, 0))
             else
                 dprint("teleport failed: invalid position for", locationData.name)
             end
