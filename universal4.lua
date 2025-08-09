@@ -11,6 +11,7 @@ local API_KEY     = "asdasdasdasdasdasdasdasd"             -- GANTI dengan API k
 
 -- ========== Services ==========
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
@@ -419,7 +420,9 @@ end
 
 local function createUI()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
+    -- ===== TELEPORT =====
+    local function createTpRow(h) return createRow(tpScroll, h) end
+    
     -- Loading overlay 5 detik
     local overlay = Instance.new("ScreenGui")
     overlay.Name = "PusingbatLoading"
@@ -767,6 +770,370 @@ local function createUI()
 
     -- ===== TELEPORT =====
     local function createTpRow(h) return createRow(tpScroll, h) end
+
+    -- ▼▼▼ Teleport to Player (Instant/Tween) ▼▼▼
+    local tpToPlayerTitle = createTpRow(28)
+    tpToPlayerTitle.BackgroundTransparency = 1
+    local tptpLabel = Instance.new("TextLabel")
+    tptpLabel.BackgroundTransparency = 1
+    tptpLabel.Size = UDim2.new(1, -20, 1, 0)
+    tptpLabel.Position = UDim2.new(0,10,0,0)
+    tptpLabel.Text = "Teleport to Player"
+    tptpLabel.TextColor3 = Color3.new(1,1,1)
+    tptpLabel.TextXAlignment = Enum.TextXAlignment.Left
+    tptpLabel.Font = Enum.Font.GothamBold
+    tptpLabel.TextSize = 14
+    tptpLabel.Parent = tpToPlayerTitle
+
+    -- Row: Player Picker + Refresh
+    local pickerRow = createTpRow(56)
+    pickerRow:SetAttribute("label","Teleport to Player")
+
+    local playerNameLbl = Instance.new("TextLabel")
+    playerNameLbl.BackgroundTransparency = 1
+    playerNameLbl.Size = UDim2.new(1, -140, 0.5, -2)
+    playerNameLbl.Position = UDim2.new(0, 10, 0, 4)
+    playerNameLbl.Text = "Target: (belum dipilih)"
+    playerNameLbl.TextColor3 = Color3.fromRGB(235,235,235)
+    playerNameLbl.TextXAlignment = Enum.TextXAlignment.Left
+    playerNameLbl.Font = Enum.Font.Gotham
+    playerNameLbl.TextSize = 15
+    playerNameLbl.Parent = pickerRow
+
+    local distanceLbl = Instance.new("TextLabel")
+    distanceLbl.BackgroundTransparency = 1
+    distanceLbl.Size = UDim2.new(1, -140, 0.5, -2)
+    distanceLbl.Position = UDim2.new(0, 10, 0.5, 0)
+    distanceLbl.Text = "Distance: -"
+    distanceLbl.TextColor3 = Color3.fromRGB(200,200,200)
+    distanceLbl.TextXAlignment = Enum.TextXAlignment.Left
+    distanceLbl.Font = Enum.Font.Gotham
+    distanceLbl.TextSize = 13
+    distanceLbl.Parent = pickerRow
+
+    local pickBtn = Instance.new("TextButton")
+    pickBtn.Size = UDim2.new(0, 100, 0, 26)
+    pickBtn.Position = UDim2.new(1, -120, 0, 6)
+    pickBtn.Text = "Pilih Player"
+    pickBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
+    pickBtn.TextColor3 = Color3.new(1,1,1)
+    pickBtn.BorderSizePixel = 0
+    pickBtn.Parent = pickerRow
+    Instance.new("UICorner", pickBtn).CornerRadius = UDim.new(0,6)
+
+    local refreshBtn = Instance.new("TextButton")
+    refreshBtn.Size = UDim2.new(0, 100, 0, 26)
+    refreshBtn.Position = UDim2.new(1, -120, 0, 30)
+    refreshBtn.Text = "Refresh"
+    refreshBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
+    refreshBtn.TextColor3 = Color3.new(1,1,1)
+    refreshBtn.BorderSizePixel = 0
+    refreshBtn.Parent = pickerRow
+    Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0,6)
+
+    -- Popup list pemain
+    local selectedPlayerName = nil
+    local function openPlayerPopup()
+        local pg = LocalPlayer:WaitForChild("PlayerGui")
+        local pop = Instance.new("ScreenGui")
+        pop.Name = "PB_PlayerPicker"
+        pop.ResetOnSpawn = false
+        pop.Parent = pg
+
+        local f = Instance.new("Frame")
+        f.Size = UDim2.fromOffset(300, 320)
+        f.Position = UDim2.new(0.5, -150, 0.5, -160)
+        f.BackgroundColor3 = Color3.fromRGB(45,45,50)
+        f.BorderSizePixel = 0
+        f.Parent = pop
+        f.ClipsDescendants = true
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1, -12, 0, 30)
+        title.Position = UDim2.new(0,6,0,6)
+        title.BackgroundColor3 = Color3.fromRGB(70,70,70)
+        title.Text = "Pilih Player"
+        title.TextColor3 = Color3.new(1,1,1)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 14
+        title.Parent = f
+        Instance.new("UICorner", title).CornerRadius = UDim.new(0,6)
+
+        local list = Instance.new("ScrollingFrame")
+        list.Size = UDim2.new(1, -12, 1, -80)
+        list.Position = UDim2.new(0,6,0,42)
+        list.BackgroundTransparency = 1
+        list.ScrollBarThickness = 6
+        list.ClipsDescendants = true
+        list.Parent = f
+        local lay = Instance.new("UIListLayout")
+        lay.Padding = UDim.new(0,6)
+        lay.Parent = list
+
+        local close = Instance.new("TextButton")
+        close.Size = UDim2.new(1, -12, 0, 30)
+        close.Position = UDim2.new(0,6,1,-36)
+        close.Text = "Tutup"
+        close.BackgroundColor3 = Color3.fromRGB(90,60,60)
+        close.TextColor3 = Color3.new(1,1,1)
+        close.Parent = f
+        Instance.new("UICorner", close).CornerRadius = UDim.new(0,6)
+
+        local function build()
+            for _,ch in ipairs(list:GetChildren()) do
+                if ch:IsA("TextButton") then ch:Destroy() end
+            end
+            for _,plr in ipairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer then
+                    local b = Instance.new("TextButton")
+                    b.Size = UDim2.new(1, -4, 0, 28)
+                    b.Text = plr.Name
+                    b.BackgroundColor3 = Color3.fromRGB(60,60,70)
+                    b.TextColor3 = Color3.new(1,1,1)
+                    b.Parent = list
+                    Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+                    b.MouseButton1Click:Connect(function()
+                        selectedPlayerName = plr.Name
+                        playerNameLbl.Text = "Target: "..selectedPlayerName
+                        pop:Destroy()
+                    end)
+                end
+            end
+        end
+        build()
+        close.MouseButton1Click:Connect(function() pop:Destroy() end)
+    end
+
+    pickBtn.MouseButton1Click:Connect(openPlayerPopup)
+    refreshBtn.MouseButton1Click:Connect(function()
+        if selectedPlayerName then
+            playerNameLbl.Text = "Target: "..selectedPlayerName
+        end
+    end)
+
+    -- Update distance realtime (ketika tab Teleport aktif)
+    RunService.RenderStepped:Connect(function()
+        if not tpScroll.Visible then return end
+        if selectedPlayerName and root then
+            local target = Players:FindFirstChild(selectedPlayerName)
+            if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                local d = (root.Position - target.Character.HumanoidRootPart.Position).Magnitude
+                distanceLbl.Text = string.format("Distance: %.1f studs", d)
+            else
+                distanceLbl.Text = "Distance: -"
+            end
+        else
+            distanceLbl.Text = "Distance: -"
+        end
+    end)
+
+    -- Row: Mode (Instant / Tween)
+    local modeRow = createTpRow(40)
+    local modeLbl = Instance.new("TextLabel")
+    modeLbl.BackgroundTransparency = 1
+    modeLbl.Size = UDim2.new(1, -140, 1, 0)
+    modeLbl.Position = UDim2.new(0,10,0,0)
+    modeLbl.Text = "Mode Teleport"
+    modeLbl.TextColor3 = Color3.fromRGB(235,235,235)
+    modeLbl.TextXAlignment = Enum.TextXAlignment.Left
+    modeLbl.Font = Enum.Font.Gotham
+    modeLbl.TextSize = 16
+    modeLbl.Parent = modeRow
+
+    local modeInstant = Instance.new("TextButton")
+    modeInstant.Size = UDim2.new(0, 86, 0, 26)
+    modeInstant.Position = UDim2.new(1, -196, 0.5, -13)
+    modeInstant.Text = "Instant"
+    modeInstant.BackgroundColor3 = Color3.fromRGB(0,120,0)
+    modeInstant.TextColor3 = Color3.new(1,1,1)
+    modeInstant.Parent = modeRow
+    Instance.new("UICorner", modeInstant).CornerRadius = UDim.new(0,6)
+
+    local modeTween = Instance.new("TextButton")
+    modeTween.Size = UDim2.new(0, 86, 0, 26)
+    modeTween.Position = UDim2.new(1, -100, 0.5, -13)
+    modeTween.Text = "Tween"
+    modeTween.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    modeTween.TextColor3 = Color3.new(1,1,1)
+    modeTween.Parent = modeRow
+    Instance.new("UICorner", modeTween).CornerRadius = UDim.new(0,6)
+
+    local tpMode = "Instant"
+    local function setMode(m)
+        tpMode = m
+        modeInstant.BackgroundColor3 = (m=="Instant") and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
+        modeTween.BackgroundColor3   = (m=="Tween")   and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
+    end
+    modeInstant.MouseButton1Click:Connect(function() setMode("Instant") end)
+    modeTween.MouseButton1Click:Connect(function() setMode("Tween") end)
+
+    -- Row: Durasi Tween + Easing
+    local tweenRow = createTpRow(58)
+    tweenRow:SetAttribute("label","Tween Settings")
+    local durLbl = Instance.new("TextLabel")
+    durLbl.BackgroundTransparency = 1
+    durLbl.Size = UDim2.new(1, 0, 0, 20)
+    durLbl.Position = UDim2.new(0,10,0,6)
+    durLbl.Text = "Tween Duration: 1.0s"
+    durLbl.TextColor3 = Color3.fromRGB(235,235,235)
+    durLbl.TextXAlignment = Enum.TextXAlignment.Left
+    durLbl.Font = Enum.Font.Gotham
+    durLbl.TextSize = 16
+    durLbl.Parent = tweenRow
+
+    local bar = Instance.new("Frame")
+    bar.Size = UDim2.new(0.6, -20, 0, 8)
+    bar.Position = UDim2.new(0,10,0,34)
+    bar.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    bar.BorderSizePixel = 0
+    bar.Parent = tweenRow
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(0,8)
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(0.2, 0, 1, 0) -- 20% = 1.0s dari rentang 0.2..5.0
+    fill.BackgroundColor3 = Color3.fromRGB(0,170,255)
+    fill.BorderSizePixel = 0
+    fill.Parent = bar
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(0,8)
+
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.fromOffset(18,18)
+    knob.Position = UDim2.new(0.2, -9, 0.5, -9)
+    knob.BackgroundColor3 = Color3.fromRGB(240,240,240)
+    knob.BorderSizePixel = 0
+    knob.Parent = bar
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
+
+    local tweenDuration = 1.0
+    local dragging = false
+    local function setDurPct(p)
+        p = math.clamp(p, 0, 1)
+        -- rentang 0.2s .. 5.0s (logik: 0 => 0.2, 1 => 5.0)
+        tweenDuration = math.floor(((0.2 + 4.8 * p) * 10) + 0.5) / 10
+        fill.Size = UDim2.new(p, 0, 1, 0)
+        knob.Position = UDim2.new(p, -9, 0.5, -9)
+        durLbl.Text = string.format("Tween Duration: %.1fs", tweenDuration)
+    end
+    bar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
+            setDurPct(rel)
+        end
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
+            setDurPct(rel)
+        end
+    end)
+    bar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    local easeBtn = Instance.new("TextButton")
+    easeBtn.Size = UDim2.new(0.35, -10, 0, 26)
+    easeBtn.Position = UDim2.new(0.65, 0, 0, 30)
+    easeBtn.Text = "Easing: QuadOut"
+    easeBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
+    easeBtn.TextColor3 = Color3.new(1,1,1)
+    easeBtn.BorderSizePixel = 0
+    easeBtn.Parent = tweenRow
+    Instance.new("UICorner", easeBtn).CornerRadius = UDim.new(0,6)
+
+    local easeStyles = {
+        {"QuadOut",  Enum.EasingStyle.Quad,    Enum.EasingDirection.Out},
+        {"QuadIn",   Enum.EasingStyle.Quad,    Enum.EasingDirection.In},
+        {"SineOut",  Enum.EasingStyle.Sine,    Enum.EasingDirection.Out},
+        {"Linear",   Enum.EasingStyle.Linear,  Enum.EasingDirection.InOut},
+        {"BackOut",  Enum.EasingStyle.Back,    Enum.EasingDirection.Out},
+        {"CubicOut", Enum.EasingStyle.Cubic,   Enum.EasingDirection.Out},
+    }
+    local easeIdx = 1
+    local function cycleEase()
+        easeIdx = easeIdx % #easeStyles + 1
+        easeBtn.Text = "Easing: "..easeStyles[easeIdx][1]
+    end
+    easeBtn.MouseButton1Click:Connect(cycleEase)
+
+    -- Row: Tombol Teleport
+    local goRow = createTpRow(40)
+    local goBtn = Instance.new("TextButton")
+    goBtn.Size = UDim2.new(1, -20, 1, -10)
+    goBtn.Position = UDim2.new(0,10,0,5)
+    goBtn.Text = "Teleport Now"
+    goBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+    goBtn.TextColor3 = Color3.new(1,1,1)
+    goBtn.BorderSizePixel = 0
+    goBtn.Parent = goRow
+    Instance.new("UICorner", goBtn).CornerRadius = UDim.new(0,8)
+
+    local function getTargetHRP()
+        if not selectedPlayerName then return nil end
+        local plr = Players:FindFirstChild(selectedPlayerName)
+        if not plr or not plr.Character then return nil end
+        return plr.Character:FindFirstChild("HumanoidRootPart")
+    end
+
+    local teleporting = false
+    local function teleportToTarget()
+        if teleporting then return end
+        if not root then return end
+        local targetHRP = getTargetHRP()
+        if not targetHRP then
+            distanceLbl.Text = "Distance: - (target tidak valid)"
+            return
+        end
+
+        -- posisi target + offset kecil (supaya tidak clip)
+        local dest = targetHRP.Position + Vector3.new(0, 3, 0)
+
+        if tpMode == "Instant" then
+            root.CFrame = CFrame.new(dest)
+            return
+        end
+
+        -- Tween mode
+        teleporting = true
+        -- matikan fly saat tween agar tidak melawan kecepatan
+        local oldFly = fly
+        if oldFly then setFly(false) end
+
+        local tweenInfo = TweenInfo.new(
+            math.max(0.05, tweenDuration),
+            easeStyles[easeIdx][2],
+            easeStyles[easeIdx][3],
+            0, false, 0
+        )
+
+        -- Tween CFrame root
+        local tween = TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(dest)})
+        tween:Play()
+        tween.Completed:Connect(function()
+            teleporting = false
+            if oldFly then setFly(true) end
+        end)
+    end
+
+    goBtn.MouseButton1Click:Connect(teleportToTarget)
+
+    -- Auto update list & label jika player join/leave
+    local function onRosterChange()
+        -- kalau target keluar, kosongkan pilihan
+        if selectedPlayerName then
+            local still = Players:FindFirstChild(selectedPlayerName)
+            if not still then
+                selectedPlayerName = nil
+                playerNameLbl.Text = "Target: (belum dipilih)"
+            end
+        end
+    end
+    Players.PlayerAdded:Connect(onRosterChange)
+    Players.PlayerRemoving:Connect(onRosterChange)
+    -- ▲▲▲ End Teleport to Player ▲▲▲
 
     -- Bar Add/Delete
     local btnBar = createTpRow(40)
