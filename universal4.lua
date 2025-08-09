@@ -284,20 +284,13 @@ end)
 -- ========== Noclip ==========
 local function setNoclip(state) noclip = state and true or false end
 RunService.Stepped:Connect(function()
-    if not char then return end
-    if noclip then
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = false
-            end
-        end
-    else
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-            end
+    if not char or not root then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if noclip then part.CanCollide = false end
         end
     end
+    if not noclip and root then root.CanCollide = true end
 end)
 
 -- ========== Inf Jump ==========
@@ -1716,15 +1709,17 @@ onClick(startBtn, function()
     tourRunning = true
     task.spawn(function()
         while tourRunning do
-            for idx, loc in ipairs(savedLocations) do
+            for i = 1, #savedLocations do
                 if not tourRunning then break end
 
+                -- lindungi 1 langkah dengan xpcall biar thread tidak mati
                 local ok, err = xpcall(function()
-                    -- re-grab karakter/HRP tiap langkah
+                    -- re-grab karakter/HRP setiap langkah (atasi respawn/checkpoint)
                     if (not char) or (not char.Parent) or (not hum) or hum.Health <= 0 then
                         pcall(getCharacter)
                     end
                     if (not root) or (not root.Parent) then
+                        -- cari HRP lagi dengan timeout kecil (tanpa hang)
                         local c = LocalPlayer.Character
                         if c then
                             root = c:FindFirstChild("HumanoidRootPart") or c:WaitForChild("HumanoidRootPart", 2)
@@ -1732,20 +1727,21 @@ onClick(startBtn, function()
                         end
                     end
 
-                    statusLbl.Text = ("Status: Running (%d/%d)"):format(idx, #savedLocations)
+                    statusLbl.Text = ("Status: Running (%d/%d)"):format(i, #savedLocations)
 
+                    local loc = savedLocations[i]
                     local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
                     if v and root then
                         local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0, 3, 0)
 
-                        -- teleport instant + settle
+                        -- Teleport instant yang robust (tanpa bergantung tpMode)
                         root.Anchored = false
                         root.AssemblyLinearVelocity = Vector3.zero
                         root.AssemblyAngularVelocity = Vector3.zero
                         root.CFrame = CFrame.new(dest)
                         if hum then hum:ChangeState(Enum.HumanoidStateType.Running) end
 
-                        -- kalau HRP kepotong checkpoint, retry sekali
+                        -- jika HRP diganti oleh checkpoint, coba sekali lagi setelah 0.1s
                         if (not root) or (not root.Parent) then
                             task.wait(0.1)
                             pcall(getCharacter)
@@ -1757,28 +1753,25 @@ onClick(startBtn, function()
                                 if hum then hum:ChangeState(Enum.HumanoidStateType.Running) end
                             end
                         end
-
-                        -- tambahin settle kecil biar step berikutnya nggak “nyangkut”
-                        task.wait(0.05)
                     end
+
                 end, function(e)
                     return debug.traceback(tostring(e), 2)
                 end)
 
                 if not ok then
                     statusLbl.Text = "Status: Error, lanjut…"
-                    appendAutoTourLog(("Step %d: %s"):format(idx, tostring(err)))
+                    appendAutoTourLog("Step " .. i .. ": " .. tostring(err))
                 end
 
-                -- jeda antar lokasi (versi counter)
+
+                -- jeda antar lokasi
                 local waitSec = parseInterval()
-                local elapsed = 0
-                while tourRunning and elapsed < waitSec do
-                    local dt = task.wait(0.05)
-                    elapsed += dt or 0.05
+                local t0 = tick()
+                while tourRunning and (tick() - t0) < waitSec do
+                    task.wait(0.05)
                 end
             end
-
             if tourRunning then task.wait(0.1) end
         end
         statusLbl.Text = "Status: Stopped"
