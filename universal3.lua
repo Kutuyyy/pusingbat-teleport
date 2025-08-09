@@ -2,63 +2,34 @@
     Pusingbat Hub (Server-only Persistence)
     Tabs: Main • Misc • Teleport • Config
 
-    • Semua config & export lokasi disimpan ke server kamu:
-      - POST /v1/usage { username, hwid }
-      - GET  /v1/users/:hwid  -> {autoload, configs, exports}
-      - PUT  /v1/users/:hwid  -> body sama, plus optional { meta = { username } }
+    ✔ Server-only: configs & exports tersimpan di server kamu (Node.js)
+    ✔ Auto-load config dari server saat start (autoload)
+    ✔ Tracking ke /v1/usage (username + HWID)
+    ✔ Kalau server mati: UI & fitur tetap jalan; penyimpanan non-aktif (tidak error/crash)
 
-    • Tanpa penyimpanan lokal sama sekali (tidak pakai writefile/readfile).
-    • Jika server tidak bisa dihubungi, UI tetap jalan, tapi perubahan TIDAK tersimpan.
+    >>> PENTING <<<
+    1) Ubah API_URL ke alamat server kamu (contoh: "http://123.45.67.89:3087")
+    2) Ubah API_KEY ke key yang sama dengan di server.js (X-API-Key)
 
-    Letakkan sebagai LocalScript di StarterPlayer > StarterPlayerScripts
+    Letakkan script ini sebagai LocalScript di StarterPlayer > StarterPlayerScripts
 ]]--
 
--- ===== CONFIG SERVER =====
-local API_BASE = "http://127.0.0.1:3087"   -- ganti ke domain/IP server kamu
-local API_KEY  = "asdasdasdasdasdasdasdasd" -- SAMAKAN dengan server.js
+-- ====== KONFIGURASI SERVER ======
+local API_URL = "https://9af2851a399d.ngrok-free.app"
+local API_KEY = "asdasdasdasdasdasdasdasd"
+local DEBUG_HTTP = true
 
--- ===== Services =====
-local Players             = game:GetService("Players")
-local UIS                 = game:GetService("UserInputService")
-local RunService          = game:GetService("RunService")
-local Lighting            = game:GetService("Lighting")
-local HttpService         = game:GetService("HttpService")
+-- ====== Services ======
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
 local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
 
 local LocalPlayer = Players.LocalPlayer
 
--- ====== State dasar ======
-local MIN_WALK, MAX_WALK = 8, 200
-local MIN_JUMP, MAX_JUMP = 25, 300
-local walkSpeed = 16
-local jumpPower = 50
-
-local fly = false
-local noclip = false
-local infJumpMobile = false
-local infJumpPC = false
-local noFallDamage = false
-
--- Misc state
-local fullBright = false
-local removeFog  = false
-local defaultFOV = 70
-
-local char, root, hum
-local lv, align
-local lastFreefallHealth, lastFreefallT
-
--- Lighting backup
-local savedLighting
-local savedAtmos
-
--- Teleport & Config (in-memory)
-local savedLocations = {}     -- current locations (tidak otomatis persist; persist via Export -> server)
-local exportedSets   = {}     -- name -> array of { name, position = Vector3 }
-local configs        = {}     -- name -> settings table
-local autoloadName   = nil    -- string|nil
-
--- ====== Util: HWID & Username ======
+-- ====== HWID ======
 local function getHWID()
     local id
     pcall(function()
@@ -67,123 +38,74 @@ local function getHWID()
         if get_hwid then id = get_hwid() return end
         id = RbxAnalyticsService:GetClientId()
     end)
-    id = tostring(id or LocalPlayer.UserId or "unknown")
+    id = tostring(id or (LocalPlayer and LocalPlayer.UserId) or "unknown")
     id = id:gsub("[^%w%-_]", "-")
     return id
 end
 local HWID = getHWID()
-local USERNAME = tostring(LocalPlayer and LocalPlayer.Name or "unknown")
 
--- ====== Util: HTTP Request Wrapper ======
-local function getRequestFunc()
-    return (syn and syn.request)
-        or (http and http.request)
-        or (http_request)
-        or (request)
-        or (fluxus and fluxus.request)
-        or (krnl and krnl.request)
-        or nil
-end
-local function jsonEncode(tbl) return HttpService:JSONEncode(tbl) end
-local function jsonDecode(str) local ok,res=pcall(function() return HttpService:JSONDecode(str) end); return ok and res or nil end
-
-local function doRequest(method, path, bodyTbl)
-    local req = getRequestFunc()
-    if not req then
-        warn("[Pusingbat] Executor HTTP request tidak tersedia.")
-        return nil, "no_http"
-    end
-    local url = API_BASE .. path
-    local headers = {
-        ["X-API-Key"] = API_KEY,
-        ["Content-Type"] = "application/json",
-        ["Accept"] = "application/json",
-    }
-    local body = bodyTbl and jsonEncode(bodyTbl) or nil
+-- ====== HTTP helpers ======
+local function request(method, path, bodyTbl)
     local ok, res = pcall(function()
-        return req({
-            Url = url,
-            Method = method,
-            Headers = headers,
-            Body = body
+        local url = string.format("%s%s", API_URL, path)
+        local headers = {
+            ["Content-Type"] = "application/json",
+            ["X-API-Key"] = API_KEY,
+        }
+        local body = bodyTbl and HttpService:JSONEncode(bodyTbl) or nil
+        return HttpService:RequestAsync({
+            Url = url, Method = method, Headers = headers, Body = body
         })
     end)
-    if not ok or not res then
-        return nil, "request_failed"
+    if not ok or not res then return false, "request-failed" end
+    if not res.Success then return false, res.StatusCode or "http-error" end
+    local data
+    if res.Body and res.Body ~= "" then
+        local good, parsed = pcall(function() return HttpService:JSONDecode(res.Body) end)
+        data = good and parsed or nil
     end
-    if res.StatusCode < 200 or res.StatusCode >= 300 then
-        return nil, "bad_status_"..tostring(res.StatusCode)
-    end
-    local data = jsonDecode(res.Body or "")
-    return data, nil
+    return true, data
 end
 
--- Convert Vector3 <-> table {x=,y=,z=}
-local function vecToTable(v)
-    return { x = v.X, y = v.Y, z = v.Z }
+local function apiGetUser(hwid)
+    return request("GET", "/v1/users/"..hwid, nil)
 end
-local function tableToVec(t)
-    if typeof(t) == "Vector3" then return t end
-    if type(t) == "table" and t.x and t.y and t.z then
-        return Vector3.new(t.x, t.y, t.z)
-    end
-    return Vector3.new(0,0,0)
+local function apiPutUser(hwid, userObj)
+    return request("PUT", "/v1/users/"..hwid, userObj)
+end
+local function apiUsage(username, hwid)
+    return request("POST", "/v1/usage", { username = username, hwid = hwid })
 end
 
--- ====== Server Sync ======
-local function postUsage()
-    doRequest("POST", "/v1/usage", { username = USERNAME, hwid = HWID })
-    -- tidak perlu handling error; best-effort
-end
+-- ====== STATE (Gameplay) ======
+local MIN_WALK, MAX_WALK = 8, 200
+local MIN_JUMP, MAX_JUMP = 25, 300
+local walkSpeed, jumpPower = 16, 50
 
-local function loadFromServer()
-    local data, err = doRequest("GET", "/v1/users/"..HWID)
-    if not data then
-        warn("[Pusingbat] GET users gagal:", err)
-        return
-    end
-    autoloadName = data.autoload or nil
-    configs = data.configs or {}
-    exportedSets = {}
-    local exp = data.exports or {}
-    for name, arr in pairs(exp) do
-        local list = {}
-        for _,loc in ipairs(arr) do
-            list[#list+1] = {
-                name     = tostring(loc.name or "Location"),
-                position = tableToVec(loc.position or {x=0,y=0,z=0}),
-            }
-        end
-        exportedSets[name] = list
-    end
-end
+local fly, noclip = false, false
+local infJumpMobile, infJumpPC = false, false
+local noFallDamage = false
 
-local function pushToServer()
-    -- serialize exports (Vector3 -> table)
-    local expOut = {}
-    for name, arr in pairs(exportedSets) do
-        local list = {}
-        for _,loc in ipairs(arr) do
-            list[#list+1] = {
-                name = tostring(loc.name or "Location"),
-                position = vecToTable(loc.position or Vector3.new(0,0,0))
-            }
-        end
-        expOut[name] = list
-    end
-    local body = {
-        autoload = autoloadName,
-        configs  = configs,
-        exports  = expOut,
-        meta     = { username = USERNAME },
-    }
-    local _, err = doRequest("PUT", "/v1/users/"..HWID, body)
-    if err then
-        warn("[Pusingbat] PUT users gagal:", err)
-    end
-end
+local fullBright, removeFog = false, false
+local defaultFOV = 70
 
--- ====== Character helpers & core features ======
+local char, root, hum
+local lv, align
+local lastFreefallHealth, lastFreefallT
+
+local savedLighting, savedAtmos
+
+-- ====== STATE (Server) ======
+local serverOnline = false
+local headerStatusLabel -- kecil di header untuk info ONLINE/OFFLINE
+local remoteUser = {
+    autoload = nil,        -- string|nil
+    configs = {},          -- name -> settings table
+    exports = {},          -- name -> array of {name, position = Vector3-like}
+    meta = { username = LocalPlayer and LocalPlayer.Name or "Player" }
+}
+
+-- ====== Character helpers ======
 local function getCharacter()
     char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     root = char:WaitForChild("HumanoidRootPart")
@@ -202,8 +124,8 @@ local function ensurePhysics()
 end
 
 local function cleanupFly()
-    if lv then lv:Destroy() lv=nil end
-    if align then align:Destroy() align=nil end
+    if lv then lv:Destroy() lv = nil end
+    if align then align:Destroy() align = nil end
 end
 
 local function attachFly()
@@ -220,6 +142,7 @@ local function attachFly()
     ensurePhysics()
 end
 
+-- ====== Fly logic ======
 local function setFly(state)
     fly = state and true or false
     if not hum then return end
@@ -242,7 +165,7 @@ local function setFly(state)
             lv.VectorVelocity = Vector3.zero
             lv.Enabled = false
         end
-        if align then align:Destroy() align=nil end
+        if align then align:Destroy() align = nil end
         hum.PlatformStand = false
         hum.AutoRotate = true
         hum:ChangeState(Enum.HumanoidStateType.Running)
@@ -256,9 +179,9 @@ RunService.RenderStepped:Connect(function()
 
     local look = cam.CFrame.LookVector
     local right = cam.CFrame.RightVector
-    local flatLook  = Vector3.new(look.X, 0, look.Z)
-    local flatRight = Vector3.new(right.X,0, right.Z)
-    if flatLook.Magnitude  > 0 then flatLook  = flatLook.Unit end
+    local flatLook = Vector3.new(look.X, 0, look.Z)
+    local flatRight = Vector3.new(right.X, 0, right.Z)
+    if flatLook.Magnitude > 0 then flatLook = flatLook.Unit end
     if flatRight.Magnitude > 0 then flatRight = flatRight.Unit end
 
     local dir = Vector3.zero
@@ -280,7 +203,10 @@ RunService.RenderStepped:Connect(function()
     root.AssemblyAngularVelocity = Vector3.zero
 end)
 
-local function setNoclip(state) noclip = state and true or false end
+-- ====== Noclip ======
+local function setNoclip(state)
+    noclip = state and true or false
+end
 RunService.Stepped:Connect(function()
     if not char or not root then return end
     for _, part in ipairs(char:GetDescendants()) do
@@ -291,6 +217,7 @@ RunService.Stepped:Connect(function()
     if not noclip and root then root.CanCollide = true end
 end)
 
+-- ====== Inf Jump ======
 UIS.JumpRequest:Connect(function()
     if not hum then return end
     if UIS.TouchEnabled and infJumpMobile then
@@ -299,7 +226,6 @@ UIS.JumpRequest:Connect(function()
         hum:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
-
 UIS.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.Space and (not UIS.TouchEnabled) and infJumpPC and hum then
@@ -307,9 +233,10 @@ UIS.InputBegan:Connect(function(input, gp)
     end
 end)
 
+-- ====== No Fall Damage ======
 local function hookFallDamage()
     if not hum then return end
-    hum.StateChanged:Connect(function(_, new)
+    hum.StateChanged:Connect(function(old, new)
         if new == Enum.HumanoidStateType.Freefall then
             lastFreefallHealth = hum.Health
             lastFreefallT = tick()
@@ -328,7 +255,7 @@ local function hookFallDamage()
     end)
 end
 
--- ====== MISC (Fullbright/FOV/Fog) ======
+-- ====== Misc ======
 local function setFullBright(state)
     fullBright = state and true or false
     local atm = Lighting:FindFirstChildOfClass("Atmosphere")
@@ -336,15 +263,15 @@ local function setFullBright(state)
         if not savedLighting then
             savedLighting = {
                 Brightness = Lighting.Brightness,
-                ClockTime  = Lighting.ClockTime,
-                Ambient    = Lighting.Ambient,
+                ClockTime = Lighting.ClockTime,
+                Ambient = Lighting.Ambient,
                 OutdoorAmbient = Lighting.OutdoorAmbient,
-                GlobalShadows  = Lighting.GlobalShadows,
-                FogEnd     = Lighting.FogEnd,
-                FogStart   = Lighting.FogStart,
+                GlobalShadows = Lighting.GlobalShadows,
+                FogEnd = Lighting.FogEnd,
+                FogStart = Lighting.FogStart,
             }
             if atm then
-                savedAtmos = { Density = atm.Density, Haze = atm.Haze, Color = atm.Color }
+                savedAtmos = {Density = atm.Density, Haze = atm.Haze, Color = atm.Color}
             end
         end
         Lighting.Brightness = 3
@@ -353,25 +280,21 @@ local function setFullBright(state)
         Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
         Lighting.GlobalShadows = false
         Lighting.FogStart = 0
-        Lighting.FogEnd   = 1e6
+        Lighting.FogEnd = 1e6
         if atm then atm.Density = 0; atm.Haze = 0 end
     else
         if savedLighting then
             Lighting.Brightness = savedLighting.Brightness
-            Lighting.ClockTime  = savedLighting.ClockTime
-            Lighting.Ambient    = savedLighting.Ambient
+            Lighting.ClockTime = savedLighting.ClockTime
+            Lighting.Ambient = savedLighting.Ambient
             Lighting.OutdoorAmbient = savedLighting.OutdoorAmbient
-            Lighting.GlobalShadows  = savedLighting.GlobalShadows
-            Lighting.FogStart   = savedLighting.FogStart
-            Lighting.FogEnd     = savedLighting.FogEnd
+            Lighting.GlobalShadows = savedLighting.GlobalShadows
+            Lighting.FogStart = savedLighting.FogStart
+            Lighting.FogEnd = savedLighting.FogEnd
         end
         if savedAtmos then
             local atm2 = Lighting:FindFirstChildOfClass("Atmosphere")
-            if atm2 then
-                atm2.Density = savedAtmos.Density
-                atm2.Haze    = savedAtmos.Haze
-                atm2.Color   = savedAtmos.Color
-            end
+            if atm2 then atm2.Density = savedAtmos.Density; atm2.Haze = savedAtmos.Haze; atm2.Color = savedAtmos.Color end
         end
     end
 end
@@ -381,12 +304,12 @@ local function setRemoveFog(state)
     local atm = Lighting:FindFirstChildOfClass("Atmosphere")
     if removeFog then
         Lighting.FogStart = 0
-        Lighting.FogEnd   = 1e6
+        Lighting.FogEnd = 1e6
         if atm then atm.Density = 0; atm.Haze = 0 end
     else
         if not fullBright and savedLighting then
             Lighting.FogStart = savedLighting.FogStart
-            Lighting.FogEnd   = savedLighting.FogEnd
+            Lighting.FogEnd = savedLighting.FogEnd
             if savedAtmos then
                 local a = Lighting:FindFirstChildOfClass("Atmosphere")
                 if a then a.Density = savedAtmos.Density; a.Haze = savedAtmos.Haze end
@@ -402,16 +325,15 @@ local function setFOV(value)
 end
 
 -- ====== UI ======
-local MainGUI, ShowPillGUI
-
+local MainGUI
+local ShowPillGUI
 local function showPill()
     if ShowPillGUI then ShowPillGUI:Destroy() end
-    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
     local sg = Instance.new("ScreenGui")
     sg.Name = "PusingPill"
     sg.ResetOnSpawn = false
     sg.IgnoreGuiInset = true
-    sg.Parent = PlayerGui
+    sg.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.fromOffset(160, 46)
@@ -429,13 +351,14 @@ local function showPill()
         if MainGUI then MainGUI.Enabled = true end
         if ShowPillGUI then ShowPillGUI:Destroy() ShowPillGUI=nil end
     end)
+
     ShowPillGUI = sg
 end
 
 local function createUI()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-    -- Loading overlay (5s)
+    -- Loading overlay 5 detik
     local overlay = Instance.new("ScreenGui")
     overlay.Name = "PusingbatLoading"
     overlay.ResetOnSpawn = false
@@ -479,7 +402,7 @@ local function createUI()
 
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.fromOffset(480, 480)
+    frame.Size = UDim2.fromOffset(440, 420) -- tidak terlalu tinggi; nyaman mobile
     frame.Position = UDim2.new(0, 24, 0, 120)
     frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
     frame.BackgroundTransparency = 0.15
@@ -496,7 +419,7 @@ local function createUI()
 
     local title = Instance.new("TextLabel")
     title.BackgroundTransparency = 1
-    title.Size = UDim2.new(1, -220, 1, 0)
+    title.Size = UDim2.new(1, -240, 1, 0)
     title.Position = UDim2.new(0, 10, 0, 0)
     title.Font = Enum.Font.GothamBold
     title.TextSize = 18
@@ -505,6 +428,18 @@ local function createUI()
     title.Text = "Created by pusingbat"
     title.Parent = header
 
+    headerStatusLabel = Instance.new("TextLabel")
+    headerStatusLabel.BackgroundTransparency = 1
+    headerStatusLabel.Size = UDim2.new(0, 120, 1, 0)
+    headerStatusLabel.Position = UDim2.new(1, -390, 0, 0)
+    headerStatusLabel.Font = Enum.Font.Gotham
+    headerStatusLabel.TextSize = 12
+    headerStatusLabel.TextXAlignment = Enum.TextXAlignment.Right
+    headerStatusLabel.TextColor3 = Color3.fromRGB(200,200,200)
+    headerStatusLabel.Text = "[CHECKING]"
+    headerStatusLabel.Parent = header
+
+    -- Search / Minimize / Close
     local searchBtn = Instance.new("ImageButton")
     searchBtn.Size = UDim2.fromOffset(26, 26)
     searchBtn.Position = UDim2.new(1, -96, 0.5, -13)
@@ -537,6 +472,7 @@ local function createUI()
     btnClose.Parent = header
     Instance.new("UICorner", btnClose).CornerRadius = UDim.new(1,0)
 
+    -- Search panel
     local searchPanel = Instance.new("Frame")
     searchPanel.Size = UDim2.fromOffset(220, 36)
     searchPanel.Position = UDim2.new(1, -346, 0, 42)
@@ -563,6 +499,7 @@ local function createUI()
         if searchPanel.Visible then searchBox:CaptureFocus() end
     end)
 
+    -- Drag area
     local drag = Instance.new("Frame")
     drag.BackgroundTransparency = 1
     drag.Size = UDim2.new(1, -240, 1, 0)
@@ -595,12 +532,12 @@ local function createUI()
     local tabTpBtn   = makeTabButton("Teleport", 232)
     local tabCfgBtn  = makeTabButton("Config", 348)
 
+    -- Scroll per tab
     local function makeScroll()
         local scroll = Instance.new("ScrollingFrame")
         scroll.Size = UDim2.new(1, -16, 1, -88)
         scroll.Position = UDim2.new(0, 8, 0, 78)
         scroll.BackgroundTransparency = 1
-        scroll.BorderSizePixel = 0
         scroll.CanvasSize = UDim2.new(0,0,0,0)
         scroll.ScrollBarThickness = 6
         scroll.Visible = false
@@ -624,6 +561,7 @@ local function createUI()
     local tpScroll   = makeScroll()
     local cfgScroll  = makeScroll()
 
+    -- Builder helpers
     local function createRow(parent, height)
         local row = Instance.new("Frame")
         row.Size = UDim2.new(1, 0, 0, height)
@@ -655,7 +593,6 @@ local function createUI()
         switch.BorderSizePixel = 0
         switch.Parent = row
         Instance.new("UICorner", switch).CornerRadius = UDim.new(1,0)
-
         local knob = Instance.new("Frame")
         knob.Size = UDim2.fromOffset(20,20)
         knob.Position = initial and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10)
@@ -677,7 +614,7 @@ local function createUI()
             end
         end)
         row:SetAttribute("label", labelText)
-        return { Row=row, Set=function(v) value = v and true or false; redraw(); if callback then task.spawn(callback, value) end end }
+        return {Row=row, Set=function(v) value=v and true or false; redraw(); if callback then task.spawn(callback, value) end end}
     end
 
     local function makeSlider(parent, labelText, minV, maxV, initial, callback)
@@ -747,7 +684,7 @@ local function createUI()
         end)
 
         row:SetAttribute("label", labelText)
-        return { Row=row, Set=function(v) local pct=(math.clamp(v,minV,maxV)-minV)/(maxV-minV); setFromPct(pct) end }
+        return {Row=row, Set=function(v) local pct=(math.clamp(v,minV,maxV)-minV)/(maxV-minV); setFromPct(pct) end}
     end
 
     -- ===== MAIN =====
@@ -756,8 +693,8 @@ local function createUI()
     local wsSl  = makeSlider(mainScroll, "Walk Speed (studs)", MIN_WALK, MAX_WALK, walkSpeed, function(v) walkSpeed=v; ensurePhysics() end)
     local jpSl  = makeSlider(mainScroll, "Jump Power (studs)", MIN_JUMP, MAX_JUMP, jumpPower, function(v) jumpPower=v; ensurePhysics() end)
     local ijmSw = makeSwitch(mainScroll, "Inf Jump (Mobile)", false, function(v) infJumpMobile=v end)
-    local ijpSw = makeSwitch(mainScroll, "Inf Jump (PC)",     false, function(v) infJumpPC=v end)
-    local nfdSw = makeSwitch(mainScroll, "No Fall Damage",    false, function(v) noFallDamage=v end)
+    local ijpSw = makeSwitch(mainScroll, "Inf Jump (PC)", false, function(v) infJumpPC=v end)
+    local nfdSw = makeSwitch(mainScroll, "No Fall Damage", false, function(v) noFallDamage=v end)
 
     -- ===== MISC =====
     local fbSw  = makeSwitch(miscScroll, "Fullbright (Terang Terus)", false, function(v) setFullBright(v) end)
@@ -765,7 +702,11 @@ local function createUI()
     local rfSw  = makeSwitch(miscScroll, "Remove Fog", false, function(v) setRemoveFog(v) end)
 
     -- ===== TELEPORT =====
-    local function createTpRow(height) return createRow(tpScroll, height) end
+    local savedLocations = {} -- array of {name, position=Vector3, selected=false, checkbox=instance}
+
+    local function createTpRow(height)
+        return createRow(tpScroll, height)
+    end
 
     local btnBar = createTpRow(40)
     btnBar.BackgroundTransparency = 1
@@ -817,55 +758,6 @@ local function createUI()
     importBtn.Parent = eximBar
     Instance.new("UICorner", importBtn).CornerRadius = UDim.new(0, 8)
 
-    local function createLocationEntry(locationData)
-        local entry = createTpRow(56)
-        local checkbox = Instance.new("TextButton")
-        checkbox.Size = UDim2.fromOffset(26, 26)
-        checkbox.Position = UDim2.new(0, 10, 0.5, -13)
-        checkbox.Text = ""
-        checkbox.BackgroundColor3 = Color3.fromRGB(80,80,80)
-        checkbox.BorderSizePixel = 0
-        checkbox.Parent = entry
-        Instance.new("UICorner", checkbox).CornerRadius = UDim.new(0, 6)
-        locationData.checkbox = checkbox
-
-        local tpBtn = Instance.new("TextButton")
-        tpBtn.Size = UDim2.new(1, -56, 0.5, -4)
-        tpBtn.Position = UDim2.new(0, 46, 0, 6)
-        tpBtn.Text = locationData.name
-        tpBtn.Font = Enum.Font.GothamBold
-        tpBtn.TextSize = 14
-        tpBtn.TextColor3 = Color3.fromRGB(255,255,255)
-        tpBtn.BackgroundColor3 = Color3.fromRGB(0,80,120)
-        tpBtn.BorderSizePixel = 0
-        tpBtn.Parent = entry
-        Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
-
-        local info = Instance.new("TextLabel")
-        info.Size = UDim2.new(1, -56, 0.5, -4)
-        info.Position = UDim2.new(0, 46, 0.5, 2)
-        info.Text = string.format("X: %.1f, Y: %.1f, Z: %.1f", locationData.position.X, locationData.position.Y, locationData.position.Z)
-        info.BackgroundTransparency = 1
-        info.TextColor3 = Color3.fromRGB(200,200,200)
-        info.TextXAlignment = Enum.TextXAlignment.Left
-        info.Font = Enum.Font.Gotham
-        info.TextSize = 13
-        info.Parent = entry
-
-        checkbox.MouseButton1Click:Connect(function()
-            locationData.selected = not locationData.selected
-            checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
-        end)
-        tpBtn.MouseButton1Click:Connect(function()
-            local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-            local hrp = character:WaitForChild("HumanoidRootPart")
-            hrp.CFrame = CFrame.new(locationData.position)
-        end)
-
-        entry:SetAttribute("label", string.lower(locationData.name))
-        return entry
-    end
-
     local function promptName(defaultText, titleText, onSave)
         local prompt = Instance.new("ScreenGui")
         prompt.Name = "PB_Prompt"
@@ -913,12 +805,61 @@ local function createUI()
         cancel.MouseButton1Click:Connect(function() prompt:Destroy() end)
     end
 
+    local function createLocationEntry(locationData)
+        local entry = createRow(tpScroll, 56)
+        local checkbox = Instance.new("TextButton")
+        checkbox.Size = UDim2.fromOffset(26, 26)
+        checkbox.Position = UDim2.new(0, 10, 0.5, -13)
+        checkbox.Text = ""
+        checkbox.BackgroundColor3 = Color3.fromRGB(80,80,80)
+        checkbox.BorderSizePixel = 0
+        checkbox.Parent = entry
+        Instance.new("UICorner", checkbox).CornerRadius = UDim.new(0, 6)
+        locationData.checkbox = checkbox
+
+        local tpBtn = Instance.new("TextButton")
+        tpBtn.Size = UDim2.new(1, -56, 0.5, -4)
+        tpBtn.Position = UDim2.new(0, 46, 0, 6)
+        tpBtn.Text = locationData.name
+        tpBtn.Font = Enum.Font.GothamBold
+        tpBtn.TextSize = 14
+        tpBtn.TextColor3 = Color3.fromRGB(255,255,255)
+        tpBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
+        tpBtn.BorderSizePixel = 0
+        tpBtn.Parent = entry
+        Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+
+        local info = Instance.new("TextLabel")
+        info.Size = UDim2.new(1, -56, 0.5, -4)
+        info.Position = UDim2.new(0, 46, 0.5, 2)
+        info.Text = string.format("X: %.1f, Y: %.1f, Z: %.1f", locationData.position.X, locationData.position.Y, locationData.position.Z)
+        info.BackgroundTransparency = 1
+        info.TextColor3 = Color3.fromRGB(200,200,200)
+        info.TextXAlignment = Enum.TextXAlignment.Left
+        info.Font = Enum.Font.Gotham
+        info.TextSize = 13
+        info.Parent = entry
+
+        checkbox.MouseButton1Click:Connect(function()
+            locationData.selected = not locationData.selected
+            checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+        end)
+        tpBtn.MouseButton1Click:Connect(function()
+            local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+            local hrp = character:WaitForChild("HumanoidRootPart")
+            hrp.CFrame = CFrame.new(locationData.position)
+        end)
+
+        entry:SetAttribute("label", string.lower(locationData.name))
+        return entry
+    end
+
     addBtn.MouseButton1Click:Connect(function()
         local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
         local hrp = character:WaitForChild("HumanoidRootPart")
         local defaultName = "Location "..tostring(#savedLocations + 1)
         promptName(defaultName, "Name this location:", function(name)
-            local locationData = { name = name, position = hrp.Position, selected = false }
+            local locationData = {name=name, position=hrp.Position, selected=false}
             table.insert(savedLocations, locationData)
             createLocationEntry(locationData)
         end)
@@ -936,84 +877,80 @@ local function createUI()
 
     exportBtn.MouseButton1Click:Connect(function()
         if #savedLocations == 0 then return end
+        if not serverOnline then return end
         local defaultName = "Export "..tostring(os.time())
         promptName(defaultName, "Export as:", function(name)
-            local copy = {}
+            local arr = {}
             for _,loc in ipairs(savedLocations) do
-                copy[#copy+1] = { name = loc.name, position = loc.position }
+                arr[#arr+1] = { name = loc.name, position = {X=loc.position.X, Y=loc.position.Y, Z=loc.position.Z} }
             end
-            exportedSets[name] = copy
-            -- persist to server
-            pushToServer()
+            remoteUser.exports[name] = arr
+            apiPutUser(HWID, remoteUser) -- best-effort
         end)
     end)
 
     importBtn.MouseButton1Click:Connect(function()
-        -- refresh dari server dulu supaya up-to-date
-        loadFromServer()
-        local popup = Instance.new("ScreenGui")
-        popup.Name = "PB_ImportList"
-        popup.Parent = PlayerGui
-        local f = Instance.new("Frame")
-        f.Size = UDim2.fromOffset(320, 280)
-        f.Position = UDim2.new(0.5, -160, 0.5, -140)
-        f.BackgroundColor3 = Color3.fromRGB(45,45,50)
-        f.BorderSizePixel = 0
-        f.Parent = popup
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
-        local lbl = Instance.new("TextLabel")
-        lbl.Size = UDim2.new(1, 0, 0, 30)
-        lbl.BackgroundColor3 = Color3.fromRGB(70,70,70)
-        lbl.Text = "Choose export to import"
-        lbl.TextColor3 = Color3.new(1,1,1)
-        lbl.Parent = f
-        local list = Instance.new("ScrollingFrame")
-        list.Size = UDim2.new(1, -12, 1, -50)
-        list.Position = UDim2.new(0, 6, 0, 40)
-        list.BackgroundTransparency = 1
-        list.ScrollBarThickness = 6
-        list.Parent = f
-        local lay = Instance.new("UIListLayout")
-        lay.Parent = list
-        lay.Padding = UDim.new(0,6)
-
-        for name,set in pairs(exportedSets) do
-            local b = Instance.new("TextButton")
-            b.Size = UDim2.new(1, -4, 0, 28)
-            b.Text = name
-            b.BackgroundColor3 = Color3.fromRGB(60,60,70)
-            b.TextColor3 = Color3.new(1,1,1)
-            b.Parent = list
+        -- refresh dari server dulu
+        if serverOnline then
+            local ok, data = apiGetUser(HWID)
+            if ok and data then remoteUser = data end
+        end
+        local popup = Instance.new("ScreenGui"); popup.Parent = PlayerGui
+        local f = Instance.new("Frame"); f.Size = UDim2.fromOffset(320, 280); f.Position = UDim2.new(0.5,-160,0.5,-140)
+        f.BackgroundColor3 = Color3.fromRGB(45,45,50); f.BorderSizePixel = 0; f.Parent = popup
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0,10)
+        local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1,0,0,30); lbl.Text = "Choose export to import"
+        lbl.BackgroundColor3 = Color3.fromRGB(70,70,70); lbl.TextColor3 = Color3.new(1,1,1); lbl.Parent = f
+        local list = Instance.new("ScrollingFrame"); list.Size = UDim2.new(1,-12,1,-50); list.Position = UDim2.new(0,6,0,40)
+        list.BackgroundTransparency = 1; list.ScrollBarThickness = 6; list.Parent = f
+        local lay = Instance.new("UIListLayout"); lay.Parent = list; lay.Padding = UDim.new(0,6)
+        for name,set in pairs(remoteUser.exports or {}) do
+            local b = Instance.new("TextButton"); b.Size = UDim2.new(1,-4,0,28); b.Text = name
+            b.BackgroundColor3 = Color3.fromRGB(60,60,70); b.TextColor3 = Color3.new(1,1,1); b.Parent = list
             Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
             b.MouseButton1Click:Connect(function()
-                -- clear current UI list
+                -- clear current UI
                 for i=#savedLocations,1,-1 do
                     local chk = savedLocations[i].checkbox
                     if chk and chk.Parent then chk.Parent:Destroy() end
-                    table.remove(savedLocations, i)
+                    table.remove(savedLocations,i)
                 end
-                -- load from chosen export
                 for _,loc in ipairs(set) do
-                    local nd = { name = loc.name, position = loc.position, selected = false }
+                    local pos = Vector3.new(loc.position.X, loc.position.Y, loc.position.Z)
+                    local nd = { name = loc.name, position = pos, selected=false }
                     savedLocations[#savedLocations+1] = nd
                     createLocationEntry(nd)
                 end
                 popup:Destroy()
             end)
         end
-
-        local closeB = Instance.new("TextButton")
-        closeB.Size = UDim2.new(1, -12, 0, 28)
-        closeB.Position = UDim2.new(0,6,1,-34)
-        closeB.Text = "Close"
-        closeB.BackgroundColor3 = Color3.fromRGB(90,60,60)
-        closeB.TextColor3 = Color3.new(1,1,1)
-        closeB.Parent = f
+        local closeB = Instance.new("TextButton"); closeB.Size = UDim2.new(1,-12,0,28); closeB.Position = UDim2.new(0,6,1,-34)
+        closeB.Text = "Close"; closeB.BackgroundColor3 = Color3.fromRGB(90,60,60); closeB.TextColor3 = Color3.new(1,1,1); closeB.Parent = f
         Instance.new("UICorner", closeB).CornerRadius = UDim.new(0,6)
         closeB.MouseButton1Click:Connect(function() popup:Destroy() end)
     end)
 
-    -- ===== CONFIG TAB =====
+    -- ===== CONFIG =====
+    local function getCurrentSettings()
+        return {
+            fly=fly, noclip=noclip, infJumpMobile=infJumpMobile, infJumpPC=infJumpPC, noFallDamage=noFallDamage,
+            walkSpeed=walkSpeed, jumpPower=jumpPower, fullBright=fullBright, removeFog=removeFog, fov=defaultFOV,
+        }
+    end
+    local function applySettings(s)
+        if not s then return end
+        wsSl.Set(s.walkSpeed or walkSpeed); walkSpeed = s.walkSpeed or walkSpeed; ensurePhysics()
+        jpSl.Set(s.jumpPower or jumpPower); jumpPower = s.jumpPower or jumpPower; ensurePhysics()
+        setFOV(s.fov or defaultFOV)
+        fbSw.Set(s.fullBright or false)
+        rfSw.Set(s.removeFog or false)
+        flySw.Set(s.fly or false)
+        ncSw.Set(s.noclip or false)
+        ijmSw.Set(s.infJumpMobile or false)
+        ijpSw.Set(s.infJumpPC or false)
+        nfdSw.Set(s.noFallDamage or false)
+    end
+
     local nameRow = createRow(cfgScroll, 58)
     nameRow:SetAttribute("label","Config Name")
     local nameLbl = Instance.new("TextLabel")
@@ -1041,7 +978,7 @@ local function createUI()
     local saveBtn = Instance.new("TextButton")
     saveBtn.Size = UDim2.new(1, -20, 1, -10)
     saveBtn.Position = UDim2.new(0,10,0,5)
-    saveBtn.Text = "Save Config (server)"
+    saveBtn.Text = "Save Config (Server)"
     saveBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
     saveBtn.TextColor3 = Color3.new(1,1,1)
     saveBtn.BorderSizePixel = 0
@@ -1053,51 +990,30 @@ local function createUI()
     lt.BackgroundTransparency = 1
     lt.Size = UDim2.new(1, -20, 1, 0)
     lt.Position = UDim2.new(0,10,0,0)
-    lt.Text = "Saved Configs (server)"
+    lt.Text = "Saved Configs (Server)"
     lt.TextColor3 = Color3.new(1,1,1)
     lt.TextXAlignment = Enum.TextXAlignment.Left
     lt.Font = Enum.Font.GothamBold
     lt.TextSize = 14
     lt.Parent = listTitle
 
-    local cfgList = createRow(cfgScroll, 200)
+    local cfgList = createRow(cfgScroll, 180)
     cfgList.BackgroundTransparency = 1
     local cfgScrollInner = Instance.new("ScrollingFrame")
-    cfgScrollInner.Size = UDim2.new(1, -12, 1, -0)
+    cfgScrollInner.Size = UDim2.new(1, -12, 1, 0)
     cfgScrollInner.Position = UDim2.new(0,6,0,0)
     cfgScrollInner.BackgroundTransparency = 1
-    cfgScrollInner.Parent = cfgList
     cfgScrollInner.ScrollBarThickness = 6
+    cfgScrollInner.Parent = cfgList
     local cfgLay = Instance.new("UIListLayout")
     cfgLay.Parent = cfgScrollInner
     cfgLay.Padding = UDim.new(0,6)
 
-    local function getCurrentSettings()
-        return {
-            fly=fly, noclip=noclip, infJumpMobile=infJumpMobile, infJumpPC=infJumpPC, noFallDamage=noFallDamage,
-            walkSpeed=walkSpeed, jumpPower=jumpPower,
-            fullBright=fullBright, removeFog=removeFog, fov=defaultFOV,
-        }
-    end
-    local function applySettings(s)
-        if not s then return end
-        wsSl.Set(s.walkSpeed or walkSpeed)
-        jpSl.Set(s.jumpPower or jumpPower)
-        setFOV(s.fov or defaultFOV)
-        fbSw.Set(s.fullBright or false)
-        rfSw.Set(s.removeFog or false)
-        flySw.Set(s.fly or false)
-        ncSw.Set(s.noclip or false)
-        ijmSw.Set(s.infJumpMobile or false)
-        ijpSw.Set(s.infJumpPC or false)
-        nfdSw.Set(s.noFallDamage or false)
-    end
-
     local function rebuildCfgList()
         for _,ch in ipairs(cfgScrollInner:GetChildren()) do
-            if ch:IsA("Frame") or ch:IsA("TextButton") then ch:Destroy() end
+            if ch:IsA("TextButton") or ch:IsA("Frame") then ch:Destroy() end
         end
-        for name, s in pairs(configs) do
+        for name, s in pairs(remoteUser.configs or {}) do
             local row = Instance.new("Frame")
             row.Size = UDim2.new(1, -4, 0, 32)
             row.BackgroundColor3 = Color3.fromRGB(50,50,58)
@@ -1108,7 +1024,7 @@ local function createUI()
             nameLbl.BackgroundTransparency = 1
             nameLbl.Size = UDim2.new(0.5, -10, 1, 0)
             nameLbl.Position = UDim2.new(0,10,0,0)
-            nameLbl.Text = name .. (autoloadName==name and "  (Auto)" or "")
+            nameLbl.Text = name .. ((remoteUser.autoload==name) and "  (Auto)" or "")
             nameLbl.TextXAlignment = Enum.TextXAlignment.Left
             nameLbl.TextColor3 = Color3.new(1,1,1)
             nameLbl.Parent = row
@@ -1126,7 +1042,7 @@ local function createUI()
             autoB.Size = UDim2.new(0.2, -6, 0, 26)
             autoB.Position = UDim2.new(0.7, 0, 0.5, -13)
             autoB.Text = "Auto"
-            autoB.BackgroundColor3 = autoloadName==name and Color3.fromRGB(0,150,0) or Color3.fromRGB(70,70,70)
+            autoB.BackgroundColor3 = (remoteUser.autoload==name) and Color3.fromRGB(0,150,0) or Color3.fromRGB(70,70,70)
             autoB.TextColor3 = Color3.new(1,1,1)
             autoB.Parent = row
             Instance.new("UICorner", autoB).CornerRadius = UDim.new(0,6)
@@ -1142,27 +1058,31 @@ local function createUI()
 
             loadB.MouseButton1Click:Connect(function() applySettings(s) end)
             autoB.MouseButton1Click:Connect(function()
-                autoloadName = (autoloadName==name) and nil or name
-                pushToServer()
+                if not serverOnline then return end
+                remoteUser.autoload = (remoteUser.autoload==name) and nil or name
+                apiPutUser(HWID, remoteUser)
                 rebuildCfgList()
             end)
             delB.MouseButton1Click:Connect(function()
-                configs[name] = nil
-                if autoloadName == name then autoloadName = nil end
-                pushToServer()
+                if not serverOnline then return end
+                remoteUser.configs[name] = nil
+                if remoteUser.autoload == name then remoteUser.autoload = nil end
+                apiPutUser(HWID, remoteUser)
                 rebuildCfgList()
             end)
         end
     end
 
     saveBtn.MouseButton1Click:Connect(function()
+        if not serverOnline then return end
         local nm = nameBox.Text ~= "" and nameBox.Text or ("config-"..tostring(os.time()))
-        configs[nm] = getCurrentSettings()
-        pushToServer()
+        remoteUser.configs[nm] = getCurrentSettings()
+        apiPutUser(HWID, remoteUser)
         rebuildCfgList()
     end)
 
-    -- Tab switching + search
+    -- ===== Search per tab =====
+    local activeTab = "Main"
     local function applySearchTo(parent)
         local q = string.lower(searchBox.Text or "")
         for _,row in ipairs(parent:GetChildren()) do
@@ -1172,23 +1092,16 @@ local function createUI()
             end
         end
     end
-
-    local activeTab = "Main"
-    local function showTab(name)
-        activeTab = name
-        mainScroll.Visible = (name == "Main")
-        miscScroll.Visible = (name == "Misc")
-        tpScroll.Visible   = (name == "Teleport")
-        cfgScroll.Visible  = (name == "Config")
-        if name == "Main" then applySearchTo(mainScroll)
-        elseif name == "Misc" then applySearchTo(miscScroll)
-        elseif name == "Teleport" then
-            -- biarkan bar tombol selalu tampil, yang lain difilter
+    local function applySearch()
+        if activeTab == "Main" then applySearchTo(mainScroll)
+        elseif activeTab == "Misc" then applySearchTo(miscScroll)
+        elseif activeTab == "Teleport" then
+            -- biarkan bar tombol tetap terlihat
             local q = string.lower(searchBox.Text or "")
             for _,row in ipairs(tpScroll:GetChildren()) do
                 if row:IsA("Frame") then
-                    local isToolbar = (row == btnBar) or (row == eximBar)
-                    if not isToolbar then
+                    local keep = (row == btnBar) or (row == eximBar)
+                    if not keep then
                         local label = string.lower(tostring(row:GetAttribute("label") or row.Name or ""))
                         row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
                     end
@@ -1198,10 +1111,17 @@ local function createUI()
             applySearchTo(cfgScroll)
         end
     end
-    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
-        showTab(activeTab)
-    end)
+    searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
 
+    -- Tab switching
+    local function showTab(name)
+        activeTab = name
+        mainScroll.Visible = (name == "Main")
+        miscScroll.Visible = (name == "Misc")
+        tpScroll.Visible   = (name == "Teleport")
+        cfgScroll.Visible  = (name == "Config")
+        applySearch()
+    end
     tabMainBtn.MouseButton1Click:Connect(function() showTab("Main") end)
     tabMiscBtn.MouseButton1Click:Connect(function() showTab("Misc") end)
     tabTpBtn.MouseButton1Click:Connect(function() showTab("Teleport") end)
@@ -1212,12 +1132,13 @@ local function createUI()
     local minimized = false
     btnMin.MouseButton1Click:Connect(function()
         minimized = not minimized
-        mainScroll.Visible = not minimized and activeTab == "Main"
-        miscScroll.Visible = not minimized and activeTab == "Misc"
-        tpScroll.Visible   = not minimized and activeTab == "Teleport"
-        cfgScroll.Visible  = not minimized and activeTab == "Config"
-        tabs.Visible = not minimized
-        frame.Size = minimized and UDim2.fromOffset(480, 56) or UDim2.fromOffset(480, 480)
+        local vis = not minimized
+        mainScroll.Visible = vis and activeTab == "Main"
+        miscScroll.Visible = vis and activeTab == "Misc"
+        tpScroll.Visible   = vis and activeTab == "Teleport"
+        cfgScroll.Visible  = vis and activeTab == "Config"
+        tabs.Visible = vis
+        frame.Size = minimized and UDim2.fromOffset(440, 56) or UDim2.fromOffset(440, 420)
     end)
     btnClose.MouseButton1Click:Connect(function()
         MainGUI.Enabled = false
@@ -1225,26 +1146,19 @@ local function createUI()
     end)
 
     -- Drag window
-    local draggingFrame, dragStart, startPos
-    local function begin(input)
-        draggingFrame = true
-        dragStart = input.Position
-        startPos = frame.Position
-    end
-    local function update(input)
-        if draggingFrame then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end
+    local draggingFrame = false
+    local dragStart, startPos
     drag.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            begin(input)
+            draggingFrame = true
+            dragStart = input.Position
+            startPos = frame.Position
         end
     end)
     UIS.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            update(input)
+        if draggingFrame and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
     drag.InputEnded:Connect(function(input)
@@ -1253,49 +1167,55 @@ local function createUI()
         end
     end)
 
-    -- Setelah 5 detik baru buka panel
+    -- ====== Setelah 5 detik tutup loading, tampilkan panel ======
     task.delay(5, function()
         overlay:Destroy()
         MainGUI.Enabled = true
 
-        -- Ambil data terbaru dari server dulu
-        loadFromServer()
-        -- tampilkan list config
-        rebuildCfgList()
+        -- Ping usage (best-effort)
+        task.spawn(function() apiUsage(LocalPlayer.Name, HWID) end)
 
-        -- Auto-load config kalau ada
-        if autoloadName and configs[autoloadName] then
-            task.defer(function()
-                applySettings(configs[autoloadName])
-            end)
-        end
+        -- Tarik data user dari server
+        task.spawn(function()
+            local ok, data = apiGetUser(HWID)
+            if ok and data then
+                serverOnline = true
+                headerStatusLabel.Text = "[ONLINE]"
+                -- merge minimal: pastikan meta.username terisi
+                data.meta = data.meta or {}
+                data.meta.username = LocalPlayer.Name
+                remoteUser = data
+                -- autoload
+                if remoteUser.autoload and remoteUser.configs[remoteUser.autoload] then
+                    task.defer(function() applySettings(remoteUser.configs[remoteUser.autoload]) end)
+                end
+            else
+                serverOnline = false
+                headerStatusLabel.Text = "[OFFLINE]"
+            end
+            -- build list config
+            rebuildCfgList()
+        end)
 
-        -- refresh FOV awal
+        -- Set FOV awal
         setFOV(defaultFOV)
     end)
 end
 
 -- ====== Init ======
-postUsage()
 getCharacter()
 attachFly()
 ensurePhysics()
 hookFallDamage()
 
 LocalPlayer.CharacterAdded:Connect(function()
-    getCharacter()
-    attachFly()
-    ensurePhysics()
-    hookFallDamage()
-    fly = false
-    noclip = false
+    getCharacter(); attachFly(); ensurePhysics(); hookFallDamage()
+    fly = false; noclip = false
 end)
 
 UIS.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if input.KeyCode == Enum.KeyCode.F then
-        setFly(not fly)
-    end
+    if input.KeyCode == Enum.KeyCode.F then setFly(not fly) end
 end)
 
 createUI()
