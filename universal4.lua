@@ -1842,15 +1842,36 @@ end
 
     -- Input Handling untuk Mobile
     if IS_MOBILE then
-        -- Sistem touch yang lebih baik untuk tombol tour
-        startBtn.Activated:Connect(function()
+        -- Sistem touch yang lebih baik
+        local function createTouchHandler(button, callback)
+            local touchStart = 0
+            local function handleInput(input)
+                if input.UserInputType == Enum.UserInputType.Touch then
+                    if input.UserInputState == Enum.UserInputState.Begin then
+                        touchStart = os.clock()
+                    elseif input.UserInputState == Enum.UserInputState.End then
+                        if os.clock() - touchStart < 0.5 then
+                            callback()
+                        end
+                    end
+                end
+            end
+            
+            button.InputBegan:Connect(handleInput)
+            button.InputEnded:Connect(handleInput)
+        end
+
+        -- Terapkan ke tombol tour
+        createTouchHandler(startBtn, function() 
             if not tourRunning then
+                logBox.Text = ""
                 startAutoTour()
             end
         end)
-        
-        stopBtn.Activated:Connect(stopAutoTour)
+        createTouchHandler(stopBtn, stopAutoTour)
     end
+
+    -- ====== END OF AUTO TOUR PATCH ======
 
     -----------------------------------------------------
     -- Search (filter tab aktif)
