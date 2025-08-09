@@ -6,7 +6,7 @@
 ]]--
 
 -- ========== KONFIG SERVER ==========
-local SERVER_BASE = "https://c437232dda4d.ngrok-free.app"  -- GANTI dengan URL ngrok kamu
+local SERVER_BASE = "https://deep-factual-goat.ngrok-free.app"  -- GANTI dengan URL ngrok kamu
 local API_KEY     = "asdasdasdasdasdasdasdasd"             -- GANTI dengan API key server.py kamu
 
 -- ========== Services ==========
