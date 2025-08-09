@@ -1,13 +1,15 @@
 --[[ 
-    Fly + Utility Controller (UI Bawaan) — by pusingbat request
+    Pusingbat Hub (LocalScript UI Bawaan)
+    Tabs: Main • Misc • Teleport • Config
     Fitur:
       • Loading overlay 5 detik (50% transparansi) "Created by Pusingbat" + panel teks ber-background 50%
-      • Panel UI dengan header "Created by pusingbat" + tombol Search (ikon) / Minimize / Close
-      • Tab: Player & Teleport (ikon). Search memfilter konten tab aktif.
+      • Header: "Created by pusingbat" + Search (ikon) / Minimize / Close
+      • Search memfilter konten di tab aktif
       • Close: sembunyikan panel, munculkan tombol pill "Show Pusing"
       • Minimize: tampilkan header saja (klik lagi untuk restore)
-      • ScrollingFrame untuk konten
-      • Player tab:
+      • ScrollingFrame per tab
+
+      • MAIN (Player):
           - Fly Toggle (default OFF)
           - NoClip Toggle
           - Walk Speed Slider (studs) — pengaruhi jalan & kecepatan fly
@@ -15,11 +17,25 @@
           - Inf Jump (Mobile) Toggle
           - Inf Jump (PC) Toggle
           - No Fall Damage Toggle
-      • Teleport tab (integrasi dari kode kamu):
-          - Daftar lokasi (scroll)
+
+      • MISC:
+          - Fullbright (Terang Terus) Toggle
+          - Field of View Slider
+          - Remove Fog Toggle
+
+      • TELEPORT:
           - Add Current Location (prompt nama)
           - Delete Selected
           - Klik entry untuk teleport
+          - Export Locations (minta nama)
+          - Import Locations (list exports)
+
+      • CONFIG:
+          - Input nama config
+          - Save config (menyimpan semua toggle/slider)
+          - Daftar config (Load / Delete)
+          - Set Auto Load (pilih satu); saat script start akan auto-apply
+
     Letakkan sebagai LocalScript di StarterPlayer > StarterPlayerScripts
 ]]--
 
@@ -27,6 +43,7 @@
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -42,15 +59,28 @@ local infJumpMobile = false
 local infJumpPC = false
 local noFallDamage = false
 
+-- Misc state
+local fullBright = false
+local removeFog = false
+local defaultFOV = 70
+
 local char, root, hum
 local lv       -- LinearVelocity (movement saat fly)
 local align    -- AlignOrientation (lock rotation)
 local lastFreefallHealth
-local fellFromY
 local lastFreefallT
 
--- Teleport state
+-- Lighting originals (untuk restore)
+local savedLighting -- table of original values saat Fullbright ON pertama kali
+local savedAtmos -- original Atmosphere
+
+-- Teleport
 local savedLocations = {}
+local exportedSets = {} -- name -> array of {name, position}
+
+-- Configs
+local configs = {} -- name -> settings table
+local autoloadName = nil
 
 -- ====== Character helpers ======
 local function getCharacter()
@@ -65,7 +95,6 @@ local function ensurePhysics()
 	hum.WalkSpeed = walkSpeed
 	pcall(function() hum.UseJumpPower = true end)
 	hum.JumpPower = jumpPower
-	-- Sesuaikan JumpHeight agar kira-kira konsisten
 	local g = workspace.Gravity
 	local h = (jumpPower * jumpPower) / math.max(2*g, 1)
 	pcall(function() hum.JumpHeight = h end)
@@ -143,7 +172,6 @@ RunService.RenderStepped:Connect(function()
 	if UIS:IsKeyDown(Enum.KeyCode.Space) then vertical = 1 end
 	if UIS:IsKeyDown(Enum.KeyCode.LeftControl) or UIS:IsKeyDown(Enum.KeyCode.LeftShift) then vertical = -1 end
 
-	-- Speed fly mengikuti WalkSpeed
 	local vSpeed = walkSpeed * 0.9
 	local velocity = Vector3.new(0, vertical * vSpeed, 0)
 	if dir.Magnitude > 0 then
@@ -191,25 +219,90 @@ local function hookFallDamage()
 	hum.StateChanged:Connect(function(old, new)
 		if new == Enum.HumanoidStateType.Freefall then
 			lastFreefallHealth = hum.Health
-			fellFromY = root and root.Position.Y or nil
 			lastFreefallT = tick()
 		elseif new == Enum.HumanoidStateType.Landed then
-			if noFallDamage and lastFreefallHealth then
-				if hum.Health < lastFreefallHealth then
-					hum.Health = math.max(hum.Health, lastFreefallHealth)
-				end
+			if noFallDamage and lastFreefallHealth and hum.Health < lastFreefallHealth then
+				hum.Health = math.max(hum.Health, lastFreefallHealth)
 			end
 		end
 	end)
 	hum.HealthChanged:Connect(function(h)
 		if noFallDamage and lastFreefallT and (tick() - lastFreefallT) < 2.5 then
-			if lastFreefallHealth and h < lastFreefallHealth then
-				hum.Health = lastFreefallHealth
-			end
+			if lastFreefallHealth and h < lastFreefallHealth then hum.Health = lastFreefallHealth end
 		else
 			lastFreefallHealth = h
 		end
 	end)
+end
+
+-- ====== MISC functions ======
+local function setFullBright(state)
+	fullBright = state and true or false
+	local atm = Lighting:FindFirstChildOfClass("Atmosphere")
+	if fullBright then
+		if not savedLighting then
+			savedLighting = {
+				Brightness = Lighting.Brightness,
+				ClockTime = Lighting.ClockTime,
+				Ambient = Lighting.Ambient,
+				OutdoorAmbient = Lighting.OutdoorAmbient,
+				GlobalShadows = Lighting.GlobalShadows,
+				FogEnd = Lighting.FogEnd,
+				FogStart = Lighting.FogStart,
+			}
+			if atm then
+				savedAtmos = {Density = atm.Density, Haze = atm.Haze, Color = atm.Color}
+			end
+		end
+		Lighting.Brightness = 3
+		Lighting.ClockTime = 14
+		Lighting.Ambient = Color3.fromRGB(255,255,255)
+		Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
+		Lighting.GlobalShadows = false
+		Lighting.FogStart = 0
+		Lighting.FogEnd = 1e6
+		if atm then atm.Density = 0; atm.Haze = 0 end
+	else
+		if savedLighting then
+			Lighting.Brightness = savedLighting.Brightness
+			Lighting.ClockTime = savedLighting.ClockTime
+			Lighting.Ambient = savedLighting.Ambient
+			Lighting.OutdoorAmbient = savedLighting.OutdoorAmbient
+			Lighting.GlobalShadows = savedLighting.GlobalShadows
+			Lighting.FogStart = savedLighting.FogStart
+			Lighting.FogEnd = savedLighting.FogEnd
+		end
+		if savedAtmos then
+			local atm2 = Lighting:FindFirstChildOfClass("Atmosphere")
+			if atm2 then atm2.Density = savedAtmos.Density; atm2.Haze = savedAtmos.Haze; atm2.Color = savedAtmos.Color end
+		end
+	end
+end
+
+local function setRemoveFog(state)
+	removeFog = state and true or false
+	local atm = Lighting:FindFirstChildOfClass("Atmosphere")
+	if removeFog then
+		Lighting.FogStart = 0
+		Lighting.FogEnd = 1e6
+		if atm then atm.Density = 0; atm.Haze = 0 end
+	else
+		-- if FullBright off, restore from savedLighting; otherwise keep bright
+		if not fullBright and savedLighting then
+			Lighting.FogStart = savedLighting.FogStart
+			Lighting.FogEnd = savedLighting.FogEnd
+			if savedAtmos then
+				local a = Lighting:FindFirstChildOfClass("Atmosphere")
+				if a then a.Density = savedAtmos.Density; a.Haze = savedAtmos.Haze end
+			end
+		end
+	end
+end
+
+local function setFOV(value)
+	defaultFOV = value
+	local cam = workspace.CurrentCamera
+	if cam then cam.FieldOfView = defaultFOV end
 end
 
 -- ====== UI (Bawaan) ======
@@ -292,7 +385,7 @@ local function createUI()
 
 	local frame = Instance.new("Frame")
 	frame.Name = "MainFrame"
-	frame.Size = UDim2.fromOffset(420, 420)
+	frame.Size = UDim2.fromOffset(480, 480)
 	frame.Position = UDim2.new(0, 24, 0, 120)
 	frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
 	frame.BackgroundTransparency = 0.15
@@ -309,7 +402,7 @@ local function createUI()
 
 	local title = Instance.new("TextLabel")
 	title.BackgroundTransparency = 1
-	title.Size = UDim2.new(1, -200, 1, 0)
+	title.Size = UDim2.new(1, -220, 1, 0)
 	title.Position = UDim2.new(0, 10, 0, 0)
 	title.Font = Enum.Font.GothamBold
 	title.TextSize = 18
@@ -357,8 +450,8 @@ local function createUI()
 
 	-- Search panel
 	local searchPanel = Instance.new("Frame")
-	searchPanel.Size = UDim2.fromOffset(200, 36)
-	searchPanel.Position = UDim2.new(1, -326, 0, 42)
+	searchPanel.Size = UDim2.fromOffset(220, 36)
+	searchPanel.Position = UDim2.new(1, -346, 0, 42)
 	searchPanel.BackgroundColor3 = Color3.fromRGB(45,45,50)
 	searchPanel.Visible = false
 	searchPanel.Parent = frame
@@ -387,20 +480,20 @@ local function createUI()
 	-- Drag area (kiri agar tombol bisa diklik)
 	local drag = Instance.new("Frame")
 	drag.BackgroundTransparency = 1
-	drag.Size = UDim2.new(1, -220, 1, 0)
+	drag.Size = UDim2.new(1, -240, 1, 0)
 	drag.Position = UDim2.new(0, 0, 0, 0)
 	drag.Parent = header
 
-	-- Tab bar (Player / Teleport)
+	-- Tab bar: Main, Misc, Teleport, Config
 	local tabs = Instance.new("Frame")
 	tabs.Size = UDim2.new(1, -16, 0, 30)
 	tabs.Position = UDim2.new(0, 8, 0, 44)
 	tabs.BackgroundTransparency = 1
 	tabs.Parent = frame
 
-	local function makeTabButton(text, iconId, xOffset)
+	local function makeTabButton(text, xOffset)
 		local b = Instance.new("TextButton")
-		b.Size = UDim2.fromOffset(120, 28)
+		b.Size = UDim2.fromOffset(110, 28)
 		b.Position = UDim2.new(0, xOffset, 0, 0)
 		b.BackgroundColor3 = Color3.fromRGB(45,45,50)
 		b.TextColor3 = Color3.fromRGB(230,230,230)
@@ -410,24 +503,15 @@ local function createUI()
 		b.BorderSizePixel = 0
 		b.Parent = tabs
 		Instance.new("UICorner", b).CornerRadius = UDim.new(1,0)
-		if iconId then
-			local img = Instance.new("ImageLabel")
-			img.Size = UDim2.fromOffset(18,18)
-			img.Position = UDim2.new(0, 8, 0.5, -9)
-			img.BackgroundTransparency = 1
-			img.Image = iconId
-			img.ImageColor3 = Color3.fromRGB(230,230,230)
-			img.Parent = b
-			b.TextXAlignment = Enum.TextXAlignment.Left
-			b.Text = "   "..text
-		end
 		return b
 	end
 
-	local tabPlayerBtn = makeTabButton("Player", "rbxassetid://6031068426", 0) -- player silhouette
-	local tabTpBtn = makeTabButton("Teleport", "rbxassetid://6034407067", 130) -- map pin
+	local tabMainBtn   = makeTabButton("Main", 0)
+	local tabMiscBtn   = makeTabButton("Misc", 116)
+	local tabTpBtn     = makeTabButton("Teleport", 232)
+	local tabCfgBtn    = makeTabButton("Config", 348)
 
-	-- Scrolling content container per tab
+	-- Scrolling content per tab
 	local function makeScroll()
 		local scroll = Instance.new("ScrollingFrame")
 		scroll.Size = UDim2.new(1, -16, 1, -88)
@@ -452,11 +536,12 @@ local function createUI()
 		return scroll, layout, recalc
 	end
 
-	local playerScroll, playerLayout, recalcPlayer = makeScroll()
-	local tpScroll, tpLayout, recalcTp = makeScroll()
+	local mainScroll, _, recalcMain = makeScroll()
+	local miscScroll, _, recalcMisc = makeScroll()
+	local tpScroll, _, recalcTp = makeScroll()
+	local cfgScroll, _, recalcCfg = makeScroll()
 
-	-- ===== Build Player tab controls =====
-	local allRows = {}
+	-- Helpers create rows / widgets
 	local function createRow(parent, height)
 		local row = Instance.new("Frame")
 		row.Size = UDim2.new(1, 0, 0, height)
@@ -465,11 +550,10 @@ local function createUI()
 		row.BorderSizePixel = 0
 		row.Parent = parent
 		Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
-		allRows[#allRows+1] = row
 		return row
 	end
 
-	local function createSwitch(parent, labelText, initial, callback)
+	local function makeSwitch(parent, labelText, initial, callback)
 		local row = createRow(parent, 40)
 		local lbl = Instance.new("TextLabel")
 		lbl.BackgroundTransparency = 1
@@ -489,7 +573,6 @@ local function createUI()
 		switch.BorderSizePixel = 0
 		switch.Parent = row
 		Instance.new("UICorner", switch).CornerRadius = UDim.new(1,0)
-
 		local knob = Instance.new("Frame")
 		knob.Size = UDim2.fromOffset(20,20)
 		knob.Position = initial and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10)
@@ -501,8 +584,7 @@ local function createUI()
 		local value = initial
 		local function redraw()
 			switch.BackgroundColor3 = value and Color3.fromRGB(60,180,75) or Color3.fromRGB(120,120,120)
-			knob:TweenPosition(value and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10),
-				Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true)
+			knob:TweenPosition(value and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true)
 		end
 		switch.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -511,13 +593,11 @@ local function createUI()
 				if callback then task.spawn(callback, value) end
 			end
 		end)
-
 		row:SetAttribute("label", labelText)
-		row:SetAttribute("type", "switch")
-		return {Row=row, Set=function(v) value = v and true or false; redraw(); if callback then task.spawn(callback, value) end end}
+		return {Row=row, Set=function(v) value=v and true or false; redraw(); if callback then task.spawn(callback, value) end end}
 	end
 
-	local function createSlider(parent, labelText, minV, maxV, initial, callback)
+	local function makeSlider(parent, labelText, minV, maxV, initial, callback)
 		local row = createRow(parent, 58)
 		local lbl = Instance.new("TextLabel")
 		lbl.BackgroundTransparency = 1
@@ -584,44 +664,29 @@ local function createUI()
 		end)
 
 		row:SetAttribute("label", labelText)
-		row:SetAttribute("type", "slider")
 		return {Row=row, Set=function(v) local pct=(math.clamp(v,minV,maxV)-minV)/(maxV-minV); setFromPct(pct) end}
 	end
 
-	-- Controls on Player tab
-	local flySw = createSwitch(playerScroll, "Fly", false, function(v) setFly(v) end)
-	local ncSw = createSwitch(playerScroll, "NoClip (tembus)", false, function(v) setNoclip(v) end)
-	local wsSl = createSlider(playerScroll, "Walk Speed (studs)", MIN_WALK, MAX_WALK, walkSpeed, function(v) walkSpeed = v; ensurePhysics() end)
-	local jpSl = createSlider(playerScroll, "Jump Power (studs)", MIN_JUMP, MAX_JUMP, jumpPower, function(v) jumpPower = v; ensurePhysics() end)
-	local ijmSw = createSwitch(playerScroll, "Inf Jump (Mobile)", false, function(v) infJumpMobile = v end)
-	local ijpSw = createSwitch(playerScroll, "Inf Jump (PC)", false, function(v) infJumpPC = v end)
-	local nfdSw = createSwitch(playerScroll, "No Fall Damage", false, function(v) noFallDamage = v end)
+	-- ===== MAIN (Player) controls =====
+	local flySw = makeSwitch(mainScroll, "Fly", false, function(v) setFly(v) end)
+	local ncSw = makeSwitch(mainScroll, "NoClip (tembus)", false, function(v) setNoclip(v) end)
+	local wsSl = makeSlider(mainScroll, "Walk Speed (studs)", MIN_WALK, MAX_WALK, walkSpeed, function(v) walkSpeed = v; ensurePhysics() end)
+	local jpSl = makeSlider(mainScroll, "Jump Power (studs)", MIN_JUMP, MAX_JUMP, jumpPower, function(v) jumpPower = v; ensurePhysics() end)
+	local ijmSw = makeSwitch(mainScroll, "Inf Jump (Mobile)", false, function(v) infJumpMobile = v end)
+	local ijpSw = makeSwitch(mainScroll, "Inf Jump (PC)", false, function(v) infJumpPC = v end)
+	local nfdSw = makeSwitch(mainScroll, "No Fall Damage", false, function(v) noFallDamage = v end)
 
-	-- Search filter for Player tab
-	local function applySearchPlayer()
-		local q = string.lower(searchBox.Text or "")
-		for _,row in ipairs(playerScroll:GetChildren()) do
-			if row:IsA("Frame") then
-				local label = string.lower(tostring(row:GetAttribute("label") or ""))
-				row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
-			end
-		end
-		recalcPlayer()
-	end
+	-- ===== MISC controls =====
+	local fbSw = makeSwitch(miscScroll, "Fullbright (Terang Terus)", false, function(v) setFullBright(v) end)
+	local fovSl = makeSlider(miscScroll, "Field of View", 60, 120, defaultFOV, function(v) setFOV(v) end)
+	local rfSw = makeSwitch(miscScroll, "Remove Fog", false, function(v) setRemoveFog(v) end)
 
-	-- ===== Build Teleport tab =====
+	-- ===== TELEPORT =====
 	local function createTpRow(height)
-		local row = Instance.new("Frame")
-		row.Size = UDim2.new(1, 0, 0, height)
-		row.BackgroundColor3 = Color3.fromRGB(38,38,42)
-		row.BackgroundTransparency = 0.2
-		row.BorderSizePixel = 0
-		row.Parent = tpScroll
-		Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
-		return row
+		return createRow(tpScroll, height)
 	end
 
-	-- Buttons bar
+	-- Button bar: Add / Delete / Export / Import
 	local btnBar = createTpRow(40)
 	btnBar.BackgroundTransparency = 1
 	local addBtn = Instance.new("TextButton")
@@ -648,7 +713,32 @@ local function createUI()
 	delBtn.Parent = btnBar
 	Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0, 8)
 
-	-- Locations list follows (entries are rows)
+	local eximBar = createTpRow(40)
+	eximBar.BackgroundTransparency = 1
+	local exportBtn = Instance.new("TextButton")
+	exportBtn.Size = UDim2.new(0.5, -6, 1, 0)
+	exportBtn.Position = UDim2.new(0, 0, 0, 0)
+	exportBtn.Text = "Export Locations"
+	exportBtn.Font = Enum.Font.GothamBold
+	exportBtn.TextSize = 14
+	exportBtn.TextColor3 = Color3.fromRGB(255,255,255)
+	exportBtn.BackgroundColor3 = Color3.fromRGB(0,90,140)
+	exportBtn.BorderSizePixel = 0
+	exportBtn.Parent = eximBar
+	Instance.new("UICorner", exportBtn).CornerRadius = UDim.new(0, 8)
+
+	local importBtn = Instance.new("TextButton")
+	importBtn.Size = UDim2.new(0.5, -6, 1, 0)
+	importBtn.Position = UDim2.new(0.5, 6, 0, 0)
+	importBtn.Text = "Import Locations"
+	importBtn.Font = Enum.Font.GothamBold
+	importBtn.TextSize = 14
+	importBtn.TextColor3 = Color3.fromRGB(255,255,255)
+	importBtn.BackgroundColor3 = Color3.fromRGB(90,90,90)
+	importBtn.BorderSizePixel = 0
+	importBtn.Parent = eximBar
+	Instance.new("UICorner", importBtn).CornerRadius = UDim.new(0, 8)
+
 	local function createLocationEntry(locationData)
 		local entry = createTpRow(56)
 		local checkbox = Instance.new("TextButton")
@@ -699,14 +789,9 @@ local function createUI()
 		return entry
 	end
 
-	addBtn.MouseButton1Click:Connect(function()
-		local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-		local hrp = character:WaitForChild("HumanoidRootPart")
-		local defaultName = "Location "..tostring(#savedLocations + 1)
-
-		-- simple input prompt
+	local function promptName(defaultText, titleText, onSave)
 		local prompt = Instance.new("ScreenGui")
-		prompt.Name = "LocationNameInput"
+		prompt.Name = "PB_Prompt"
 		prompt.Parent = PlayerGui
 		local f = Instance.new("Frame")
 		f.Size = UDim2.fromOffset(300, 150)
@@ -718,13 +803,13 @@ local function createUI()
 		local titleLbl = Instance.new("TextLabel")
 		titleLbl.Size = UDim2.new(1, 0, 0, 30)
 		titleLbl.BackgroundColor3 = Color3.fromRGB(70,70,70)
-		titleLbl.Text = "Name this location:"
+		titleLbl.Text = titleText
 		titleLbl.TextColor3 = Color3.new(1,1,1)
 		titleLbl.Parent = f
 		local tb = Instance.new("TextBox")
 		tb.Size = UDim2.new(1, -20, 0, 30)
 		tb.Position = UDim2.new(0, 10, 0, 40)
-		tb.Text = defaultName
+		tb.Text = defaultText
 		tb.BackgroundColor3 = Color3.fromRGB(30,30,30)
 		tb.TextColor3 = Color3.new(1,1,1)
 		tb.Parent = f
@@ -744,14 +829,23 @@ local function createUI()
 		cancel.Parent = f
 
 		save.MouseButton1Click:Connect(function()
-			local name = (tb.Text ~= "" and tb.Text) or defaultName
+			local name = (tb.Text ~= "" and tb.Text) or defaultText
+			prompt:Destroy()
+			onSave(name)
+		end)
+		cancel.MouseButton1Click:Connect(function() prompt:Destroy() end)
+	end
+
+	addBtn.MouseButton1Click:Connect(function()
+		local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hrp = character:WaitForChild("HumanoidRootPart")
+		local defaultName = "Location "..tostring(#savedLocations + 1)
+		promptName(defaultName, "Name this location:", function(name)
 			local locationData = {name=name, position=hrp.Position, selected=false}
 			table.insert(savedLocations, locationData)
 			createLocationEntry(locationData)
-			prompt:Destroy()
 			recalcTp()
 		end)
-		cancel.MouseButton1Click:Connect(function() prompt:Destroy() end)
 	end)
 
 	delBtn.MouseButton1Click:Connect(function()
@@ -765,48 +859,296 @@ local function createUI()
 		recalcTp()
 	end)
 
-	-- Search filter for Teleport tab
+	exportBtn.MouseButton1Click:Connect(function()
+		if #savedLocations == 0 then return end
+		local defaultName = "Export "..tostring(os.time())
+		promptName(defaultName, "Export as:", function(name)
+			local copy = {}
+			for _,loc in ipairs(savedLocations) do
+				copy[#copy+1] = {name=loc.name, position=loc.position}
+			end
+			exportedSets[name] = copy
+		end)
+	end)
+
+	importBtn.MouseButton1Click:Connect(function()
+		-- popup list
+		local popup = Instance.new("ScreenGui")
+		popup.Name = "PB_ImportList"
+		popup.Parent = PlayerGui
+		local f = Instance.new("Frame")
+		f.Size = UDim2.fromOffset(320, 280)
+		f.Position = UDim2.new(0.5, -160, 0.5, -140)
+		f.BackgroundColor3 = Color3.fromRGB(45,45,50)
+		f.BorderSizePixel = 0
+		f.Parent = popup
+		Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+		local lbl = Instance.new("TextLabel")
+		lbl.Size = UDim2.new(1, 0, 0, 30)
+		lbl.BackgroundColor3 = Color3.fromRGB(70,70,70)
+		lbl.Text = "Choose export to import"
+		lbl.TextColor3 = Color3.new(1,1,1)
+		lbl.Parent = f
+		local list = Instance.new("ScrollingFrame")
+		list.Size = UDim2.new(1, -12, 1, -50)
+		list.Position = UDim2.new(0, 6, 0, 40)
+		list.BackgroundTransparency = 1
+		list.ScrollBarThickness = 6
+		list.Parent = f
+		local lay = Instance.new("UIListLayout")
+		lay.Parent = list
+		lay.Padding = UDim.new(0,6)
+		for name,set in pairs(exportedSets) do
+			local b = Instance.new("TextButton")
+			b.Size = UDim2.new(1, -4, 0, 28)
+			b.Text = name
+			b.BackgroundColor3 = Color3.fromRGB(60,60,70)
+			b.TextColor3 = Color3.new(1,1,1)
+			b.Parent = list
+			Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+			b.MouseButton1Click:Connect(function()
+				-- clear current
+				for i=#savedLocations,1,-1 do
+					local chk = savedLocations[i].checkbox
+					if chk and chk.Parent then chk.Parent:Destroy() end
+					table.remove(savedLocations,i)
+				end
+				for _,loc in ipairs(set) do
+					local nd = {name=loc.name, position=loc.position, selected=false}
+					savedLocations[#savedLocations+1] = nd
+					createLocationEntry(nd)
+				end
+				recalcTp()
+				popup:Destroy()
+			end)
+		end
+		local closeB = Instance.new("TextButton")
+		closeB.Size = UDim2.new(1, -12, 0, 28)
+		closeB.Position = UDim2.new(0,6,1,-34)
+		closeB.Text = "Close"
+		closeB.BackgroundColor3 = Color3.fromRGB(90,60,60)
+		closeB.TextColor3 = Color3.new(1,1,1)
+		closeB.Parent = f
+		Instance.new("UICorner", closeB).CornerRadius = UDim.new(0,6)
+		closeB.MouseButton1Click:Connect(function() popup:Destroy() end)
+	end)
+
+	-- Search filter per tab
+	local function applySearchMain()
+		local q = string.lower(searchBox.Text or "")
+		for _,row in ipairs(mainScroll:GetChildren()) do
+			if row:IsA("Frame") then
+				local label = string.lower(tostring(row:GetAttribute("label") or row.Name or ""))
+				row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
+			end
+		end
+		recalcMain()
+	end
 	local function applySearchTp()
 		local q = string.lower(searchBox.Text or "")
 		for _,row in ipairs(tpScroll:GetChildren()) do
-			if row:IsA("Frame") and row ~= btnBar then
+			if row:IsA("Frame") and row ~= btnBar and row ~= eximBar then
 				local label = tostring(row:GetAttribute("label") or "")
 				row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
 			end
 		end
 		recalcTp()
 	end
-
-	-- Hook search to active tab
-	local activeTab = "Player"
-	local function applySearch()
-		if activeTab == "Player" then
-			applySearchPlayer()
-		else
-			applySearchTp()
+	local function applySearchMisc()
+		local q = string.lower(searchBox.Text or "")
+		for _,row in ipairs(miscScroll:GetChildren()) do
+			if row:IsA("Frame") then
+				local label = string.lower(tostring(row:GetAttribute("label") or row.Name or ""))
+				row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
+			end
 		end
+		recalcMisc()
+	end
+	local function applySearchCfg()
+		local q = string.lower(searchBox.Text or "")
+		for _,row in ipairs(cfgScroll:GetChildren()) do
+			if row:IsA("Frame") then
+				local label = string.lower(tostring(row:GetAttribute("label") or row.Name or ""))
+				row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
+			end
+		end
+		recalcCfg()
+	end
+
+	local activeTab = "Main"
+	local function applySearch()
+		if activeTab == "Main" then applySearchMain()
+		elseif activeTab == "Misc" then applySearchMisc()
+		elseif activeTab == "Teleport" then applySearchTp()
+		else applySearchCfg() end
 	end
 	searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
+
+	-- ===== CONFIG TAB =====
+	local nameRow = createRow(cfgScroll, 58)
+	nameRow:SetAttribute("label","Config Name")
+	local nameLbl = Instance.new("TextLabel")
+	nameLbl.BackgroundTransparency = 1
+	nameLbl.Size = UDim2.new(1, 0, 0, 20)
+	nameLbl.Position = UDim2.new(0,10,0,6)
+	nameLbl.Text = "Config Name"
+	nameLbl.TextColor3 = Color3.fromRGB(235,235,235)
+	nameLbl.Font = Enum.Font.Gotham
+	nameLbl.TextSize = 16
+	nameLbl.Parent = nameRow
+	local nameBox = Instance.new("TextBox")
+	nameBox.Size = UDim2.new(1, -20, 0, 28)
+	nameBox.Position = UDim2.new(0,10,0,28)
+	nameBox.PlaceholderText = "my-config"
+	nameBox.Text = ""
+	nameBox.TextColor3 = Color3.new(1,1,1)
+	nameBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
+	nameBox.BorderSizePixel = 0
+	nameBox.Parent = nameRow
+	Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0,6)
+
+	local saveRow = createRow(cfgScroll, 40)
+	saveRow:SetAttribute("label","Save Config")
+	local saveBtn = Instance.new("TextButton")
+	saveBtn.Size = UDim2.new(1, -20, 1, -10)
+	saveBtn.Position = UDim2.new(0,10,0,5)
+	saveBtn.Text = "Save Config"
+	saveBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+	saveBtn.TextColor3 = Color3.new(1,1,1)
+	saveBtn.BorderSizePixel = 0
+	saveBtn.Parent = saveRow
+	Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0,8)
+
+	local listTitle = createRow(cfgScroll, 28)
+	local lt = Instance.new("TextLabel")
+	lt.BackgroundTransparency = 1
+	lt.Size = UDim2.new(1, -20, 1, 0)
+	lt.Position = UDim2.new(0,10,0,0)
+	lt.Text = "Saved Configs"
+	lt.TextColor3 = Color3.new(1,1,1)
+	lt.TextXAlignment = Enum.TextXAlignment.Left
+	lt.Font = Enum.Font.GothamBold
+	lt.TextSize = 14
+	lt.Parent = listTitle
+
+	local cfgList = createRow(cfgScroll, 160)
+	cfgList.BackgroundTransparency = 1
+	local cfgScrollInner = Instance.new("ScrollingFrame")
+	cfgScrollInner.Size = UDim2.new(1, -12, 1, -0)
+	cfgScrollInner.Position = UDim2.new(0,6,0,0)
+	cfgScrollInner.BackgroundTransparency = 1
+	cfgScrollInner.Parent = cfgList
+	cfgScrollInner.ScrollBarThickness = 6
+	local cfgLay = Instance.new("UIListLayout")
+	cfgLay.Parent = cfgScrollInner
+	cfgLay.Padding = UDim.new(0,6)
+
+	local function getCurrentSettings()
+		return {
+			fly=fly, noclip=noclip, infJumpMobile=infJumpMobile, infJumpPC=infJumpPC, noFallDamage=noFallDamage,
+			walkSpeed=walkSpeed, jumpPower=jumpPower,
+			fullBright=fullBright, removeFog=removeFog, fov=defaultFOV,
+		}
+	end
+	local function applySettings(s)
+		if not s then return end
+		wsSl.Set(s.walkSpeed or walkSpeed)
+		jpSl.Set(s.jumpPower or jumpPower)
+		setFOV(s.fov or defaultFOV)
+		fbSw.Set(s.fullBright or false)
+		rfSw.Set(s.removeFog or false)
+		flySw.Set(s.fly or false)
+		ncSw.Set(s.noclip or false)
+		ijmSw.Set(s.infJumpMobile or false)
+		ijpSw.Set(s.infJumpPC or false)
+		nfdSw.Set(s.noFallDamage or false)
+	end
+
+	local function rebuildCfgList()
+		for _,ch in ipairs(cfgScrollInner:GetChildren()) do if ch:IsA("TextButton") or ch:IsA("Frame") then ch:Destroy() end end
+		for name, s in pairs(configs) do
+			local row = Instance.new("Frame")
+			row.Size = UDim2.new(1, -4, 0, 32)
+			row.BackgroundColor3 = Color3.fromRGB(50,50,58)
+			row.Parent = cfgScrollInner
+			Instance.new("UICorner", row).CornerRadius = UDim.new(0,6)
+			local nameLbl = Instance.new("TextLabel")
+			nameLbl.BackgroundTransparency = 1
+			nameLbl.Size = UDim2.new(0.5, -10, 1, 0)
+			nameLbl.Position = UDim2.new(0,10,0,0)
+			nameLbl.Text = name .. (autoloadName==name and "  (Auto)" or "")
+			nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+			nameLbl.TextColor3 = Color3.new(1,1,1)
+			nameLbl.Parent = row
+			local loadB = Instance.new("TextButton")
+			loadB.Size = UDim2.new(0.2, -6, 0, 26)
+			loadB.Position = UDim2.new(0.5, 0, 0.5, -13)
+			loadB.Text = "Load"
+			loadB.BackgroundColor3 = Color3.fromRGB(0,90,140)
+			loadB.TextColor3 = Color3.new(1,1,1)
+			loadB.Parent = row
+			Instance.new("UICorner", loadB).CornerRadius = UDim.new(0,6)
+			local autoB = Instance.new("TextButton")
+			autoB.Size = UDim2.new(0.2, -6, 0, 26)
+			autoB.Position = UDim2.new(0.7, 0, 0.5, -13)
+			autoB.Text = "Auto"
+			autoB.BackgroundColor3 = autoloadName==name and Color3.fromRGB(0,150,0) or Color3.fromRGB(70,70,70)
+			autoB.TextColor3 = Color3.new(1,1,1)
+			autoB.Parent = row
+			Instance.new("UICorner", autoB).CornerRadius = UDim.new(0,6)
+			local delB = Instance.new("TextButton")
+			delB.Size = UDim2.new(0.1, -6, 0, 26)
+			delB.Position = UDim2.new(0.9, 0, 0.5, -13)
+			delB.Text = "Del"
+			delB.BackgroundColor3 = Color3.fromRGB(120,0,0)
+			delB.TextColor3 = Color3.new(1,1,1)
+			delB.Parent = row
+			Instance.new("UICorner", delB).CornerRadius = UDim.new(0,6)
+
+			loadB.MouseButton1Click:Connect(function() applySettings(s) end)
+			autoB.MouseButton1Click:Connect(function()
+				autoloadName = (autoloadName==name) and nil or name
+				rebuildCfgList()
+			end)
+			delB.MouseButton1Click:Connect(function()
+				configs[name] = nil
+				if autoloadName == name then autoloadName = nil end
+				rebuildCfgList()
+			end)
+		end
+	end
+
+	saveBtn.MouseButton1Click:Connect(function()
+		local nm = nameBox.Text ~= "" and nameBox.Text or ("config-"..tostring(os.time()))
+		configs[nm] = getCurrentSettings()
+		rebuildCfgList()
+	end)
 
 	-- Tab switching
 	local function showTab(name)
 		activeTab = name
-		playerScroll.Visible = (name == "Player")
-		tpScroll.Visible = (name == "Teleport")
+		mainScroll.Visible = (name == "Main")
+		miscScroll.Visible = (name == "Misc")
+		tpScroll.Visible   = (name == "Teleport")
+		cfgScroll.Visible  = (name == "Config")
 		applySearch()
 	end
-	tabPlayerBtn.MouseButton1Click:Connect(function() showTab("Player") end)
+	tabMainBtn.MouseButton1Click:Connect(function() showTab("Main") end)
+	tabMiscBtn.MouseButton1Click:Connect(function() showTab("Misc") end)
 	tabTpBtn.MouseButton1Click:Connect(function() showTab("Teleport") end)
-	showTab("Player")
+	tabCfgBtn.MouseButton1Click:Connect(function() showTab("Config") end)
+	showTab("Main")
 
 	-- Minimize / Close
 	local minimized = false
 	btnMin.MouseButton1Click:Connect(function()
 		minimized = not minimized
-		playerScroll.Visible = not minimized and activeTab == "Player"
-		tpScroll.Visible = not minimized and activeTab == "Teleport"
+		mainScroll.Visible = not minimized and activeTab == "Main"
+		miscScroll.Visible = not minimized and activeTab == "Misc"
+		tpScroll.Visible   = not minimized and activeTab == "Teleport"
+		cfgScroll.Visible  = not minimized and activeTab == "Config"
 		tabs.Visible = not minimized
-		frame.Size = minimized and UDim2.fromOffset(420, 56) or UDim2.fromOffset(420, 420)
+		frame.Size = minimized and UDim2.fromOffset(480, 56) or UDim2.fromOffset(480, 480)
 	end)
 
 	btnClose.MouseButton1Click:Connect(function()
@@ -841,6 +1183,12 @@ local function createUI()
 	task.delay(5, function()
 		overlay:Destroy()
 		MainGUI.Enabled = true
+		-- Auto-load config jika ada
+		if autoloadName and configs[autoloadName] then
+			applySettings(configs[autoloadName])
+		end
+		-- Set FOV awal
+		setFOV(defaultFOV)
 	end)
 end
 
