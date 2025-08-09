@@ -435,47 +435,40 @@ end
 local function teleportToPositionAndWait(dest)
     if not root then return end
     if tpMode == "Instant" then
+        root.Anchored = false
         root.CFrame = CFrame.new(dest)
-        task.wait() -- beri 1 frame biar posisi settle
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Running) end
         return
     end
 
     local wasFly = fly
     if wasFly then setFly(false) end
 
+    root.Anchored = false -- jaga2 kalau ada script yg nge-anchored
+    if hum then hum:ChangeState(Enum.HumanoidStateType.Running) end
+
     local info = TweenInfo.new(
         math.max(0.05, tweenDuration),
         easeStyles[easeIdx][2],
         easeStyles[easeIdx][3],
-        0, false, 0
+        0,false,0
     )
-    -- tween ke CFrame tujuan (Y +3 sudah dihitung di pemanggil)
     local tw = TweenService:Create(root, info, { CFrame = CFrame.new(dest) })
-
-    local done = false
-    local conn = tw.Completed:Connect(function()
-        done = true
-    end)
-
+    local finished = false
+    tw.Completed:Connect(function() finished = true end)
     tw:Play()
 
-    -- tunggu sampai dekat tujuan ATAU timeout ATAU HRP hilang
-    local eps = 4 -- toleransi jarak
-    local deadline = os.clock() + tweenDuration + 2.0
-    while not done and os.clock() < deadline do
-        if (not root) or (not root.Parent) then break end
-        if (root.Position - dest).Magnitude <= eps then
-            done = true
-            break
-        end
+    -- TUNGGU DENGAN TIMEOUT (durasi tween + 1 detik buffer)
+    local deadline = tick() + tweenDuration + 1.0
+    while not finished and tick() < deadline do
         task.wait(0.05)
+        -- kalau HRP hilang/respawn, jangan ngunci
+        if (not root) or (not root.Parent) then break end
     end
-
-    if conn then conn:Disconnect() end
-    pcall(function() tw:Cancel() end) -- cancel kalau masih jalan
 
     if wasFly then setFly(true) end
 end
+
 
 
 local function showPill()
@@ -1658,33 +1651,26 @@ local function createUI()
         task.spawn(function()
             while tourRunning do
                 for i = 1, #savedLocations do
-                    if not tourRunning then break end
+                if not tourRunning then break end
+                local loc = savedLocations[i]
+                local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
+                if v then
+                    local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0, 3, 0)
 
-                    -- re-ensure character parts
-                    if (not root) or (not root.Parent) then
-                        pcall(getCharacter)
-                    end
-
-                    statusLbl.Text = ("Status: Running (%d/%d)"):format(i, #savedLocations)
-
-                    local loc = savedLocations[i]
-                    local v = (typeof(loc.position)=="Vector3") and loc.position or unpackVec3(loc.position)
-                    if v and root then
-                        local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
-                        if tpMode == "Instant" then
-                            teleportToPosition(dest)
-                        else
-                            teleportToPositionAndWait(dest) -- tunggu tween selesai
-                        end
-                    end
-
-                    -- jeda antar lokasi
-                    local waitSec = parseInterval()
-                    local t0 = tick()
-                    while tourRunning and (tick() - t0) < waitSec do
-                        task.wait(0.05)
-                    end
+                    -- 🚀 paksa Instant untuk Auto Tour
+                    local oldMode = tpMode
+                    tpMode = "Instant"
+                    teleportToPositionAndWait(dest)
+                    tpMode = oldMode
                 end
+
+                -- jeda antar lokasi sesuai input
+                local waitSec = parseInterval()
+                local t0 = tick()
+                while tourRunning and (tick() - t0) < waitSec do
+                    task.wait(0.05)
+                end
+            end
                 -- jeda kecil antar putaran biar nggak 100% CPU
                 if tourRunning then task.wait(0.1) end
             end
