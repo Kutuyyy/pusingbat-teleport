@@ -7,7 +7,7 @@
 
 -- ========== KONFIG SERVER ==========
 local SERVER_BASE = "https://9af2851a399d.ngrok-free.app"  -- GANTI dengan URL ngrok kamu
-local API_KEY     = "asdasdasdasdasdasdasdasd"        -- GANTI dengan API key server.js kamu
+local API_KEY     = "asdasdasdasdasdasdasdasd"            -- GANTI dengan API key server.js kamu
 
 -- ========== Services ==========
 local Players = game:GetService("Players")
@@ -453,12 +453,13 @@ local function createUI()
     text.TextColor3 = Color3.fromRGB(255,255,255)
     text.Parent = textBg
 
-    -- Panel utama (kompak + scroll)
+    -- Panel utama
     if MainGUI then MainGUI:Destroy() end
     MainGUI = Instance.new("ScreenGui")
     MainGUI.Name = "PusingbatController"
     MainGUI.ResetOnSpawn = false
     MainGUI.IgnoreGuiInset = true
+    MainGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     MainGUI.Parent = PlayerGui
     MainGUI.Enabled = false
 
@@ -470,7 +471,8 @@ local function createUI()
     frame.BackgroundTransparency = 0.15
     frame.BorderSizePixel = 0
     frame.Active = true
-    frame.ClipsDescendants = true   -- ⬅️ tambahin ini
+    frame.ClipsDescendants = true
+    frame.ZIndex = 1
     frame.Parent = MainGUI
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
@@ -478,6 +480,7 @@ local function createUI()
     local header = Instance.new("Frame")
     header.Size = UDim2.new(1, 0, 0, 40)
     header.BackgroundTransparency = 1
+    header.ZIndex = 40
     header.Parent = frame
 
     local title = Instance.new("TextLabel")
@@ -489,6 +492,7 @@ local function createUI()
     title.TextXAlignment = Enum.TextXAlignment.Left
     title.TextColor3 = Color3.fromRGB(255,255,255)
     title.Text = "Created by pusingbat"
+    title.ZIndex = 41
     title.Parent = header
 
     local searchBtn = Instance.new("ImageButton")
@@ -497,6 +501,7 @@ local function createUI()
     searchBtn.BackgroundTransparency = 1
     searchBtn.Image = "rbxassetid://6031075938"
     searchBtn.ImageColor3 = Color3.fromRGB(220,220,220)
+    searchBtn.ZIndex = 45
     searchBtn.Parent = header
 
     local btnMin = Instance.new("TextButton")
@@ -508,6 +513,7 @@ local function createUI()
     btnMin.TextColor3 = Color3.fromRGB(255,255,255)
     btnMin.BackgroundColor3 = Color3.fromRGB(70,70,80)
     btnMin.BorderSizePixel = 0
+    btnMin.ZIndex = 45
     btnMin.Parent = header
     Instance.new("UICorner", btnMin).CornerRadius = UDim.new(1,0)
 
@@ -520,6 +526,7 @@ local function createUI()
     btnClose.TextColor3 = Color3.fromRGB(255,255,255)
     btnClose.BackgroundColor3 = Color3.fromRGB(90,50,50)
     btnClose.BorderSizePixel = 0
+    btnClose.ZIndex = 45
     btnClose.Parent = header
     Instance.new("UICorner", btnClose).CornerRadius = UDim.new(1,0)
 
@@ -529,6 +536,7 @@ local function createUI()
     searchPanel.Position = UDim2.new(1, -346, 0, 42)
     searchPanel.BackgroundColor3 = Color3.fromRGB(45,45,50)
     searchPanel.Visible = false
+    searchPanel.ZIndex = 50
     searchPanel.Parent = frame
     Instance.new("UICorner", searchPanel).CornerRadius = UDim.new(0, 8)
 
@@ -542,6 +550,7 @@ local function createUI()
     searchBox.TextSize = 14
     searchBox.TextColor3 = Color3.fromRGB(230,230,230)
     searchBox.ClearTextOnFocus = false
+    searchBox.ZIndex = 51
     searchBox.Parent = searchPanel
     Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 6)
 
@@ -555,6 +564,7 @@ local function createUI()
     drag.BackgroundTransparency = 1
     drag.Size = UDim2.new(1, -240, 1, 0)
     drag.Position = UDim2.new(0, 0, 0, 0)
+    drag.ZIndex = 41
     drag.Parent = header
 
     -- Tabs
@@ -562,6 +572,7 @@ local function createUI()
     tabs.Size = UDim2.new(1, -16, 0, 30)
     tabs.Position = UDim2.new(0, 8, 0, 44)
     tabs.BackgroundTransparency = 1
+    tabs.ZIndex = 30
     tabs.Parent = frame
 
     local function makeTabButton(text, xOffset)
@@ -574,6 +585,7 @@ local function createUI()
         b.Font = Enum.Font.GothamBold
         b.TextSize = 14
         b.BorderSizePixel = 0
+        b.ZIndex = 31
         b.Parent = tabs
         Instance.new("UICorner", b).CornerRadius = UDim.new(1,0)
         return b
@@ -593,19 +605,18 @@ local function createUI()
         scroll.CanvasSize = UDim2.new(0,0,0,0)
         scroll.ScrollBarThickness = 6
         scroll.Visible = false
-        scroll.ClipsDescendants = true           -- ⬅️ baru
-        scroll.AutomaticCanvasSize = Enum.AutomaticSize.None  -- ⬅️ paksa manual
-        scroll.ZIndex = 2
+        scroll.ClipsDescendants = true
+        scroll.AutomaticCanvasSize = Enum.AutomaticSize.None
+        scroll.ZIndex = 10
         scroll.Parent = frame
 
-        -- konten vertikal
         local layout = Instance.new("UIListLayout")
         layout.FillDirection = Enum.FillDirection.Vertical
         layout.Padding = UDim.new(0, 8)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.ZIndex = 10
         layout.Parent = scroll
 
-        -- padding biar konten nggak nempel pinggir & tidak “keluar” di bawah
         local pad = Instance.new("UIPadding")
         pad.PaddingTop = UDim.new(0, 6)
         pad.PaddingBottom = UDim.new(0, 12)
@@ -614,13 +625,11 @@ local function createUI()
         pad.Parent = scroll
 
         local function recalc()
-            -- + padding bottom biar tidak spill
             scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 12)
         end
         layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(recalc)
         return scroll, layout, recalc
     end
-
 
     local mainScroll, _, recalcMain = makeScroll()
     local miscScroll, _, recalcMisc = makeScroll()
@@ -633,6 +642,7 @@ local function createUI()
         row.BackgroundColor3 = Color3.fromRGB(38,38,42)
         row.BackgroundTransparency = 0.2
         row.BorderSizePixel = 0
+        row.ZIndex = 11
         row.Parent = parent
         Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
         return row
@@ -649,6 +659,7 @@ local function createUI()
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.TextColor3 = Color3.fromRGB(235,235,235)
         lbl.Text = labelText
+        lbl.ZIndex = 12
         lbl.Parent = row
 
         local switch = Instance.new("Frame")
@@ -656,6 +667,7 @@ local function createUI()
         switch.Position = UDim2.new(1, -70, 0.5, -12)
         switch.BackgroundColor3 = initial and Color3.fromRGB(60,180,75) or Color3.fromRGB(120,120,120)
         switch.BorderSizePixel = 0
+        switch.ZIndex = 12
         switch.Parent = row
         Instance.new("UICorner", switch).CornerRadius = UDim.new(1,0)
 
@@ -664,6 +676,7 @@ local function createUI()
         knob.Position = initial and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10)
         knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
         knob.BorderSizePixel = 0
+        knob.ZIndex = 13
         knob.Parent = switch
         Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 
@@ -695,6 +708,7 @@ local function createUI()
         lbl.TextXAlignment = Enum.TextXAlignment.Left
         lbl.TextColor3 = Color3.fromRGB(235,235,235)
         lbl.Text = string.format("%s: %d", labelText, initial)
+        lbl.ZIndex = 12
         lbl.Parent = row
 
         local bar = Instance.new("Frame")
@@ -702,6 +716,7 @@ local function createUI()
         bar.Position = UDim2.new(0, 10, 0, 34)
         bar.BackgroundColor3 = Color3.fromRGB(60,60,60)
         bar.BorderSizePixel = 0
+        bar.ZIndex = 12
         bar.Parent = row
         Instance.new("UICorner", bar).CornerRadius = UDim.new(0,8)
 
@@ -710,6 +725,7 @@ local function createUI()
         fill.Size = UDim2.new(pct0, 0, 1, 0)
         fill.BackgroundColor3 = Color3.fromRGB(0,170,255)
         fill.BorderSizePixel = 0
+        fill.ZIndex = 12
         fill.Parent = bar
         Instance.new("UICorner", fill).CornerRadius = UDim.new(0,8)
 
@@ -718,6 +734,7 @@ local function createUI()
         knob.Position = UDim2.new(pct0, -9, 0.5, -9)
         knob.BackgroundColor3 = Color3.fromRGB(240,240,240)
         knob.BorderSizePixel = 0
+        knob.ZIndex = 13
         knob.Parent = bar
         Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 
@@ -782,6 +799,7 @@ local function createUI()
     addBtn.TextColor3 = Color3.new(1,1,1)
     addBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
     addBtn.BorderSizePixel = 0
+    addBtn.ZIndex = 12
     addBtn.Parent = btnBar
     Instance.new("UICorner", addBtn).CornerRadius = UDim.new(0,8)
 
@@ -794,6 +812,7 @@ local function createUI()
     delBtn.TextColor3 = Color3.new(1,1,1)
     delBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
     delBtn.BorderSizePixel = 0
+    delBtn.ZIndex = 12
     delBtn.Parent = btnBar
     Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0,8)
 
@@ -808,6 +827,7 @@ local function createUI()
     exportBtn.TextColor3 = Color3.new(1,1,1)
     exportBtn.BackgroundColor3 = Color3.fromRGB(0,90,140)
     exportBtn.BorderSizePixel = 0
+    exportBtn.ZIndex = 12
     exportBtn.Parent = eximBar
     Instance.new("UICorner", exportBtn).CornerRadius = UDim.new(0,8)
 
@@ -820,6 +840,7 @@ local function createUI()
     importBtn.TextColor3 = Color3.new(1,1,1)
     importBtn.BackgroundColor3 = Color3.fromRGB(90,90,90)
     importBtn.BorderSizePixel = 0
+    importBtn.ZIndex = 12
     importBtn.Parent = eximBar
     Instance.new("UICorner", importBtn).CornerRadius = UDim.new(0,8)
 
@@ -832,6 +853,7 @@ local function createUI()
         checkbox.Text = ""
         checkbox.BackgroundColor3 = Color3.fromRGB(80,80,80)
         checkbox.BorderSizePixel = 0
+        checkbox.ZIndex = 12
         checkbox.Parent = entry
         Instance.new("UICorner", checkbox).CornerRadius = UDim.new(0, 6)
         locationData.checkbox = checkbox
@@ -845,6 +867,7 @@ local function createUI()
         tpBtn.TextColor3 = Color3.new(1,1,1)
         tpBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
         tpBtn.BorderSizePixel = 0
+        tpBtn.ZIndex = 12
         tpBtn.Parent = entry
         Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
 
@@ -856,6 +879,7 @@ local function createUI()
         info.TextXAlignment = Enum.TextXAlignment.Left
         info.Font = Enum.Font.Gotham
         info.TextSize = 13
+        info.ZIndex = 12
         info.Parent = entry
 
         local function setInfoFromPos(pos)
@@ -891,12 +915,15 @@ local function createUI()
     local function promptName(defaultText, titleText, onSave)
         local prompt = Instance.new("ScreenGui")
         prompt.Name = "PB_Prompt"
+        prompt.ResetOnSpawn = false
+        prompt.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
         prompt.Parent = PlayerGui
         local f = Instance.new("Frame")
         f.Size = UDim2.fromOffset(300, 150)
         f.Position = UDim2.new(0.5, -150, 0.5, -75)
         f.BackgroundColor3 = Color3.fromRGB(50,50,50)
         f.BorderSizePixel = 0
+        f.ZIndex = 100
         f.Parent = prompt
         Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
         local titleLbl = Instance.new("TextLabel")
@@ -904,6 +931,7 @@ local function createUI()
         titleLbl.BackgroundColor3 = Color3.fromRGB(70,70,70)
         titleLbl.Text = titleText
         titleLbl.TextColor3 = Color3.new(1,1,1)
+        titleLbl.ZIndex = 101
         titleLbl.Parent = f
         local tb = Instance.new("TextBox")
         tb.Size = UDim2.new(1, -20, 0, 30)
@@ -911,6 +939,7 @@ local function createUI()
         tb.Text = defaultText
         tb.BackgroundColor3 = Color3.fromRGB(30,30,30)
         tb.TextColor3 = Color3.new(1,1,1)
+        tb.ZIndex = 101
         tb.Parent = f
         local save = Instance.new("TextButton")
         save.Size = UDim2.new(0.5, -15, 0, 30)
@@ -918,6 +947,7 @@ local function createUI()
         save.Text = "Save"
         save.BackgroundColor3 = Color3.fromRGB(0,120,0)
         save.TextColor3 = Color3.new(1,1,1)
+        save.ZIndex = 101
         save.Parent = f
         local cancel = Instance.new("TextButton")
         cancel.Size = UDim2.new(0.5, -15, 0, 30)
@@ -925,6 +955,7 @@ local function createUI()
         cancel.Text = "Cancel"
         cancel.BackgroundColor3 = Color3.fromRGB(120,0,0)
         cancel.TextColor3 = Color3.new(1,1,1)
+        cancel.ZIndex = 101
         cancel.Parent = f
 
         save.MouseButton1Click:Connect(function()
@@ -998,6 +1029,7 @@ local function createUI()
         local popup = Instance.new("ScreenGui")
         popup.Name = "PB_ImportList"
         popup.ResetOnSpawn = false
+        popup.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
         popup.Parent = PlayerGui
 
         local f = Instance.new("Frame")
@@ -1005,6 +1037,7 @@ local function createUI()
         f.Position = UDim2.new(0.5, -180, 0.5, -160)
         f.BackgroundColor3 = Color3.fromRGB(45,45,50)
         f.BorderSizePixel = 0
+        f.ZIndex = 100
         f.Parent = popup
         Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
 
@@ -1016,6 +1049,7 @@ local function createUI()
         lbl.TextColor3 = Color3.new(1,1,1)
         lbl.Font = Enum.Font.GothamBold
         lbl.TextSize = 14
+        lbl.ZIndex = 101
         lbl.Parent = f
         Instance.new("UICorner", lbl).CornerRadius = UDim.new(0,6)
 
@@ -1024,6 +1058,7 @@ local function createUI()
         list.Position = UDim2.new(0, 6, 0, 42)
         list.BackgroundTransparency = 1
         list.ScrollBarThickness = 6
+        list.ZIndex = 101
         list.Parent = f
 
         local lay = Instance.new("UIListLayout")
@@ -1035,11 +1070,13 @@ local function createUI()
         btnRow.Size = UDim2.new(1, -12, 0, 36)
         btnRow.Position = UDim2.new(0, 6, 1, -42)
         btnRow.BackgroundTransparency = 1
+        btnRow.ZIndex = 101
         btnRow.Parent = f
 
         local function styleBtn(b)
             b.AutoButtonColor = true
             b.BorderSizePixel = 0
+            b.ZIndex = 102
             Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
             return b
         end
@@ -1099,6 +1136,7 @@ local function createUI()
                 b.Text = name
                 b.BackgroundColor3 = Color3.fromRGB(60,60,70)
                 b.TextColor3 = Color3.new(1,1,1)
+                b.ZIndex = 101
                 b.Parent = list
                 Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
 
@@ -1148,10 +1186,8 @@ local function createUI()
             if not selectedName then return end
             if not serverOnline then dprint("delete export: server offline"); return end
 
-            -- hapus dari memory
             exportedSets[selectedName] = nil
 
-            -- push ke server
             local body = {
                 autoload = autoloadName,
                 configs  = configs,
@@ -1164,7 +1200,6 @@ local function createUI()
                 return
             end
 
-            -- refresh UI list
             rebuildList()
         end)
 
@@ -1430,7 +1465,7 @@ local function createUI()
 
     -- Aktifkan panel setelah 5 detik
     task.delay(5, function()
-        overlay:Destroy()
+        if overlay then overlay:Destroy() overlay = nil end
         MainGUI.Enabled = true
 
         -- Auto-load dari server
