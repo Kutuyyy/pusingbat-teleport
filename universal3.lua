@@ -7,7 +7,7 @@
 
 -- ========== KONFIG SERVER ==========
 local SERVER_BASE = "https://deep-factual-goat.ngrok-free.app"  -- GANTI dengan URL ngrok kamu
-local API_KEY     = "asdasdasdasdasdasdasdasd"        -- GANTI dengan API key server.js kamu
+local API_KEY     = "asdasdasdasdasdasdasdasd"             -- GANTI dengan API key server.js kamu
 
 -- ========== Services ==========
 local Players = game:GetService("Players")
@@ -453,23 +453,25 @@ local function createUI()
     text.TextColor3 = Color3.fromRGB(255,255,255)
     text.Parent = textBg
 
-    -- Panel utama (kompak + scroll)
+    -- Panel utama (kompak + clip)
     if MainGUI then MainGUI:Destroy() end
     MainGUI = Instance.new("ScreenGui")
     MainGUI.Name = "PusingbatController"
     MainGUI.ResetOnSpawn = false
     MainGUI.IgnoreGuiInset = true
+    MainGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling -- UI FIX: layering stabil
     MainGUI.Parent = PlayerGui
     MainGUI.Enabled = false
 
     local frame = Instance.new("Frame")
     frame.Name = "MainFrame"
-    frame.Size = UDim2.fromOffset(420, 380)
+    frame.Size = UDim2.fromOffset(420, 360)              -- sedikit lebih pendek biar aman di iPhone
     frame.Position = UDim2.new(0, 24, 0, 120)
     frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
     frame.BackgroundTransparency = 0.15
     frame.BorderSizePixel = 0
     frame.Active = true
+    frame.ClipsDescendants = true                        -- UI FIX: cegah konten keluar panel
     frame.Parent = MainGUI
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
@@ -583,6 +585,7 @@ local function createUI()
     local tabTpBtn   = makeTabButton("Teleport", 216)
     local tabCfgBtn  = makeTabButton("Config", 324)
 
+    -- Scroll builder (UI FIX: clips + padding)
     local function makeScroll()
         local scroll = Instance.new("ScrollingFrame")
         scroll.Size = UDim2.new(1, -16, 1, -88)
@@ -592,6 +595,8 @@ local function createUI()
         scroll.CanvasSize = UDim2.new(0,0,0,0)
         scroll.ScrollBarThickness = 6
         scroll.Visible = false
+        scroll.ClipsDescendants = true            -- UI FIX
+        scroll.AutomaticCanvasSize = Enum.AutomaticSize.None
         scroll.Parent = frame
 
         local layout = Instance.new("UIListLayout")
@@ -600,8 +605,15 @@ local function createUI()
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Parent = scroll
 
+        local pad = Instance.new("UIPadding")
+        pad.PaddingTop = UDim.new(0, 6)
+        pad.PaddingBottom = UDim.new(0, 12)      -- UI FIX: cegah spill bawah
+        pad.PaddingLeft = UDim.new(0, 4)
+        pad.PaddingRight = UDim.new(0, 4)
+        pad.Parent = scroll
+
         local function recalc()
-            scroll.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 20)
+            scroll.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + pad.PaddingBottom.Offset)
         end
         layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(recalc)
         return scroll, layout, recalc
@@ -991,6 +1003,7 @@ local function createUI()
         f.BackgroundColor3 = Color3.fromRGB(45,45,50)
         f.BorderSizePixel = 0
         f.Parent = popup
+        f.ClipsDescendants = true                  -- UI FIX: panel popup juga clip
         Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
 
         local lbl = Instance.new("TextLabel")
@@ -1009,6 +1022,7 @@ local function createUI()
         list.Position = UDim2.new(0, 6, 0, 42)
         list.BackgroundTransparency = 1
         list.ScrollBarThickness = 6
+        list.ClipsDescendants = true               -- UI FIX
         list.Parent = f
 
         local lay = Instance.new("UIListLayout")
@@ -1263,8 +1277,9 @@ local function createUI()
     cfgScrollInner.Size = UDim2.new(1, -12, 1, 0)
     cfgScrollInner.Position = UDim2.new(0,6,0,0)
     cfgScrollInner.BackgroundTransparency = 1
-    cfgScrollInner.Parent = cfgList
     cfgScrollInner.ScrollBarThickness = 6
+    cfgScrollInner.ClipsDescendants = true       -- UI FIX
+    cfgScrollInner.Parent = cfgList
     local cfgLay = Instance.new("UIListLayout")
     cfgLay.Parent = cfgScrollInner
     cfgLay.Padding = UDim.new(0,6)
@@ -1280,14 +1295,14 @@ local function createUI()
             row.Parent = cfgScrollInner
             Instance.new("UICorner", row).CornerRadius = UDim.new(0,6)
 
-            local nameLbl = Instance.new("TextLabel")
-            nameLbl.BackgroundTransparency = 1
-            nameLbl.Size = UDim2.new(0.5, -10, 1, 0)
-            nameLbl.Position = UDim2.new(0,10,0,0)
-            nameLbl.Text = name .. (autoloadName==name and "  (Auto)" or "")
-            nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-            nameLbl.TextColor3 = Color3.new(1,1,1)
-            nameLbl.Parent = row
+            local nameLbl2 = Instance.new("TextLabel")
+            nameLbl2.BackgroundTransparency = 1
+            nameLbl2.Size = UDim2.new(0.5, -10, 1, 0)
+            nameLbl2.Position = UDim2.new(0,10,0,0)
+            nameLbl2.Text = name .. (autoloadName==name and "  (Auto)" or "")
+            nameLbl2.TextXAlignment = Enum.TextXAlignment.Left
+            nameLbl2.TextColor3 = Color3.new(1,1,1)
+            nameLbl2.Parent = row
 
             local loadB = Instance.new("TextButton")
             loadB.Size = UDim2.new(0.2, -6, 0, 26)
@@ -1384,7 +1399,7 @@ local function createUI()
         miscScroll.Visible = vis and (activeTab == "Misc")
         tpScroll.Visible   = vis and (activeTab == "Teleport")
         cfgScroll.Visible  = vis and (activeTab == "Config")
-        frame.Size = minimized and UDim2.fromOffset(420, 56) or UDim2.fromOffset(420, 380)
+        frame.Size = minimized and UDim2.fromOffset(420, 56) or UDim2.fromOffset(420, 360)
     end)
     btnClose.MouseButton1Click:Connect(function()
         MainGUI.Enabled = false
