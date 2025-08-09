@@ -26,6 +26,14 @@ local function dprint(...) -- aktifkan jika perlu
     -- print("[PB]", ...)
 end
 
+local function onClick(btn, handler)
+    -- Aman untuk PC & Mobile
+    if btn.Activated then btn.Activated:Connect(handler) end
+    -- fallback kalau Activated nggak ada (executor lama)
+    if btn.MouseButton1Click then btn.MouseButton1Click:Connect(handler) end
+    if btn.TouchTap then btn.TouchTap:Connect(handler) end
+end
+
 -- HTTP helper untuk executor (synapse/krnl/etc)
 local function rawRequest(opts)
     local req = (syn and syn.request) or (http and http.request) or http_request or request
@@ -491,7 +499,7 @@ local function showPill()
     btn.Parent = sg
     Instance.new("UICorner", btn).CornerRadius = UDim.new(1,0)
 
-    btn.MouseButton1Click:Connect(function()
+    onClick(btn, function()
         if MainGUI then MainGUI.Enabled = true end
         if ShowPillGUI then ShowPillGUI:Destroy() ShowPillGUI=nil end
     end)
@@ -628,7 +636,7 @@ local function createUI()
     searchBox.Parent = searchPanel
     Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 6)
 
-    searchBtn.MouseButton1Click:Connect(function()
+    onClick(searchBtn, function()
         searchPanel.Visible = not searchPanel.Visible
         if searchPanel.Visible then searchBox:CaptureFocus() end
     end)
@@ -647,13 +655,7 @@ local function createUI()
     tabs.BackgroundTransparency = 1
     tabs.Parent = frame
 
-    local function onClick(btn, handler)
-        -- Aman untuk PC & Mobile
-        if btn.Activated then btn.Activated:Connect(handler) end
-        -- fallback kalau Activated nggak ada (executor lama)
-        if btn.MouseButton1Click then btn.MouseButton1Click:Connect(handler) end
-        if btn.TouchTap then btn.TouchTap:Connect(handler) end
-    end
+    
 
     local function makeTabButton(text, xOffset)
         local b = Instance.new("TextButton")
@@ -982,7 +984,7 @@ local function createUI()
                     b.TextColor3 = Color3.new(1,1,1)
                     b.Parent = list
                     Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
-                    b.MouseButton1Click:Connect(function()
+                    onClick(b, function()
                         selectedPlayerName = plr.Name
                         playerNameLbl.Text = "Target: "..selectedPlayerName
                         pop:Destroy()
@@ -991,11 +993,11 @@ local function createUI()
             end
         end
         build()
-        close.MouseButton1Click:Connect(function() pop:Destroy() end)
+        onClick(close, function() pop:Destroy() end)
     end
 
-    pickBtn.MouseButton1Click:Connect(openPlayerPopup)
-    refreshBtn.MouseButton1Click:Connect(function()
+    onClick(pickBtn, openPlayerPopup)
+    onClick(refreshBtn, function()
         if selectedPlayerName then
             playerNameLbl.Text = "Target: "..selectedPlayerName
         end
@@ -1052,8 +1054,8 @@ local function createUI()
         modeInstant.BackgroundColor3 = (m=="Instant") and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
         modeTween.BackgroundColor3   = (m=="Tween")   and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
     end
-    modeInstant.MouseButton1Click:Connect(function() setMode("Instant") end)
-    modeTween.MouseButton1Click:Connect(function() setMode("Tween") end)
+    onClick(modeInstant, function() setMode("Instant") end)
+    onClick(modeTween,  function() setMode("Tween")  end)
 
     -- Duration + Easing
     local tweenRow = createTpRow(58)
@@ -1133,7 +1135,7 @@ local function createUI()
         easeIdx = easeIdx % #easeStyles + 1
         easeBtn.Text = "Easing: "..easeStyles[easeIdx][1]
     end
-    easeBtn.MouseButton1Click:Connect(cycleEase)
+    onClick(easeBtn,    cycleEase)
 
     -- Tombol Teleport Now (target player)
     local goRow = createTpRow(40)
@@ -1156,7 +1158,7 @@ local function createUI()
         if not hrp then return end
         teleportToPosition(hrp.Position + Vector3.new(0,3,0))
     end
-    goBtn.MouseButton1Click:Connect(teleportToTarget)
+    onClick(goBtn, teleportToTarget)
 
     -- Auto update target jika keluar/masuk
     local function onRosterChange()
@@ -1275,12 +1277,12 @@ local function createUI()
         end
         setInfoFromPos(locationData.position)
 
-        checkbox.MouseButton1Click:Connect(function()
+        onClick(checkbox, function()
             locationData.selected = not locationData.selected
             checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
         end)
 
-        tpBtn.MouseButton1Click:Connect(function()
+        onClick(tpBtn, function()
             local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
             local hrp = character:WaitForChild("HumanoidRootPart")
             local v = (typeof(locationData.position)=="Vector3") and locationData.position or unpackVec3(locationData.position)
@@ -1340,18 +1342,18 @@ local function createUI()
         cancel.TextColor3 = Color3.new(1,1,1)
         cancel.Parent = f
 
-        save.MouseButton1Click:Connect(function()
+        onClick(save, function()
             local name = (tb.Text ~= "" and tb.Text) or defaultText
             prompt:Destroy()
             onSave(name)
         end)
-        cancel.MouseButton1Click:Connect(function() prompt:Destroy() end)
+        onClick(cancel, function() prompt:Destroy() end)
     end
 
     -----------------------------------------------------
     -- Add/Delete handlers
     -----------------------------------------------------
-    addBtn.MouseButton1Click:Connect(function()
+    onClick(addBtn, function()
         local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
         local hrp = character:WaitForChild("HumanoidRootPart")
         local defaultName = "Location "..tostring(#savedLocations + 1)
@@ -1363,7 +1365,7 @@ local function createUI()
         end)
     end)
 
-    delBtn.MouseButton1Click:Connect(function()
+    onClick(delBtn, function()
         for i = #savedLocations, 1, -1 do
             if savedLocations[i].selected then
                 local chk = savedLocations[i].checkbox
@@ -1377,7 +1379,7 @@ local function createUI()
     -----------------------------------------------------
     -- Export ke server (ikut mode data server.py)
     -----------------------------------------------------
-    exportBtn.MouseButton1Click:Connect(function()
+    onClick(exportBtn, function()
         if #savedLocations == 0 then return end
         if not serverOnline then dprint("export: server offline"); return end
 
@@ -1407,7 +1409,7 @@ local function createUI()
     -----------------------------------------------------
     -- Import popup (Load/Delete)
     -----------------------------------------------------
-    importBtn.MouseButton1Click:Connect(function()
+    onClick(importBtn, function()
         if serverOnline then
             local ok,data = apiGetUser(HWID)
             if ok and data then
@@ -1518,7 +1520,7 @@ local function createUI()
                 b.Parent = list
                 Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
 
-                b.MouseButton1Click:Connect(function()
+                onClick(b, function()
                     if selectedBtn and selectedBtn ~= b then
                         selectedBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
                     end
@@ -1533,7 +1535,7 @@ local function createUI()
 
         rebuildList()
 
-        loadBtn.MouseButton1Click:Connect(function()
+        onClick(loadBtn, function()
             if not selectedName then return end
             local set = exportedSets[selectedName]
             if not set then return end
@@ -1558,7 +1560,7 @@ local function createUI()
             popup:Destroy()
         end)
 
-        deleteBtn.MouseButton1Click:Connect(function()
+        onClick(deleteBtn, function()
             if not selectedName then return end
             if not serverOnline then dprint("delete export: server offline"); return end
 
@@ -1579,7 +1581,8 @@ local function createUI()
             rebuildList()
         end)
 
-        closeB.MouseButton1Click:Connect(function() popup:Destroy() end)
+        onClick(closeB, function()
+        popup:Destroy()
     end)
 
     -----------------------------------------------------
@@ -1647,7 +1650,9 @@ local function createUI()
     logFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
     logFrame.BackgroundTransparency = 0.3
     logFrame.BorderSizePixel = 1
-    logFrame.Parent = game:GetService("CoreGui") -- atau PlayerGui kalau mau ikut reset
+    local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+    logFrame.Parent = PlayerGui
+    logFrame.ZIndex = 10
 
     local titleLbl = Instance.new("TextLabel")
     titleLbl.Size = UDim2.new(1, 0, 0, 20)
@@ -1682,18 +1687,18 @@ local function createUI()
     end
 
     -- === Button Auto Tour ===
-    startBtn.MouseButton1Click:Connect(function()
-        -- ... logic Auto Tour
-    end)
 
     local tourRunning = false
     local function parseInterval()
-        local n = tonumber((intervalBox.Text or ""):gsub("[^%d%.]",""))
+        local raw = tostring(intervalBox.Text or "")
+        raw = raw:gsub(",", ".")
+        local n = tonumber(raw:gsub("[^%d%.]",""))
         if not n or n < 0.1 then n = 0.1 end
         return n
     end
 
-startBtn.MouseButton1Click:Connect(function()
+
+onClick(startBtn, function()
     if tourRunning then return end
     if #savedLocations == 0 then
         statusLbl.Text = "Status: tidak ada lokasi"
@@ -1772,7 +1777,7 @@ startBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
-    stopBtn.MouseButton1Click:Connect(function()
+    onClick(stopBtn, function()
         tourRunning = false
         statusLbl.Text = "Status: Stopping..."
     end)
@@ -1942,8 +1947,8 @@ end)
             delB.Parent = row
             Instance.new("UICorner", delB).CornerRadius = UDim.new(0,6)
 
-            loadB.MouseButton1Click:Connect(function() applySettings(s) end)
-            autoB.MouseButton1Click:Connect(function()
+            onClick(loadB, function() applySettings(s) end)
+            onClick(autoB, function()
                 if not serverOnline then dprint("auto set: server offline"); return end
                 autoloadName = (autoloadName==name) and nil or name
                 local body = {
@@ -1955,7 +1960,7 @@ end)
                 apiPutUser(HWID, body)
                 rebuildCfgList()
             end)
-            delB.MouseButton1Click:Connect(function()
+            onClick(delB, function()
                 if not serverOnline then dprint("delete config: server offline"); return end
                 configs[name] = nil
                 if autoloadName == name then autoloadName = nil end
@@ -1971,7 +1976,7 @@ end)
         end
     end
 
-    saveBtn.MouseButton1Click:Connect(function()
+    onClick(saveBtn, function()
         if not serverOnline then dprint("save config: server offline"); return end
         local nm = nameBox.Text ~= "" and nameBox.Text or ("config-"..tostring(os.time()))
         configs[nm] = getCurrentSettings()
@@ -1994,15 +1999,15 @@ end)
         cfgScroll.Visible  = (name == "Config")
         applySearch()
     end
-    tabMainBtn.MouseButton1Click:Connect(function() showTab("Main") end)
-    tabMiscBtn.MouseButton1Click:Connect(function() showTab("Misc") end)
-    tabTpBtn.MouseButton1Click:Connect(function() showTab("Teleport") end)
-    tabCfgBtn.MouseButton1Click:Connect(function() showTab("Config") end)
+    onClick(tabMainBtn, function() showTab("Main") end)
+    onClick(tabMiscBtn, function() showTab("Misc") end)
+    onClick(tabTpBtn,  function() showTab("Teleport") end)
+    onClick(tabCfgBtn, function() showTab("Config") end)
     showTab("Main")
 
     -- Minimize / Close
     local minimized = false
-    btnMin.MouseButton1Click:Connect(function()
+    onClick(btnMin, function()
         minimized = not minimized
         local vis = not minimized
         tabs.Visible = vis
@@ -2012,7 +2017,7 @@ end)
         cfgScroll.Visible  = vis and (activeTab == "Config")
         frame.Size = minimized and UDim2.fromOffset(420, 56) or UDim2.fromOffset(420, 360)
     end)
-    btnClose.MouseButton1Click:Connect(function()
+    onClick(btnClose, function()
         MainGUI.Enabled = false
         showPill()
     end)
