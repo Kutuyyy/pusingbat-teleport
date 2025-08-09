@@ -460,31 +460,6 @@ local function createUI()
     text.ZIndex = 10001
     text.Parent = textBg
 
-    -- fungsi aman buat menutup overlay sekali saja
-    local closed = false
-    local function closeOverlay()
-        if closed then return end
-        closed = true
-        if overlay and overlay.Parent then overlay:Destroy() end
-        -- pastikan UI utama tampil
-        if MainGUI then MainGUI.Enabled = true end
-    end
-
-    -- auto tutup 2.5s memakai Heartbeat (lebih stabil)
-    task.spawn(function()
-        local t0 = os.clock()
-        while os.clock() - t0 < 2.5 do
-            game:GetService("RunService").Heartbeat:Wait()
-        end
-        closeOverlay()
-    end)
-
-    -- tap/klik di mana saja untuk skip
-    dim.MouseButton1Click:Connect(closeOverlay)
-
-    -- failsafe 10s kalau thread di atas gagal
-    task.delay(10, closeOverlay)
-
     -- Panel utama
     if MainGUI then MainGUI:Destroy() end
     MainGUI = Instance.new("ScreenGui")
@@ -492,6 +467,7 @@ local function createUI()
     MainGUI.ResetOnSpawn = false
     MainGUI.IgnoreGuiInset = true
     MainGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    MainGUI.DisplayOrder = 100
     MainGUI.Parent = PlayerGui
     MainGUI.Enabled = false
 
@@ -1427,21 +1403,6 @@ local function createUI()
         end
     end
 
-    saveBtn.MouseButton1Click:Connect(function()
-        if not serverOnline then dprint("save config: server offline"); return end
-        local nm = nameBox.Text ~= "" and nameBox.Text or ("config-"..tostring(os.time()))
-        configs[nm] = getCurrentSettings()
-        local body = {
-            autoload = autoloadName,
-            configs  = configs,
-            exports  = normalizeExportsForSend(exportedSets),
-            meta     = { username = USERNAME }
-        }
-        apiPutUser(HWID, body)
-        rebuildCfgList()
-    end)
-
-    -- Tab switching
     local function showTab(name)
         activeTab = name
         mainScroll.Visible = (name == "Main")
@@ -1450,10 +1411,13 @@ local function createUI()
         cfgScroll.Visible  = (name == "Config")
         applySearch()
     end
-    tabMainBtn.MouseButton1Click:Connect(function() showTab("Main") end)
-    tabMiscBtn.MouseButton1Click:Connect(function() showTab("Misc") end)
-    tabTpBtn.MouseButton1Click:Connect(function() showTab("Teleport") end)
-    tabCfgBtn.MouseButton1Click:Connect(function() showTab("Config") end)
+
+    -- Inisialisasi UI state lebih awal (tanpa nunggu timer)
+    if autoloadName and configs[autoloadName] then
+        task.defer(function() applySettings(configs[autoloadName]) end)
+    end
+    setFOV(defaultFOV)
+    rebuildCfgList()
     showTab("Main")
 
     -- Minimize / Close
@@ -1495,18 +1459,30 @@ local function createUI()
         end
     end)
 
-    -- Aktifkan panel setelah 5 detik
-    task.delay(5, function()
-        if overlay then overlay:Destroy() overlay = nil end
-        MainGUI.Enabled = true
+    -- fungsi aman buat menutup overlay sekali saja
+    local closed = false
+    local function closeOverlay()
+        if closed then return end
+        closed = true
+        if overlay and overlay.Parent then overlay:Destroy() end
+        -- enable panel utama setelah overlay tutup
+        if MainGUI then MainGUI.Enabled = true end
+    end
 
-        -- Auto-load dari server
-        if autoloadName and configs[autoloadName] then
-            task.defer(function() applySettings(configs[autoloadName]) end)
+    -- auto tutup 2.5s memakai Heartbeat
+    task.spawn(function()
+        local t0 = os.clock()
+        while os.clock() - t0 < 2.5 do
+            RunService.Heartbeat:Wait()
         end
-        setFOV(defaultFOV)
-        rebuildCfgList()
+        closeOverlay()
     end)
+
+    -- tap/klik di mana saja untuk skip
+    dim.MouseButton1Click:Connect(closeOverlay)
+
+    -- failsafe 10s
+    task.delay(10, closeOverlay)
 end
 
 -- ========== Init ==========
