@@ -6,7 +6,7 @@
 ]]--
 
 -- ========== KONFIG SERVER ==========
-local SERVER_BASE = "https://xxxxxxx.ngrok-free.app"  -- GANTI dengan URL ngrok kamu
+local SERVER_BASE = "https://9af2851a399d.ngrok-free.app"  -- GANTI dengan URL ngrok kamu
 local API_KEY     = "asdasdasdasdasdasdasdasd"        -- GANTI dengan API key server.js kamu
 
 -- ========== Services ==========
