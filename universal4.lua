@@ -436,23 +436,42 @@ local function teleportToPositionAndWait(dest)
     if not root then return end
     if tpMode == "Instant" then
         root.CFrame = CFrame.new(dest)
+        task.wait() -- beri 1 frame buat settle
         return
     end
 
     local wasFly = fly
     if wasFly then setFly(false) end
+
     local info = TweenInfo.new(
         math.max(0.05, tweenDuration),
         easeStyles[easeIdx][2],
         easeStyles[easeIdx][3],
-        0,false,0
+        0, false, 0
     )
-    local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
+    local tw = TweenService:Create(root, info, { CFrame = CFrame.new(dest) })
+
+    local done = false
+    local conn
+    conn = tw.Completed:Connect(function()
+        done = true
+        if conn then conn:Disconnect() conn = nil end
+    end)
+
     tw:Play()
-    -- tunggu tween selesai
-    pcall(function() tw.Completed:Wait() end)
+
+    -- timeout supaya nggak nge-freeze kalau tween cancel/object hilang
+    local deadline = os.clock() + tweenDuration + 1.5
+    while not done and os.clock() < deadline do
+        -- kalau root hilang di tengah jalan (mati/respawn), keluarin aja loop tunggu
+        if not root or not root.Parent then break end
+        task.wait(0.05)
+    end
+    if conn then conn:Disconnect() end
+
     if wasFly then setFly(true) end
 end
+
 
 local function showPill()
     if ShowPillGUI then ShowPillGUI:Destroy() end
