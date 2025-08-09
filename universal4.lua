@@ -1268,7 +1268,6 @@ local function createUI()
                     teleportToPositionAndWait(dest)
                 end
             end
-            local waitSec = parseInterval()
         end)
 
         entry:SetAttribute("label", string.lower(locationData.name))
@@ -1636,17 +1635,26 @@ local function createUI()
             while tourRunning do
                 for i = 1, #savedLocations do
                     if not tourRunning then break end
+
+                    -- re-ensure character parts
+                    if (not root) or (not root.Parent) then
+                        pcall(getCharacter)
+                    end
+
+                    statusLbl.Text = ("Status: Running (%d/%d)"):format(i, #savedLocations)
+
                     local loc = savedLocations[i]
                     local v = (typeof(loc.position)=="Vector3") and loc.position or unpackVec3(loc.position)
-                    if v then
+                    if v and root then
                         local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
                         if tpMode == "Instant" then
                             teleportToPosition(dest)
                         else
-                            teleportToPositionAndWait(dest)  -- nunggu tween selesai
+                            teleportToPositionAndWait(dest) -- tunggu tween selesai
                         end
                     end
-                    -- jeda antar lokasi sesuai input (detik)
+
+                    -- jeda antar lokasi
                     local waitSec = parseInterval()
                     local t0 = tick()
                     while tourRunning and (tick() - t0) < waitSec do
