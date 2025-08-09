@@ -285,9 +285,17 @@ end)
 local function setNoclip(state) noclip = state and true or false end
 RunService.Stepped:Connect(function()
     if not char then return end
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = not noclip  -- false kalau noclip ON, true kalau OFF
+    if noclip then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    else
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
         end
     end
 end)
