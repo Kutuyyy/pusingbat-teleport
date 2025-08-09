@@ -420,18 +420,23 @@ end
 local function createUI()
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-    -- Loading overlay 5 detik
+    -- Loading overlay (auto 2.5s + tap to skip + failsafe 10s)
     local overlay = Instance.new("ScreenGui")
     overlay.Name = "PusingbatLoading"
     overlay.ResetOnSpawn = false
     overlay.IgnoreGuiInset = true
+    overlay.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    overlay.DisplayOrder = 9999
     overlay.Parent = PlayerGui
 
-    local dim = Instance.new("Frame")
+    local dim = Instance.new("TextButton") -- pakai TextButton biar bisa diklik
+    dim.AutoButtonColor = false
+    dim.Text = ""
     dim.Size = UDim2.fromScale(1,1)
     dim.BackgroundColor3 = Color3.new(0,0,0)
     dim.BackgroundTransparency = 0.5
     dim.BorderSizePixel = 0
+    dim.ZIndex = 9999
     dim.Parent = overlay
 
     local textBg = Instance.new("Frame")
@@ -441,17 +446,44 @@ local function createUI()
     textBg.BackgroundColor3 = Color3.fromRGB(0,0,0)
     textBg.BackgroundTransparency = 0.5
     textBg.BorderSizePixel = 0
+    textBg.ZIndex = 10000
     textBg.Parent = overlay
     Instance.new("UICorner", textBg).CornerRadius = UDim.new(0,18)
 
     local text = Instance.new("TextLabel")
     text.Size = UDim2.fromScale(1,1)
     text.BackgroundTransparency = 1
-    text.Text = "Created by Pusingbat"
+    text.Text = "Created by Pusingbat\n(tap to continue)"
     text.Font = Enum.Font.GothamBlack
-    text.TextSize = 42
+    text.TextSize = 36
     text.TextColor3 = Color3.fromRGB(255,255,255)
+    text.ZIndex = 10001
     text.Parent = textBg
+
+    -- fungsi aman buat menutup overlay sekali saja
+    local closed = false
+    local function closeOverlay()
+        if closed then return end
+        closed = true
+        if overlay and overlay.Parent then overlay:Destroy() end
+        -- pastikan UI utama tampil
+        if MainGUI then MainGUI.Enabled = true end
+    end
+
+    -- auto tutup 2.5s memakai Heartbeat (lebih stabil)
+    task.spawn(function()
+        local t0 = os.clock()
+        while os.clock() - t0 < 2.5 do
+            game:GetService("RunService").Heartbeat:Wait()
+        end
+        closeOverlay()
+    end)
+
+    -- tap/klik di mana saja untuk skip
+    dim.MouseButton1Click:Connect(closeOverlay)
+
+    -- failsafe 10s kalau thread di atas gagal
+    task.delay(10, closeOverlay)
 
     -- Panel utama
     if MainGUI then MainGUI:Destroy() end
@@ -1472,7 +1504,6 @@ local function createUI()
         if autoloadName and configs[autoloadName] then
             task.defer(function() applySettings(configs[autoloadName]) end)
         end
-
         setFOV(defaultFOV)
         rebuildCfgList()
     end)
