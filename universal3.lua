@@ -1,6 +1,3 @@
-# Generate the updated full Lua script with mobile-friendly UI (smaller height, center position, drag clamp),
-# cloud sync (GET/PUT + usage ping), and local FS fallback.
-
 --[[
     Pusingbat Hub (LocalScript UI Bawaan) — Cloud + Local Fallback
     Tabs: Main • Misc • Teleport • Config
