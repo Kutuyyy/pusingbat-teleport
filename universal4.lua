@@ -136,11 +136,13 @@ local function apiGetUser(hwid)
     local res = rawRequest({
         Url = string.format("%s/v1/users/%s", SERVER_BASE, hwid),
         Method = "GET",
-        Headers = { ["X-API-Key"] = API_KEY }
+        Headers = apiHeaders()
     })
     if res and res.StatusCode == 200 then return true, jsonDecode(res.Body) end
+    dprint("GET /v1/users status:", res and res.StatusCode, "body:", res and res.Body)
     return false, res
 end
+
 local function apiPutUser(hwid, bodyTbl)
     local res = rawRequest({
         Url = string.format("%s/v1/users/%s", SERVER_BASE, hwid),
@@ -164,6 +166,7 @@ local function tryLoadFromServer()
     local ok, dataOrRes = apiGetUser(HWID)
     if not ok then
         serverOnline = false
+        dprint("Server offline atau error saat GET user. Cek StatusCode di log di atas.")
         return
     end
     local data = dataOrRes
@@ -173,6 +176,7 @@ local function tryLoadFromServer()
     exportedSets = data.exports or {}
     apiPostUsage(USERNAME, HWID)
 end
+
 
 -- ========== Character helpers ==========
 local function getCharacter()
@@ -426,6 +430,28 @@ local function teleportToPosition(dest)
         teleporting = false
         if wasFly then setFly(true) end
     end)
+end
+
+local function teleportToPositionAndWait(dest)
+    if not root then return end
+    if tpMode == "Instant" then
+        root.CFrame = CFrame.new(dest)
+        return
+    end
+
+    local wasFly = fly
+    if wasFly then setFly(false) end
+    local info = TweenInfo.new(
+        math.max(0.05, tweenDuration),
+        easeStyles[easeIdx][2],
+        easeStyles[easeIdx][3],
+        0,false,0
+    )
+    local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
+    tw:Play()
+    -- tunggu tween selesai
+    pcall(function() tw.Completed:Wait() end)
+    if wasFly then setFly(true) end
 end
 
 local function showPill()
@@ -1235,10 +1261,14 @@ local function createUI()
             local hrp = character:WaitForChild("HumanoidRootPart")
             local v = (typeof(locationData.position)=="Vector3") and locationData.position or unpackVec3(locationData.position)
             if v then
-                teleportToPosition(Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0))
-            else
-                dprint("teleport failed: invalid position for", locationData.name)
+                local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
+                if tpMode == "Instant" then
+                    teleportToPosition(dest)
+                else
+                    teleportToPositionAndWait(dest)
+                end
             end
+            local waitSec = parseInterval()
         end)
 
         entry:SetAttribute("label", string.lower(locationData.name))
