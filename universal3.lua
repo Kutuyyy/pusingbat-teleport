@@ -470,6 +470,7 @@ local function createUI()
     frame.BackgroundTransparency = 0.15
     frame.BorderSizePixel = 0
     frame.Active = true
+    frame.ClipsDescendants = true   -- ⬅️ tambahin ini
     frame.Parent = MainGUI
     Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
@@ -592,20 +593,34 @@ local function createUI()
         scroll.CanvasSize = UDim2.new(0,0,0,0)
         scroll.ScrollBarThickness = 6
         scroll.Visible = false
+        scroll.ClipsDescendants = true           -- ⬅️ baru
+        scroll.AutomaticCanvasSize = Enum.AutomaticSize.None  -- ⬅️ paksa manual
+        scroll.ZIndex = 2
         scroll.Parent = frame
 
+        -- konten vertikal
         local layout = Instance.new("UIListLayout")
         layout.FillDirection = Enum.FillDirection.Vertical
         layout.Padding = UDim.new(0, 8)
         layout.SortOrder = Enum.SortOrder.LayoutOrder
         layout.Parent = scroll
 
+        -- padding biar konten nggak nempel pinggir & tidak “keluar” di bawah
+        local pad = Instance.new("UIPadding")
+        pad.PaddingTop = UDim.new(0, 6)
+        pad.PaddingBottom = UDim.new(0, 12)
+        pad.PaddingLeft = UDim.new(0, 4)
+        pad.PaddingRight = UDim.new(0, 4)
+        pad.Parent = scroll
+
         local function recalc()
-            scroll.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 20)
+            -- + padding bottom biar tidak spill
+            scroll.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 12)
         end
         layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(recalc)
         return scroll, layout, recalc
     end
+
 
     local mainScroll, _, recalcMain = makeScroll()
     local miscScroll, _, recalcMisc = makeScroll()
