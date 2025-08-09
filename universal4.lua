@@ -1634,23 +1634,32 @@ local function createUI()
         statusLbl.Text = "Status: Running"
         task.spawn(function()
             while tourRunning do
-                for i=1, #savedLocations do
+                for i = 1, #savedLocations do
                     if not tourRunning then break end
                     local loc = savedLocations[i]
                     local v = (typeof(loc.position)=="Vector3") and loc.position or unpackVec3(loc.position)
                     if v then
-                        teleportToPosition(Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0))
+                        local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
+                        if tpMode == "Instant" then
+                            teleportToPosition(dest)
+                        else
+                            teleportToPositionAndWait(dest)  -- nunggu tween selesai
+                        end
                     end
+                    -- jeda antar lokasi sesuai input (detik)
                     local waitSec = parseInterval()
                     local t0 = tick()
-                    while tourRunning and (tick()-t0) < waitSec do
+                    while tourRunning and (tick() - t0) < waitSec do
                         task.wait(0.05)
                     end
                 end
+                -- jeda kecil antar putaran biar nggak 100% CPU
+                if tourRunning then task.wait(0.1) end
             end
             statusLbl.Text = "Status: Stopped"
         end)
     end)
+
 
     stopBtn.MouseButton1Click:Connect(function()
         tourRunning = false
