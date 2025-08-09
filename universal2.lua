@@ -44,6 +44,12 @@ local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
+local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
+local HttpService = game:GetService("HttpService")
+local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
+local HttpService = game:GetService("HttpService")
+local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
 
 local LocalPlayer = Players.LocalPlayer
 
@@ -81,6 +87,289 @@ local exportedSets = {} -- name -> array of {name, position}
 -- Configs
 local configs = {} -- name -> settings table
 local autoloadName = nil
+
+-- ====== FS / Persistence (per-HWID) ======
+local fs = {
+	write = rawget(getfenv(), "writefile"),
+	read = rawget(getfenv(), "readfile"),
+	exists = rawget(getfenv(), "isfile"),
+	remove = rawget(getfenv(), "delfile"),
+	list = rawget(getfenv(), "listfiles"),
+	makefolder = rawget(getfenv(), "makefolder"),
+	isfolder = rawget(getfenv(), "isfolder"),
+}
+fs.available = (type(fs.write)=="function" and type(fs.read)=="function" and type(fs.exists)=="function" and type(fs.makefolder)=="function")
+
+local function getHWID()
+	local id
+	pcall(function()
+		if syn and syn.get_hwid then id = syn.get_hwid() return end
+		if gethwid then id = gethwid() return end
+		if get_hwid then id = get_hwid() return end
+		id = RbxAnalyticsService:GetClientId()
+	end)
+	id = tostring(id or (Players.LocalPlayer and Players.LocalPlayer.UserId) or "unknown")
+	id = id:gsub("[^%w%-_]", "-")
+	return id
+end
+
+local HWID = getHWID()
+local BASE = "pusingbat_hub"
+local USER_DIR = string.format("%s/users/%s", BASE, HWID)
+local CFG_DIR = USER_DIR.."/configs"
+local EXP_DIR = USER_DIR.."/exports"
+local SETTINGS_FILE = USER_DIR.."/settings.json"
+
+local function ensureDirs()
+	if not fs.available then return end
+	pcall(function()
+		if not (fs.isfolder and fs.isfolder(BASE)) then fs.makefolder(BASE) end
+		if not (fs.isfolder and fs.isfolder(BASE.."/users")) then fs.makefolder(BASE.."/users") end
+		if not (fs.isfolder and fs.isfolder(USER_DIR)) then fs.makefolder(USER_DIR) end
+		if not (fs.isfolder and fs.isfolder(CFG_DIR)) then fs.makefolder(CFG_DIR) end
+		if not (fs.isfolder and fs.isfolder(EXP_DIR)) then fs.makefolder(EXP_DIR) end
+	end)
+end
+
+local function jsonEncode(tbl)
+	return HttpService:JSONEncode(tbl)
+end
+local function jsonDecode(str)
+	local ok, res = pcall(function() return HttpService:JSONDecode(str) end)
+	return ok and res or nil
+end
+
+local function writeJSON(path, tbl)
+	if not fs.available then return false end
+	local ok = pcall(function()
+		fs.write(path, jsonEncode(tbl))
+	end)
+	return ok
+end
+
+local function readJSON(path)
+	if not fs.available or not fs.exists(path) then return nil end
+	local ok, data = pcall(function() return fs.read(path) end)
+	if not ok then return nil end
+	return jsonDecode(data)
+end
+
+local function listJSON(dir)
+	local out = {}
+	if not fs.available or not fs.list then return out end
+	pcall(function()
+		for _,p in ipairs(fs.list(dir)) do
+			if p:sub(-5):lower() == ".json" then table.insert(out, p) end
+		end
+	end)
+	return out
+end
+
+local function sanitizeName(name)
+	name = tostring(name or "")
+	name = name:gsub("[^%w%-%._]", "-")
+	if name == "" then name = "noname" end
+	return name
+end
+
+local function loadAllFromDisk()
+	if not fs.available then return end
+	ensureDirs()
+	-- settings
+	local s = readJSON(SETTINGS_FILE)
+	if s and type(s.autoload)=="string" then autoloadName = s.autoload end
+	-- configs
+	for _,p in ipairs(listJSON(CFG_DIR)) do
+		local data = readJSON(p)
+		if data then
+			local nm = p:match("([^/\\]+)%.json$") or p
+			configs[nm] = data
+		end
+	end
+	-- exports
+	for _,p in ipairs(listJSON(EXP_DIR)) do
+		local data = readJSON(p)
+		if data then
+			local nm = p:match("([^/\\]+)%.json$") or p
+			exportedSets[nm] = data
+		end
+	end
+end
+
+local function saveSettings()
+	if not fs.available then return end
+	ensureDirs()
+	writeJSON(SETTINGS_FILE, {autoload = autoloadName})
+end
+
+local function saveConfigFile(name, tbl)
+	if not fs.available then return end
+	ensureDirs()
+	local fn = CFG_DIR.."/"..sanitizeName(name)..".json"
+	writeJSON(fn, tbl)
+end
+
+local function deleteConfigFile(name)
+	if not fs.available or not fs.remove then return end
+	local fn = CFG_DIR.."/"..sanitizeName(name)..".json"
+	pcall(function() fs.remove(fn) end)
+end
+
+local function saveExport(name, setTbl)
+	if not fs.available then return end
+	ensureDirs()
+	local fn = EXP_DIR.."/"..sanitizeName(name)..".json"
+	writeJSON(fn, setTbl)
+end
+
+-- ====== FS / Persistence (per-HWID) ======
+local fs = {
+	write = rawget(getfenv(), "writefile"),
+	read = rawget(getfenv(), "readfile"),
+	exists = rawget(getfenv(), "isfile"),
+	remove = rawget(getfenv(), "delfile"),
+	list = rawget(getfenv(), "listfiles"),
+	makefolder = rawget(getfenv(), "makefolder"),
+	isfolder = rawget(getfenv(), "isfolder"),
+}
+fs.available = (type(fs.write)=="function" and type(fs.read)=="function" and type(fs.exists)=="function" and type(fs.makefolder)=="function")
+
+local function getHWID()
+	local id
+	pcall(function()
+		if syn and syn.get_hwid then id = syn.get_hwid() return end
+		if gethwid then id = gethwid() return end
+		if get_hwid then id = get_hwid() return end
+		id = RbxAnalyticsService:GetClientId()
+	end)
+	id = tostring(id or (Players.LocalPlayer and Players.LocalPlayer.UserId) or "unknown")
+	id = id:gsub("[^%w%-_]", "-")
+	return id
+end
+
+local HWID = getHWID()
+local BASE = "pusingbat_hub"
+local USER_DIR = string.format("%s/users/%s", BASE, HWID)
+local CFG_DIR = USER_DIR.."/configs"
+local EXP_DIR = USER_DIR.."/exports"
+local SETTINGS_FILE = USER_DIR.."/settings.json"
+
+local function ensureDirs()
+	if not fs.available then return end
+	pcall(function()
+		if not (fs.isfolder and fs.isfolder(BASE)) then fs.makefolder(BASE) end
+		if not (fs.isfolder and fs.isfolder(BASE.."/users")) then fs.makefolder(BASE.."/users") end
+		if not (fs.isfolder and fs.isfolder(USER_DIR)) then fs.makefolder(USER_DIR) end
+		if not (fs.isfolder and fs.isfolder(CFG_DIR)) then fs.makefolder(CFG_DIR) end
+		if not (fs.isfolder and fs.isfolder(EXP_DIR)) then fs.makefolder(EXP_DIR) end
+	end)
+end
+
+local function jsonEncode(tbl)
+	return HttpService:JSONEncode(tbl)
+end
+local function jsonDecode(str)
+	local ok, res = pcall(function() return HttpService:JSONDecode(str) end)
+	return ok and res or nil
+end
+
+local function writeJSON(path, tbl)
+	if not fs.available then return false end
+	local ok = pcall(function()
+		fs.write(path, jsonEncode(tbl))
+	end)
+	return ok
+end
+
+local function readJSON(path)
+	if not fs.available or not fs.exists(path) then return nil end
+	local ok, data = pcall(function() return fs.read(path) end)
+	if not ok then return nil end
+	return jsonDecode(data)
+end
+
+local function listJSON(dir)
+	local out = {}
+	if not fs.available or not fs.list then return out end
+	pcall(function()
+		for _,p in ipairs(fs.list(dir)) do
+			if p:sub(-5):lower() == ".json" then table.insert(out, p) end
+		end
+	end)
+	return out
+end
+
+local function sanitizeName(name)
+	name = tostring(name or "")
+	name = name:gsub("[^%w%-%._]", "-")
+	if name == "" then name = "noname" end
+	return name
+end
+
+local function loadAllFromDisk()
+	if not fs.available then return end
+	ensureDirs()
+	-- settings
+	local s = readJSON(SETTINGS_FILE)
+	if s and type(s.autoload)=="string" then autoloadName = s.autoload end
+	-- configs
+	for _,p in ipairs(listJSON(CFG_DIR)) do
+		local data = readJSON(p)
+		if data then
+			local nm = p:match("([^/\\]+)%.json$") or p
+			configs[nm] = data
+		end
+	end
+	-- exports
+	for _,p in ipairs(listJSON(EXP_DIR)) do
+		local data = readJSON(p)
+		if data then
+			local nm = p:match("([^/\\]+)%.json$") or p
+			exportedSets[nm] = data
+		end
+	end
+end
+
+local function saveSettings()
+	if not fs.available then return end
+	ensureDirs()
+	writeJSON(SETTINGS_FILE, {autoload = autoloadName})
+end
+
+local function saveConfigFile(name, tbl)
+	if not fs.available then return end
+	ensureDirs()
+	local fn = CFG_DIR.."/"..sanitizeName(name)..".json"
+	writeJSON(fn, tbl)
+end
+
+-- ====== FS / Persistence (per-HWID) ======
+local fs = {
+	write = rawget(getfenv(), "writefile"),
+	read = rawget(getfenv(), "readfile"),
+	exists = rawget(getfenv(), "isfile"),
+	remove = rawget(getfenv(), "delfile"),
+	list = rawget(getfenv(), "listfiles"),
+	makefolder = rawget(getfenv(), "makefolder"),
+	isfolder = rawget(getfenv(), "isfolder"),
+}
+fs.available = (type(fs.write)=="function" and type(fs.read)=="function" and type(fs.exists)=="function" and type(fs.makefolder)=="function")
+
+local function getHWID()
+	local id
+	pcall(function()
+		if syn and syn.get_hwid then id = syn.get_hwid() return end
+		if gethwid then id = gethwid() return end
+		if get_hwid then id = get_hwid() return end
+		id = RbxAnalyticsService:GetClientId()
+	end)
+	id = tostring(id or (Players.LocalPlayer and Players.LocalPlayer.UserId) or "unknown")
+	id = id:gsub("[^%w%-_]", "-")
+	return id
+end
+
+local HWID = getHWID()
+local BASE = "
 
 -- ====== Character helpers ======
 local function getCharacter()
@@ -868,10 +1157,14 @@ local function createUI()
 				copy[#copy+1] = {name=loc.name, position=loc.position}
 			end
 			exportedSets[name] = copy
+			-- persist ke file kalau FS tersedia
+			saveExport(name, copy)
 		end)
 	end)
 
 	importBtn.MouseButton1Click:Connect(function()
+		-- rebuild exportedSets dari disk kalau ada (biar up to date)
+		loadAllFr
 		-- popup list
 		local popup = Instance.new("ScreenGui")
 		popup.Name = "PB_ImportList"
@@ -911,316 +1204,3 @@ local function createUI()
 				for i=#savedLocations,1,-1 do
 					local chk = savedLocations[i].checkbox
 					if chk and chk.Parent then chk.Parent:Destroy() end
-					table.remove(savedLocations,i)
-				end
-				for _,loc in ipairs(set) do
-					local nd = {name=loc.name, position=loc.position, selected=false}
-					savedLocations[#savedLocations+1] = nd
-					createLocationEntry(nd)
-				end
-				recalcTp()
-				popup:Destroy()
-			end)
-		end
-		local closeB = Instance.new("TextButton")
-		closeB.Size = UDim2.new(1, -12, 0, 28)
-		closeB.Position = UDim2.new(0,6,1,-34)
-		closeB.Text = "Close"
-		closeB.BackgroundColor3 = Color3.fromRGB(90,60,60)
-		closeB.TextColor3 = Color3.new(1,1,1)
-		closeB.Parent = f
-		Instance.new("UICorner", closeB).CornerRadius = UDim.new(0,6)
-		closeB.MouseButton1Click:Connect(function() popup:Destroy() end)
-	end)
-
-	-- Search filter per tab
-	local function applySearchMain()
-		local q = string.lower(searchBox.Text or "")
-		for _,row in ipairs(mainScroll:GetChildren()) do
-			if row:IsA("Frame") then
-				local label = string.lower(tostring(row:GetAttribute("label") or row.Name or ""))
-				row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
-			end
-		end
-		recalcMain()
-	end
-	local function applySearchTp()
-		local q = string.lower(searchBox.Text or "")
-		for _,row in ipairs(tpScroll:GetChildren()) do
-			if row:IsA("Frame") and row ~= btnBar and row ~= eximBar then
-				local label = tostring(row:GetAttribute("label") or "")
-				row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
-			end
-		end
-		recalcTp()
-	end
-	local function applySearchMisc()
-		local q = string.lower(searchBox.Text or "")
-		for _,row in ipairs(miscScroll:GetChildren()) do
-			if row:IsA("Frame") then
-				local label = string.lower(tostring(row:GetAttribute("label") or row.Name or ""))
-				row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
-			end
-		end
-		recalcMisc()
-	end
-	local function applySearchCfg()
-		local q = string.lower(searchBox.Text or "")
-		for _,row in ipairs(cfgScroll:GetChildren()) do
-			if row:IsA("Frame") then
-				local label = string.lower(tostring(row:GetAttribute("label") or row.Name or ""))
-				row.Visible = (q == "") or (string.find(label, q, 1, true) ~= nil)
-			end
-		end
-		recalcCfg()
-	end
-
-	local activeTab = "Main"
-	local function applySearch()
-		if activeTab == "Main" then applySearchMain()
-		elseif activeTab == "Misc" then applySearchMisc()
-		elseif activeTab == "Teleport" then applySearchTp()
-		else applySearchCfg() end
-	end
-	searchBox:GetPropertyChangedSignal("Text"):Connect(applySearch)
-
-	-- ===== CONFIG TAB =====
-	local nameRow = createRow(cfgScroll, 58)
-	nameRow:SetAttribute("label","Config Name")
-	local nameLbl = Instance.new("TextLabel")
-	nameLbl.BackgroundTransparency = 1
-	nameLbl.Size = UDim2.new(1, 0, 0, 20)
-	nameLbl.Position = UDim2.new(0,10,0,6)
-	nameLbl.Text = "Config Name"
-	nameLbl.TextColor3 = Color3.fromRGB(235,235,235)
-	nameLbl.Font = Enum.Font.Gotham
-	nameLbl.TextSize = 16
-	nameLbl.Parent = nameRow
-	local nameBox = Instance.new("TextBox")
-	nameBox.Size = UDim2.new(1, -20, 0, 28)
-	nameBox.Position = UDim2.new(0,10,0,28)
-	nameBox.PlaceholderText = "my-config"
-	nameBox.Text = ""
-	nameBox.TextColor3 = Color3.new(1,1,1)
-	nameBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
-	nameBox.BorderSizePixel = 0
-	nameBox.Parent = nameRow
-	Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0,6)
-
-	local saveRow = createRow(cfgScroll, 40)
-	saveRow:SetAttribute("label","Save Config")
-	local saveBtn = Instance.new("TextButton")
-	saveBtn.Size = UDim2.new(1, -20, 1, -10)
-	saveBtn.Position = UDim2.new(0,10,0,5)
-	saveBtn.Text = "Save Config"
-	saveBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
-	saveBtn.TextColor3 = Color3.new(1,1,1)
-	saveBtn.BorderSizePixel = 0
-	saveBtn.Parent = saveRow
-	Instance.new("UICorner", saveBtn).CornerRadius = UDim.new(0,8)
-
-	local listTitle = createRow(cfgScroll, 28)
-	local lt = Instance.new("TextLabel")
-	lt.BackgroundTransparency = 1
-	lt.Size = UDim2.new(1, -20, 1, 0)
-	lt.Position = UDim2.new(0,10,0,0)
-	lt.Text = "Saved Configs"
-	lt.TextColor3 = Color3.new(1,1,1)
-	lt.TextXAlignment = Enum.TextXAlignment.Left
-	lt.Font = Enum.Font.GothamBold
-	lt.TextSize = 14
-	lt.Parent = listTitle
-
-	local cfgList = createRow(cfgScroll, 160)
-	cfgList.BackgroundTransparency = 1
-	local cfgScrollInner = Instance.new("ScrollingFrame")
-	cfgScrollInner.Size = UDim2.new(1, -12, 1, -0)
-	cfgScrollInner.Position = UDim2.new(0,6,0,0)
-	cfgScrollInner.BackgroundTransparency = 1
-	cfgScrollInner.Parent = cfgList
-	cfgScrollInner.ScrollBarThickness = 6
-	local cfgLay = Instance.new("UIListLayout")
-	cfgLay.Parent = cfgScrollInner
-	cfgLay.Padding = UDim.new(0,6)
-
-	local function getCurrentSettings()
-		return {
-			fly=fly, noclip=noclip, infJumpMobile=infJumpMobile, infJumpPC=infJumpPC, noFallDamage=noFallDamage,
-			walkSpeed=walkSpeed, jumpPower=jumpPower,
-			fullBright=fullBright, removeFog=removeFog, fov=defaultFOV,
-		}
-	end
-	local function applySettings(s)
-		if not s then return end
-		wsSl.Set(s.walkSpeed or walkSpeed)
-		jpSl.Set(s.jumpPower or jumpPower)
-		setFOV(s.fov or defaultFOV)
-		fbSw.Set(s.fullBright or false)
-		rfSw.Set(s.removeFog or false)
-		flySw.Set(s.fly or false)
-		ncSw.Set(s.noclip or false)
-		ijmSw.Set(s.infJumpMobile or false)
-		ijpSw.Set(s.infJumpPC or false)
-		nfdSw.Set(s.noFallDamage or false)
-	end
-
-	local function rebuildCfgList()
-		for _,ch in ipairs(cfgScrollInner:GetChildren()) do if ch:IsA("TextButton") or ch:IsA("Frame") then ch:Destroy() end end
-		for name, s in pairs(configs) do
-			local row = Instance.new("Frame")
-			row.Size = UDim2.new(1, -4, 0, 32)
-			row.BackgroundColor3 = Color3.fromRGB(50,50,58)
-			row.Parent = cfgScrollInner
-			Instance.new("UICorner", row).CornerRadius = UDim.new(0,6)
-			local nameLbl = Instance.new("TextLabel")
-			nameLbl.BackgroundTransparency = 1
-			nameLbl.Size = UDim2.new(0.5, -10, 1, 0)
-			nameLbl.Position = UDim2.new(0,10,0,0)
-			nameLbl.Text = name .. (autoloadName==name and "  (Auto)" or "")
-			nameLbl.TextXAlignment = Enum.TextXAlignment.Left
-			nameLbl.TextColor3 = Color3.new(1,1,1)
-			nameLbl.Parent = row
-			local loadB = Instance.new("TextButton")
-			loadB.Size = UDim2.new(0.2, -6, 0, 26)
-			loadB.Position = UDim2.new(0.5, 0, 0.5, -13)
-			loadB.Text = "Load"
-			loadB.BackgroundColor3 = Color3.fromRGB(0,90,140)
-			loadB.TextColor3 = Color3.new(1,1,1)
-			loadB.Parent = row
-			Instance.new("UICorner", loadB).CornerRadius = UDim.new(0,6)
-			local autoB = Instance.new("TextButton")
-			autoB.Size = UDim2.new(0.2, -6, 0, 26)
-			autoB.Position = UDim2.new(0.7, 0, 0.5, -13)
-			autoB.Text = "Auto"
-			autoB.BackgroundColor3 = autoloadName==name and Color3.fromRGB(0,150,0) or Color3.fromRGB(70,70,70)
-			autoB.TextColor3 = Color3.new(1,1,1)
-			autoB.Parent = row
-			Instance.new("UICorner", autoB).CornerRadius = UDim.new(0,6)
-			local delB = Instance.new("TextButton")
-			delB.Size = UDim2.new(0.1, -6, 0, 26)
-			delB.Position = UDim2.new(0.9, 0, 0.5, -13)
-			delB.Text = "Del"
-			delB.BackgroundColor3 = Color3.fromRGB(120,0,0)
-			delB.TextColor3 = Color3.new(1,1,1)
-			delB.Parent = row
-			Instance.new("UICorner", delB).CornerRadius = UDim.new(0,6)
-
-			loadB.MouseButton1Click:Connect(function() applySettings(s) end)
-			autoB.MouseButton1Click:Connect(function()
-				autoloadName = (autoloadName==name) and nil or name
-				rebuildCfgList()
-			end)
-			delB.MouseButton1Click:Connect(function()
-				configs[name] = nil
-				if autoloadName == name then autoloadName = nil end
-				rebuildCfgList()
-			end)
-		end
-	end
-
-	saveBtn.MouseButton1Click:Connect(function()
-		local nm = nameBox.Text ~= "" and nameBox.Text or ("config-"..tostring(os.time()))
-		configs[nm] = getCurrentSettings()
-		rebuildCfgList()
-	end)
-
-	-- Tab switching
-	local function showTab(name)
-		activeTab = name
-		mainScroll.Visible = (name == "Main")
-		miscScroll.Visible = (name == "Misc")
-		tpScroll.Visible   = (name == "Teleport")
-		cfgScroll.Visible  = (name == "Config")
-		applySearch()
-	end
-	tabMainBtn.MouseButton1Click:Connect(function() showTab("Main") end)
-	tabMiscBtn.MouseButton1Click:Connect(function() showTab("Misc") end)
-	tabTpBtn.MouseButton1Click:Connect(function() showTab("Teleport") end)
-	tabCfgBtn.MouseButton1Click:Connect(function() showTab("Config") end)
-	showTab("Main")
-
-	-- Minimize / Close
-	local minimized = false
-	btnMin.MouseButton1Click:Connect(function()
-		minimized = not minimized
-		mainScroll.Visible = not minimized and activeTab == "Main"
-		miscScroll.Visible = not minimized and activeTab == "Misc"
-		tpScroll.Visible   = not minimized and activeTab == "Teleport"
-		cfgScroll.Visible  = not minimized and activeTab == "Config"
-		tabs.Visible = not minimized
-		frame.Size = minimized and UDim2.fromOffset(480, 56) or UDim2.fromOffset(480, 480)
-	end)
-
-	btnClose.MouseButton1Click:Connect(function()
-		MainGUI.Enabled = false
-		showPill()
-	end)
-
-	-- Drag window
-	local draggingFrame = false
-	local dragStart
-	local startPos
-	drag.InputBegan:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			draggingFrame = true
-			dragStart = input.Position
-			startPos = frame.Position
-		end
-	end)
-	UIS.InputChanged:Connect(function(input)
-		if draggingFrame and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-			local delta = input.Position - dragStart
-			frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-		end
-	end)
-	drag.InputEnded:Connect(function(input)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-			draggingFrame = false
-		end
-	end)
-
-	-- Aktifkan panel setelah 5 detik
-	task.delay(5, function()
-		overlay:Destroy()
-		MainGUI.Enabled = true
-		-- Auto-load config jika ada
-		if autoloadName and configs[autoloadName] then
-			applySettings(configs[autoloadName])
-		end
-		-- Set FOV awal
-		setFOV(defaultFOV)
-	end)
-end
-
--- ====== Init ======
-getCharacter()
-attachFly()
-ensurePhysics()
-hookFallDamage()
-
--- Rehook on respawn
-LocalPlayer.CharacterAdded:Connect(function()
-	getCharacter()
-	attachFly()
-	ensurePhysics()
-	hookFallDamage()
-	fly = false
-	noclip = false
-end)
-
--- Optional keybind (F) toggle Fly
-UIS.InputBegan:Connect(function(input, gp)
-	if gp then return end
-	if input.KeyCode == Enum.KeyCode.F then
-		setFly(not fly)
-	end
-end)
-
--- UI
-createUI()
-
--- Safety
-game:BindToClose(function()
-	setFly(false)
-	cleanupFly()
-end)
