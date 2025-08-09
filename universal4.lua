@@ -1582,7 +1582,8 @@ local function createUI()
         end)
 
         onClick(closeB, function()
-        popup:Destroy()
+            popup:Destroy()
+        end)
     end)
 
     -----------------------------------------------------
