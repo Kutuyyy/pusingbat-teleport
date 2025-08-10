@@ -842,6 +842,38 @@ local function createUI()
     local function setTour(list)
         tourList = list or {}
     end
+    
+    -- ====== FINISH ACTION (None / Respawn / Bundir) ======
+    local finishAction = "None"  -- "None" | "Respawn" | "Bundir"
+    local finishDelayBox -- dideklarasi di UI, di-parse via parseFinishDelay()
+
+    local function parseFinishDelay()
+        local raw = (finishDelayBox and finishDelayBox.Text) or ""
+        local cleaned = raw:gsub("[^%d%.]", "")
+        local n = tonumber(cleaned)
+        if not n or n < 0 then n = 0 end
+        return n
+    end
+
+    local function doFinishAction()
+        if finishAction == "Respawn" or finishAction == "Bundir" then
+            -- “bundir” = kill character
+            if hum and hum.Parent then
+                hum.Health = 0
+            end
+            -- untuk Respawn, coba minta server respawn juga
+            if finishAction == "Respawn" then
+                task.delay(0.25, function()
+                    pcall(function()
+                        if LocalPlayer.LoadCharacter then
+                            LocalPlayer:LoadCharacter()
+                        end
+                    end)
+                end)
+            end
+        end
+    end
+
     ----------------------------------------------------------------
     -- Teleport to Player (Picker + Distance + Mode/Duration/Easing)
     ----------------------------------------------------------------
@@ -1685,6 +1717,73 @@ local function createUI()
     statusLbl.TextSize = 13
     statusLbl.Parent = tourRow
 
+    -- ===== Finish Action Row =====
+    local finishRow = createTpRow(58)
+    finishRow:SetAttribute("label","Finish Action")
+
+    local finishLbl = Instance.new("TextLabel")
+    finishLbl.BackgroundTransparency = 1
+    finishLbl.Size = UDim2.new(1, 0, 0, 20)
+    finishLbl.Position = UDim2.new(0,10,0,6)
+    finishLbl.Text = "On Finish:"
+    finishLbl.TextColor3 = Color3.fromRGB(235,235,235)
+    finishLbl.TextXAlignment = Enum.TextXAlignment.Left
+    finishLbl.Font = Enum.Font.Gotham
+    finishLbl.TextSize = 16
+    finishLbl.Parent = finishRow
+
+    local btnNone = Instance.new("TextButton")
+    btnNone.Size = UDim2.new(0, 70, 0, 26)
+    btnNone.Position = UDim2.new(0, 10, 0, 30)
+    btnNone.Text = "None"
+    btnNone.BackgroundColor3 = Color3.fromRGB(0,120,0)
+    btnNone.TextColor3 = Color3.new(1,1,1)
+    btnNone.BorderSizePixel = 0
+    btnNone.Parent = finishRow
+    Instance.new("UICorner", btnNone).CornerRadius = UDim.new(0,6)
+
+    local btnResp = Instance.new("TextButton")
+    btnResp.Size = UDim2.new(0, 90, 0, 26)
+    btnResp.Position = UDim2.new(0, 90, 0, 30)
+    btnResp.Text = "Respawn"
+    btnResp.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    btnResp.TextColor3 = Color3.new(1,1,1)
+    btnResp.BorderSizePixel = 0
+    btnResp.Parent = finishRow
+    Instance.new("UICorner", btnResp).CornerRadius = UDim.new(0,6)
+
+    local btnBundir = Instance.new("TextButton")
+    btnBundir.Size = UDim2.new(0, 80, 0, 26)
+    btnBundir.Position = UDim2.new(0, 190, 0, 30)
+    btnBundir.Text = "Bundir"
+    btnBundir.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    btnBundir.TextColor3 = Color3.new(1,1,1)
+    btnBundir.BorderSizePixel = 0
+    btnBundir.Parent = finishRow
+    Instance.new("UICorner", btnBundir).CornerRadius = UDim.new(0,6)
+
+    -- Delay box (detik) di kanan
+    finishDelayBox = Instance.new("TextBox")
+    finishDelayBox.Size = UDim2.new(0, 90, 0, 26)
+    finishDelayBox.Position = UDim2.new(1, -100, 0, 30)
+    finishDelayBox.Text = "1.5"
+    finishDelayBox.PlaceholderText = "Delay (s)"
+    finishDelayBox.TextColor3 = Color3.new(1,1,1)
+    finishDelayBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
+    finishDelayBox.BorderSizePixel = 0
+    finishDelayBox.Parent = finishRow
+    Instance.new("UICorner", finishDelayBox).CornerRadius = UDim.new(0,6)
+
+    local function setFinishMode(m)
+        finishAction = m
+        btnNone.BackgroundColor3  = (m=="None")    and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
+        btnResp.BackgroundColor3  = (m=="Respawn") and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
+        btnBundir.BackgroundColor3= (m=="Bundir")  and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
+    end
+    btnNone.MouseButton1Click:Connect(function() setFinishMode("None") end)
+    btnResp.MouseButton1Click:Connect(function() setFinishMode("Respawn") end)
+    btnBundir.MouseButton1Click:Connect(function() setFinishMode("Bundir") end)
+
     local tourRunning = false
     local function parseInterval()
         local raw = (intervalBox and intervalBox.Text) or ""
@@ -1719,30 +1818,51 @@ local function createUI()
         statusLbl.Text = "Status: Running"
 
         task.spawn(function()
-            while tourRunning do
-                for i = 1, #tourList do
-                    if not tourRunning then break end
+        while tourRunning do
+            for i = 1, #tourList do
+                if not tourRunning then break end
 
-                    local item = tourList[i]
-                    local dest = item.pos + Vector3.new(0, 3, 0)
+                local item = tourList[i]
+                local dest = item.pos + Vector3.new(0, 3, 0)
 
-                    -- pakai pcall supaya error kecil nggak menghentikan loop
-                    pcall(function()
-                        safeTeleport(dest)
-                    end)
+                -- pakai pcall supaya error kecil nggak menghentikan loop
+                pcall(function()
+                    safeTeleport(dest)
+                end)
 
-                    -- tunggu interval
-                    local waitSec = parseInterval()
-                    if waitSec < 0.1 then waitSec = 0.1 end
-                    local t0 = tick()
-                    while tourRunning and (tick() - t0) < waitSec do
-                        task.wait(0.05)
-                    end
+                -- tunggu interval
+                local waitSec = parseInterval()
+                if not waitSec or waitSec < 0.1 then waitSec = 0.1 end
+                local t0 = tick()
+                while tourRunning and (tick() - t0) < waitSec do
+                    task.wait(0.05)
                 end
             end
-            statusLbl.Text = "Status: Stopped"
-        end)
+
+            -- ===== selesai 1 putaran tourList =====
+            if not tourRunning then break end
+
+            -- delay setelah posisi terakhir (Finish Delay)
+            local postDelay = (parseFinishDelay and parseFinishDelay()) or 0
+            if postDelay > 0 then
+                local t1 = tick()
+                while tourRunning and (tick() - t1) < postDelay do
+                    task.wait(0.05)
+                end
+            end
+            if not tourRunning then break end
+
+            -- jalankan aksi finish: None / Respawn / Bundir
+            if doFinishAction then
+                pcall(doFinishAction)
+            end
+
+            -- kalau kamu mau berhenti setelah aksi finish, uncomment baris ini:
+            -- tourRunning = false
+        end
+        statusLbl.Text = "Status: Stopped"
     end)
+
 
     stopBtn.MouseButton1Click:Connect(function()
         tourRunning = false
