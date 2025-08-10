@@ -394,33 +394,6 @@ end
 local MainGUI
 local ShowPillGUI
 
--- taruh di dekat fungsi teleport existing
-local function refreshCharacterIfNeeded()
-    if not LocalPlayer.Character
-        or not LocalPlayer.Character:FindFirstChild("Humanoid")
-        or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    then
-        -- tunggu respawn
-        LocalPlayer.CharacterAdded:Wait()
-    end
-    -- update ref global
-    char = LocalPlayer.Character
-    hum  = char:WaitForChild("Humanoid")
-    root = char:WaitForChild("HumanoidRootPart")
-end
-
-local function safeTeleport(dest)
-    -- jaga-jaga kalau baru mati/respawn
-    if (not root) or (not root.Parent) or (not hum) or (hum.Health <= 0) then
-        refreshCharacterIfNeeded()
-    end
-    if tpMode == "Instant" then
-        teleportToPosition(dest)
-    else
-        teleportToPositionAndWait(dest) -- versi di bawah sudah di-patch timeout
-    end
-end
-
 -- ========= Shared Teleport Settings (mode, duration, easing) =========
 -- dipakai oleh teleport ke Player dan teleport ke Location
 local tpMode = "Instant"
@@ -459,13 +432,15 @@ local function teleportToPosition(dest)
     end)
 end
 
--- ganti fungsi teleportToPositionAndWait yang lama dengan ini
 local function teleportToPositionAndWait(dest)
     if not root then return end
+    if tpMode == "Instant" then
+        root.CFrame = CFrame.new(dest)
+        return
+    end
 
     local wasFly = fly
     if wasFly then setFly(false) end
-
     local info = TweenInfo.new(
         math.max(0.05, tweenDuration),
         easeStyles[easeIdx][2],
@@ -473,24 +448,9 @@ local function teleportToPositionAndWait(dest)
         0,false,0
     )
     local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
-
-    local done = false
-    tw.Completed:Connect(function()
-        done = true
-    end)
-
     tw:Play()
-
-    -- tunggu sampai selesai ATAU timeout (durasi + 1.5s safety)
-    local timeout = tick() + tweenDuration + 1.5
-    while not done and tick() < timeout do
-        -- kalau HRP keburu hilang (mati/respawn), hentikan tunggu
-        if (not root) or (not root.Parent) or (not hum) or (hum.Health <= 0) then
-            break
-        end
-        task.wait(0.05)
-    end
-
+    -- tunggu tween selesai
+    pcall(function() tw.Completed:Wait() end)
     if wasFly then setFly(true) end
 end
 
@@ -876,6 +836,12 @@ local function createUI()
         return createRow(tpScroll, h) 
     end
 
+    -- ====== TOUR SNAPSHOT ======
+    local tourList = {}  -- { {name=string, pos=Vector3}, ... }
+
+    local function setTour(list)
+        tourList = list or {}
+    end
     ----------------------------------------------------------------
     -- Teleport to Player (Picker + Distance + Mode/Duration/Easing)
     ----------------------------------------------------------------
@@ -1624,6 +1590,69 @@ local function createUI()
     intervalBox.BorderSizePixel = 0
     intervalBox.Parent = tourRow
     Instance.new("UICorner", intervalBox).CornerRadius = UDim.new(0,6)
+    
+    -- Row tombol snapshot & counter
+    local snapRow = createTpRow(40)
+    snapRow:SetAttribute("label","Tour Snapshot")
+
+    local getAllBtn = Instance.new("TextButton")
+    getAllBtn.Size = UDim2.new(0.35, -8, 1, -10)
+    getAllBtn.Position = UDim2.new(0,10,0,5)
+    getAllBtn.Text = "Get All Positions"
+    getAllBtn.BackgroundColor3 = Color3.fromRGB(0,90,140)
+    getAllBtn.TextColor3 = Color3.new(1,1,1)
+    getAllBtn.BorderSizePixel = 0
+    getAllBtn.Parent = snapRow
+    Instance.new("UICorner", getAllBtn).CornerRadius = UDim.new(0,8)
+
+    local clearBtn = Instance.new("TextButton")
+    clearBtn.Size = UDim2.new(0.25, -8, 1, -10)
+    clearBtn.Position = UDim2.new(0.37, 0, 0, 5)
+    clearBtn.Text = "Clear"
+    clearBtn.BackgroundColor3 = Color3.fromRGB(90,60,60)
+    clearBtn.TextColor3 = Color3.new(1,1,1)
+    clearBtn.BorderSizePixel = 0
+    clearBtn.Parent = snapRow
+    Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0,8)
+
+    local tourCountLbl = Instance.new("TextLabel")
+    tourCountLbl.BackgroundTransparency = 1
+    tourCountLbl.Size = UDim2.new(0.35, -10, 1, 0)
+    tourCountLbl.Position = UDim2.new(0.64, 0, 0, 0)
+    tourCountLbl.Text = "Tour count: 0"
+    tourCountLbl.TextXAlignment = Enum.TextXAlignment.Right
+    tourCountLbl.TextColor3 = Color3.fromRGB(220,220,220)
+    tourCountLbl.Font = Enum.Font.Gotham
+    tourCountLbl.TextSize = 14
+    tourCountLbl.Parent = snapRow
+
+    local function rebuildTourCounter()
+        tourCountLbl.Text = ("Tour count: %d"):format(#tourList)
+    end
+
+    -- builder snapshot dari savedLocations (urut atas → bawah)
+    local function buildTourFromSaved()
+        local list = {}
+        for _, loc in ipairs(savedLocations) do
+            local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
+            if v then
+                list[#list+1] = { name = loc.name, pos = Vector3.new(v.X, v.Y, v.Z) }
+            end
+        end
+        return list
+    end
+
+    getAllBtn.MouseButton1Click:Connect(function()
+        setTour(buildTourFromSaved())
+        rebuildTourCounter()
+        statusLbl.Text = "Status: Snapshot updated"
+    end)
+
+    clearBtn.MouseButton1Click:Connect(function()
+        setTour({})
+        rebuildTourCounter()
+        statusLbl.Text = "Status: Snapshot cleared"
+    end)
 
     local startBtn = Instance.new("TextButton")
     startBtn.Size = UDim2.new(0.25, -8, 0, 26)
@@ -1664,22 +1693,22 @@ local function createUI()
     end
 
     local function safeTeleport(dest)
-        -- Jika root belum ada (mis. karakter baru mati/respawn), tunggu karakter baru
-        if not root or not root.Parent or (not hum) or hum.Health <= 0 then
-            getCharacter() -- akan Wait sampai CharacterAdded dan update root/hum
+        -- kalau mati/respawn, tunggu karakter baru
+        if (not root) or (not root.Parent) or (not hum) or hum.Health <= 0 then
+            getCharacter()
         end
         if tpMode == "Instant" then
             teleportToPosition(dest)
         else
-            teleportToPositionAndWait(dest) -- akan menunggu tween selesai
+            teleportToPositionAndWait(dest)
         end
     end
 
-    -- GANTI handler Start lama dengan ini
     startBtn.MouseButton1Click:Connect(function()
         if tourRunning then return end
-        if #savedLocations == 0 then
-            statusLbl.Text = "Status: tidak ada lokasi"
+
+        if #tourList == 0 then
+            statusLbl.Text = "Status: Tour list kosong — tekan Get All dulu"
             return
         end
 
@@ -1688,48 +1717,29 @@ local function createUI()
 
         task.spawn(function()
             while tourRunning do
-                for i = 1, #savedLocations do
+                for i = 1, #tourList do
                     if not tourRunning then break end
 
-                    local loc = savedLocations[i]
-                    local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
-                    if v then
-                        local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0, 3, 0)
+                    local item = tourList[i]
+                    local dest = item.pos + Vector3.new(0, 3, 0)
 
-                        -- status debug biar keliatan progressnya
-                        statusLbl.Text = string.format("Status: TP %d/%d → %s", i, #savedLocations, tostring(loc.name))
+                    -- pakai pcall supaya error kecil nggak menghentikan loop
+                    pcall(function()
+                        safeTeleport(dest)
+                    end)
 
-                        -- jangan sampai error kecil ngehentikan tour
-                        local ok, err = pcall(function()
-                            safeTeleport(dest)
-                        end)
-                        -- kalau error, tulis di status tapi lanjut list berikutnya
-                        if not ok then
-                            statusLbl.Text = ("Status: error di '%s' (lanjut)"):format(tostring(loc.name))
-                        end
-
-                        -- jeda kecil biar physics settle, trus interval
-                        task.wait(0.1)
-
-                        local waitSec = tonumber((intervalBox.Text or ""):gsub("[^%d%.]","")) or 3
-                        if waitSec < 0.1 then waitSec = 0.1 end
-                        local tEnd = tick() + waitSec
-                        while tourRunning and tick() < tEnd do
-                            task.wait(0.05)
-                            -- kalau di tengah jeda karakter mati, langsung refresh,
-                            -- tapi TETAP lanjut ke lokasi berikutnya (tidak reset i)
-                            if hum and hum.Health <= 0 then
-                                refreshCharacterIfNeeded()
-                            end
-                        end
+                    -- tunggu interval
+                    local waitSec = tonumber((intervalBox.Text or ""):gsub("[^%d%.]","")) or 3
+                    if waitSec < 0.1 then waitSec = 0.1 end
+                    local t0 = tick()
+                    while tourRunning and (tick() - t0) < waitSec do
+                        task.wait(0.05)
                     end
                 end
             end
             statusLbl.Text = "Status: Stopped"
         end)
     end)
-
-
 
     stopBtn.MouseButton1Click:Connect(function()
         tourRunning = false
