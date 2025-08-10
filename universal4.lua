@@ -1634,16 +1634,25 @@ local function createUI()
         statusLbl.Text = "Status: Running"
         task.spawn(function()
             while tourRunning do
-                for i=1, #savedLocations do
+                for i = 1, #savedLocations do
                     if not tourRunning then break end
                     local loc = savedLocations[i]
-                    local v = (typeof(loc.position)=="Vector3") and loc.position or unpackVec3(loc.position)
+                    -- Ambil posisi Vector3 dari entri
+                    local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
                     if v then
-                        teleportToPosition(Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0))
+                        local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0, 3, 0)
+                        -- Penting: kalau Tween, tunggu sampai selesai dulu
+                        if tpMode == "Instant" then
+                            teleportToPosition(dest)
+                        else
+                            teleportToPositionAndWait(dest)
+                        end
                     end
+
+                    -- Tunggu sesuai interval setelah sampai di lokasi
                     local waitSec = parseInterval()
                     local t0 = tick()
-                    while tourRunning and (tick()-t0) < waitSec do
+                    while tourRunning and (tick() - t0) < waitSec do
                         task.wait(0.05)
                     end
                 end
