@@ -1687,10 +1687,13 @@ local function createUI()
 
     local tourRunning = false
     local function parseInterval()
-        local n = tonumber((intervalBox.Text or ""):gsub("[^%d%.]",""))
+        local raw = (intervalBox and intervalBox.Text) or ""
+        local cleaned = raw:gsub("[^%d%.]", "")  -- buang semua kecuali digit & titik
+        local n = tonumber(cleaned)
         if not n or n < 0.1 then n = 0.1 end
         return n
     end
+
 
     local function safeTeleport(dest)
         -- kalau mati/respawn, tunggu karakter baru
@@ -1729,7 +1732,7 @@ local function createUI()
                     end)
 
                     -- tunggu interval
-                    local waitSec = tonumber((intervalBox.Text or ""):gsub("[^%d%.]","")) or 3
+                    local waitSec = parseInterval()
                     if waitSec < 0.1 then waitSec = 0.1 end
                     local t0 = tick()
                     while tourRunning and (tick() - t0) < waitSec do
