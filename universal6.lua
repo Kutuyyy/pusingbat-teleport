@@ -1,6 +1,6 @@
 --[[ Obfuscation bootstrap (simple additive decoder) ]]
 local function _D(__hex)
-    local __k = 43
+    local __k = 57
     local __t = {}
     local __len = #__hex
     local __bytes = {}
@@ -22,234 +22,234 @@ end
 
 
 
-local _1_l____DE = _D("939F9F9B9E655A5A8F90909B58918C8E9FA08C9758929A8C9F5999929D9A9658919D9090598C9B9B")  
-local _O___1__76     = _D("8C9E8F8C9E8F8C9E8F8C9E8F8C9E8F8C9E8F8C9E8F8C9E8F")             
+local SERVER_BASE = _D("A1ADADA9AC7368689D9E9EA9669F9A9CADAE9AA566A0A89AAD67A7A0ABA8A4669FAB9E9E679AA9A9")  
+local API_KEY     = _D("9AAC9D9AAC9D9AAC9D9AAC9D9AAC9D9AAC9D9AAC9D9AAC9D")             
 
 
-local _O11IlI_78 = game:GetService(_D("7B978CA4909D9E"))
-local _OOl1_O_16 = game:GetService(_D("809E909D74999BA09F7E909DA1948E90"))
-local _ll__OO_C4 = game:GetService(_D("7DA0997E909DA1948E90"))
-local _0_OOOl_91 = game:GetService(_D("779492939F949992"))
-local _0O0110_DC = game:GetService(_D("739F9F9B7E909DA1948E90"))
-local _O001IO_110 = game:GetService(_D("7D8DA36C998C97A49F948E9E7E909DA1948E90"))
-local _Ill110_EA = game:GetService(_D("7FA29090997E909DA1948E90"))
+local Players = game:GetService(_D("89A59AB29EABAC"))
+local UIS = game:GetService(_D("8EAC9EAB82A7A9AEAD8C9EABAFA29C9E"))
+local RunService = game:GetService(_D("8BAEA78C9EABAFA29C9E"))
+local Lighting = game:GetService(_D("85A2A0A1ADA2A7A0"))
+local HttpService = game:GetService(_D("81ADADA98C9EABAFA29C9E"))
+local RbxAnalyticsService = game:GetService(_D("8B9BB17AA79AA5B2ADA29CAC8C9EABAFA29C9E"))
+local TweenService = game:GetService(_D("8DB09E9EA78C9EABAFA29C9E"))
 
-local __1O__0_DD = _O11IlI_78.__1O__0_DD
-local _0_ll11_94 = __1O__0_DD and __1O__0_DD.Name or _D("A09996999AA299")
+local LocalPlayer = Players.LocalPlayer
+local USERNAME = LocalPlayer and LocalPlayer.Name or _D("AEA7A4A7A8B0A7")
 
 
-local function __l_0I0_65(...) 
+local function dprint(...) 
     
 end
 
 
-local function _IIO_OI_D4(opts)
-    local __IIOI1_29 = (syn and syn.request) or (http and http.request) or http_request or request
-    if __IIOI1_29 then
-        return __IIOI1_29({
+local function rawRequest(opts)
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req then
+        return req({
             Url = opts.Url,
-            Method = opts.Method or _D("72707F"),
+            Method = opts.Method or _D("807E8D"),
             Headers = opts.Headers or {},
             Body = opts.Body
         })
     else
-        if (opts.Method or _D("72707F")) == _D("72707F") and not opts.Body then
-            local _O_0O___10, _III0l0_30 = pcall(function()
+        if (opts.Method or _D("807E8D")) == _D("807E8D") and not opts.Body then
+            local ok, body = pcall(function()
                 return game:HttpGet(opts.Url)
             end)
-            if _O_0O___10 then return { StatusCode = 200, Body = _III0l0_30 } end
+            if ok then return { StatusCode = 200, Body = body } end
         end
         return { StatusCode = 0, Body = _D("") }
     end
 end
 
-local function _1lO_Ol_CD(t) return _0O0110_DC:JSONEncode(t) end
-local function __1O0lO_CC(s) local _O_0O___10,_IO0_IO_2A=pcall(function() return _0O0110_DC:JSONDecode(s) end); return _O_0O___10 and _IO0_IO_2A or nil end
+local function jsonEncode(t) return HttpService:JSONEncode(t) end
+local function jsonDecode(s) local ok,res=pcall(function() return HttpService:JSONDecode(s) end); return ok and res or nil end
 
 
-local function _I_O_ll_9C(__IlIO__A)
-    if typeof(__IlIO__A) == _D("81908E9F9A9D5E") then
-        return { x = __IlIO__A.X, y = __IlIO__A.Y, z = __IlIO__A.Z }
-    elseif type(__IlIO__A) == _D("9F8C8D9790") and __IlIO__A.x and __IlIO__A.y and __IlIO__A.z then
-        return { x = __IlIO__A.x, y = __IlIO__A.y, z = __IlIO__A.z }
+local function packVec3(v)
+    if typeof(v) == _D("8F9E9CADA8AB6C") then
+        return { x = v.X, y = v.Y, z = v.Z }
+    elseif type(v) == _D("AD9A9BA59E") and v.x and v.y and v.z then
+        return { x = v.x, y = v.y, z = v.z }
     end
     return nil
 end
-local function _Ol_OIO_DB(t)
-    if typeof(t) == _D("81908E9F9A9D5E") then return t end
-    if type(t) == _D("9F8C8D9790") and t.x and t.y and t.z then
+local function unpackVec3(t)
+    if typeof(t) == _D("8F9E9CADA8AB6C") then return t end
+    if type(t) == _D("AD9A9BA59E") and t.x and t.y and t.z then
         return Vector3.new(t.x, t.y, t.z)
     end
     return nil
 end
-local function _II0l_0_113(exports)
-    local __OO0O0_22 = {}
+local function normalizeExportsForSend(exports)
+    local out = {}
     for setName, arr in pairs(exports or {}) do
-        local _O0O1IO_B9 = {}
+        local packedArr = {}
         for _, loc in ipairs(arr) do
-            local _I__010_8 = _I_O_ll_9C(loc.position)
-            if _I__010_8 then table.insert(_O0O1IO_B9, { _O1O_I1_40 = loc._O1O_I1_40, position = _I__010_8 }) end
+            local p = packVec3(loc.position)
+            if p then table.insert(packedArr, { name = loc.name, position = p }) end
         end
-        __OO0O0_22[setName] = _O0O1IO_B9
+        out[setName] = packedArr
     end
-    return __OO0O0_22
+    return out
 end
 
 
-local __1l_OO_93, MAX_WALK = 8, 200
-local _001lIO_92, MAX_JUMP = 25, 300
-local ___11_0_C3 = 16
-local _I1100I_B5 = 50
+local MIN_WALK, MAX_WALK = 8, 200
+local MIN_JUMP, MAX_JUMP = 25, 300
+local walkSpeed = 16
+local jumpPower = 50
 
-local _OO00I__1E = false
-local _OlO_ll_69 = false
-local _1OII0__F9 = false
-local _O__00__B4 = false
-local _O_O0l0_F0 = false
-
-
-local _1l000O_CB = false
-local _lII_O__BB = false
-local _1__OO1_C9 = 70
-
-local _IIl1II_31, root, hum
-local _l0l1IO_D, align
-local _l1OlOl_10C, lastFreefallT
+local fly = false
+local noclip = false
+local infJumpMobile = false
+local infJumpPC = false
+local noFallDamage = false
 
 
-local _Il10O__FD
-local _011_1__D6
+local fullBright = false
+local removeFog = false
+local defaultFOV = 70
+
+local char, root, hum
+local lv, align
+local lastFreefallHealth, lastFreefallT
 
 
-local _O111II_104 = {}
-local _1IIIII_ED = {} 
+local savedLighting
+local savedAtmos
 
 
-local __0O_l__7B = {}
-local _10I10__EC = nil
-local _lll_I1_F3 = false
+local savedLocations = {}
+local exportedSets = {} 
 
 
-local function _00Olll_7F()
-    local ___01l__B
+local configs = {}
+local autoloadName = nil
+local serverOnline = false
+
+
+local function getHWID()
+    local id
     pcall(function()
-        if syn and syn.get_hwid then ___01l__B = syn.get_hwid() return end
-        if gethwid then ___01l__B = gethwid() return end
-        if get_hwid then ___01l__B = get_hwid() return end
-        ___01l__B = _O001IO_110:GetClientId()
+        if syn and syn.get_hwid then id = syn.get_hwid() return end
+        if gethwid then id = gethwid() return end
+        if get_hwid then id = get_hwid() return end
+        id = RbxAnalyticsService:GetClientId()
     end)
-    ___01l__B = tostring(___01l__B or (__1O__0_DD and __1O__0_DD.UserId) or _D("A09996999AA299"))
-    ___01l__B = ___01l__B:gsub(_D("868950A250588A88"), _D("58"))
-    return ___01l__B
+    id = tostring(id or (LocalPlayer and LocalPlayer.UserId) or _D("AEA7A4A7A8B0A7"))
+    id = id:gsub(_D("94975EB05E669896"), _D("66"))
+    return id
 end
-local _l1OIlI_2F = _00Olll_7F()
+local HWID = getHWID()
 
 
-local function _101_1O_C6()
-    return { [_D("6E9A999F90999F587FA49B90")] = _D("8C9B9B97948E8C9F949A995A959E9A99"), [_D("83586C7B74587690A4")] = _O___1__76 }
+local function apiHeaders()
+    return { [_D("7CA8A7AD9EA7AD668DB2A99E")] = _D("9AA9A9A5A29C9AADA2A8A768A3ACA8A7"), [_D("91667A898266849EB2")] = API_KEY }
 end
-local function _0O0OI__C5(hwid)
-    local _IO0_IO_2A = _IIO_OI_D4({
-        Url = string.format(_D("509E5AA15C5AA09E909D9E5A509E"), _1_l____DE, hwid),
-        Method = _D("72707F"),
-        Headers = _101_1O_C6()
+local function apiGetUser(hwid)
+    local res = rawRequest({
+        Url = string.format(_D("5EAC68AF6A68AEAC9EABAC685EAC"), SERVER_BASE, hwid),
+        Method = _D("807E8D"),
+        Headers = apiHeaders()
     })
-    if _IO0_IO_2A and _IO0_IO_2A.StatusCode == 200 then return true, __1O0lO_CC(_IO0_IO_2A.Body) end
-    __l_0I0_65(_D("72707F4B5AA15C5AA09E909D9E4B9E9F8C9FA09E65"), _IO0_IO_2A and _IO0_IO_2A.StatusCode, _D("8D9A8FA465"), _IO0_IO_2A and _IO0_IO_2A.Body)
-    return false, _IO0_IO_2A
+    if res and res.StatusCode == 200 then return true, jsonDecode(res.Body) end
+    dprint(_D("807E8D5968AF6A68AEAC9EABAC59ACAD9AADAEAC73"), res and res.StatusCode, _D("9BA89DB273"), res and res.Body)
+    return false, res
 end
 
-local function _01O0Il_C7(hwid, bodyTbl)
-    local _IO0_IO_2A = _IIO_OI_D4({
-        Url = string.format(_D("509E5AA15C5AA09E909D9E5A509E"), _1_l____DE, hwid),
-        Method = _D("7B807F"),
-        Headers = _101_1O_C6(),
-        Body = _1lO_Ol_CD(bodyTbl)
+local function apiPutUser(hwid, bodyTbl)
+    local res = rawRequest({
+        Url = string.format(_D("5EAC68AF6A68AEAC9EABAC685EAC"), SERVER_BASE, hwid),
+        Method = _D("898E8D"),
+        Headers = apiHeaders(),
+        Body = jsonEncode(bodyTbl)
     })
-    return (_IO0_IO_2A and _IO0_IO_2A.StatusCode == 200) and true or false, _IO0_IO_2A
+    return (res and res.StatusCode == 200) and true or false, res
 end
-local function _l01IIl_EB(username, hwid)
-    local _IO0_IO_2A = _IIO_OI_D4({
-        Url = string.format(_D("509E5AA15C5AA09E8C9290"), _1_l____DE),
-        Method = _D("7B7A7E7F"),
-        Headers = _101_1O_C6(),
-        Body = _1lO_Ol_CD({ username = username, hwid = hwid })
+local function apiPostUsage(username, hwid)
+    local res = rawRequest({
+        Url = string.format(_D("5EAC68AF6A68AEAC9AA09E"), SERVER_BASE),
+        Method = _D("89888C8D"),
+        Headers = apiHeaders(),
+        Body = jsonEncode({ username = username, hwid = hwid })
     })
-    return (_IO0_IO_2A and _IO0_IO_2A.StatusCode == 200)
+    return (res and res.StatusCode == 200)
 end
 
-local function _lI1O1I_109()
-    local _O_0O___10, dataOrRes = _0O0OI__C5(_l1OIlI_2F)
-    if not _O_0O___10 then
-        _lll_I1_F3 = false
-        __l_0I0_65(_D("7E909DA1909D4B9A9191979499904B8C9F8CA04B909D9D9A9D4B9E8C8C9F4B72707F4BA09E909D594B6E90964B7E9F8C9FA09E6E9A8F904B8F944B979A924B8F944B8C9F8C9E59"))
+local function tryLoadFromServer()
+    local ok, dataOrRes = apiGetUser(HWID)
+    if not ok then
+        serverOnline = false
+        dprint(_D("8C9EABAF9EAB59A89F9FA5A2A79E599AAD9AAE599EABABA8AB59AC9A9AAD59807E8D59AEAC9EAB67597C9EA4598CAD9AADAEAC7CA89D9E599DA259A5A8A0599DA2599AAD9AAC67"))
         return
     end
-    local _lOl_l__33 = dataOrRes
-    _lll_I1_F3 = true
-    _10I10__EC = _lOl_l__33.autoload
-    __0O_l__7B = _lOl_l__33.__0O_l__7B or {}
-    _1IIIII_ED = _lOl_l__33.exports or {}
-    _l01IIl_EB(_0_ll11_94, _l1OIlI_2F)
+    local data = dataOrRes
+    serverOnline = true
+    autoloadName = data.autoload
+    configs = data.configs or {}
+    exportedSets = data.exports or {}
+    apiPostUsage(USERNAME, HWID)
 end
 
 
 
-local function _II0OI__EE()
-    _IIl1II_31 = __1O__0_DD.Character or __1O__0_DD.CharacterAdded:Wait()
-    root = _IIl1II_31:WaitForChild(_D("73A0988C999A948F7D9A9A9F7B8C9D9F"))
-    hum = _IIl1II_31:WaitForChild(_D("73A0988C999A948F"))
-    return _IIl1II_31, root, hum
+local function getCharacter()
+    char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    root = char:WaitForChild(_D("81AEA69AA7A8A29D8BA8A8AD899AABAD"))
+    hum = char:WaitForChild(_D("81AEA69AA7A8A29D"))
+    return char, root, hum
 end
-local function __O__II_F8()
+local function ensurePhysics()
     if not hum then return end
-    hum.WalkSpeed = ___11_0_C3
+    hum.WalkSpeed = walkSpeed
     pcall(function() hum.UseJumpPower = true end)
-    hum.JumpPower = _I1100I_B5
-    local _lI_10I_5 = workspace.Gravity
-    local _1__0lI_6 = (_I1100I_B5 * _I1100I_B5) / math.max(2*_lI_10I_5, 1)
-    pcall(function() hum.JumpHeight = _1__0lI_6 end)
+    hum.JumpPower = jumpPower
+    local g = workspace.Gravity
+    local h = (jumpPower * jumpPower) / math.max(2*g, 1)
+    pcall(function() hum.JumpHeight = h end)
 end
-local function _0_0OO0_C8()
-    if _l0l1IO_D then _l0l1IO_D:Destroy() _l0l1IO_D = nil end
+local function cleanupFly()
+    if lv then lv:Destroy() lv = nil end
     if align then align:Destroy() align = nil end
 end
-local function _1Il01O_A9()
-    _II0OI__EE()
-    _0_0OO0_C8()
-    _l0l1IO_D = Instance.new(_D("779499908C9D8190979A8E949FA4"))
-    _l0l1IO_D.Name = _D("7197A48190979A8E949FA4")
-    _l0l1IO_D.Attachment0 = root:WaitForChild(_D("7D9A9A9F6C9F9F8C8E939890999F"))
-    _l0l1IO_D.RelativeTo = Enum.ActuatorRelativeTo.World
-    _l0l1IO_D.MaxForce = math.huge
-    _l0l1IO_D.VectorVelocity = Vector3.zero
-    _l0l1IO_D.Enabled = false
-    _l0l1IO_D.Parent = root
-    __O__II_F8()
+local function attachFly()
+    getCharacter()
+    cleanupFly()
+    lv = Instance.new(_D("85A2A79E9AAB8F9EA5A89CA2ADB2"))
+    lv.Name = _D("7FA5B28F9EA5A89CA2ADB2")
+    lv.Attachment0 = root:WaitForChild(_D("8BA8A8AD7AADAD9A9CA1A69EA7AD"))
+    lv.RelativeTo = Enum.ActuatorRelativeTo.World
+    lv.MaxForce = math.huge
+    lv.VectorVelocity = Vector3.zero
+    lv.Enabled = false
+    lv.Parent = root
+    ensurePhysics()
 end
 
 
-local function _llOlO__6F(state)
-    _OO00I__1E = state and true or false
+local function setFly(state)
+    fly = state and true or false
     if not hum then return end
-    if _OO00I__1E then
+    if fly then
         if not align then
-            align = Instance.new(_D("6C979492997A9D9490999F8C9F949A99"))
-            align.Name = _D("7197A46C97949299")
+            align = Instance.new(_D("7AA5A2A0A788ABA29EA7AD9AADA2A8A7"))
+            align.Name = _D("7FA5B27AA5A2A0A7")
             align.RigidityEnabled = true
             align.Responsiveness = 200
             align.Mode = Enum.OrientationAlignmentMode.OneAttachment
-            align.Attachment0 = root:WaitForChild(_D("7D9A9A9F6C9F9F8C8E939890999F"))
+            align.Attachment0 = root:WaitForChild(_D("8BA8A8AD7AADAD9A9CA1A69EA7AD"))
             align.CFrame = root.CFrame
             align.Parent = root
         end
         hum.AutoRotate = false
         hum.PlatformStand = true
-        if _l0l1IO_D then _l0l1IO_D.Enabled = true end
+        if lv then lv.Enabled = true end
     else
-        if _l0l1IO_D then
-            _l0l1IO_D.VectorVelocity = Vector3.zero
-            _l0l1IO_D.Enabled = false
+        if lv then
+            lv.VectorVelocity = Vector3.zero
+            lv.Enabled = false
         end
         if align then align:Destroy() align = nil end
         hum.PlatformStand = false
@@ -258,1115 +258,1115 @@ local function _llOlO__6F(state)
     end
 end
 
-_ll__OO_C4.RenderStepped:Connect(function()
-    if not _OO00I__1E or not root or not hum or not _l0l1IO_D then return end
-    local __OlOIl_1A = workspace.CurrentCamera
-    if not __OlOIl_1A then return end
+RunService.RenderStepped:Connect(function()
+    if not fly or not root or not hum or not lv then return end
+    local cam = workspace.CurrentCamera
+    if not cam then return end
 
-    local __IIO0l_3E = __OlOIl_1A.CFrame.LookVector
-    local _l0I_l1_58 = __OlOIl_1A.CFrame.RightVector
-    local _0_01_O_9A = Vector3.new(__IIO0l_3E.X, 0, __IIO0l_3E.Z)
-    local _0Ol0I__B1 = Vector3.new(_l0I_l1_58.X, 0, _l0I_l1_58.Z)
-    if _0_01_O_9A.Magnitude > 0 then _0_01_O_9A = _0_01_O_9A.Unit end
-    if _0Ol0I__B1.Magnitude > 0 then _0Ol0I__B1 = _0Ol0I__B1.Unit end
+    local look = cam.CFrame.LookVector
+    local right = cam.CFrame.RightVector
+    local flatLook = Vector3.new(look.X, 0, look.Z)
+    local flatRight = Vector3.new(right.X, 0, right.Z)
+    if flatLook.Magnitude > 0 then flatLook = flatLook.Unit end
+    if flatRight.Magnitude > 0 then flatRight = flatRight.Unit end
 
-    local _l_l_II_1D = Vector3.zero
-    if _OOl1_O_16:IsKeyDown(Enum.KeyCode.W) then _l_l_II_1D = _l_l_II_1D + _0_01_O_9A end
-    if _OOl1_O_16:IsKeyDown(Enum.KeyCode.S) then _l_l_II_1D = _l_l_II_1D - _0_01_O_9A end
-    if _OOl1_O_16:IsKeyDown(Enum.KeyCode.A) then _l_l_II_1D = _l_l_II_1D - _0Ol0I__B1 end
-    if _OOl1_O_16:IsKeyDown(Enum.KeyCode.D) then _l_l_II_1D = _l_l_II_1D + _0Ol0I__B1 end
+    local dir = Vector3.zero
+    if UIS:IsKeyDown(Enum.KeyCode.W) then dir = dir + flatLook end
+    if UIS:IsKeyDown(Enum.KeyCode.S) then dir = dir - flatLook end
+    if UIS:IsKeyDown(Enum.KeyCode.A) then dir = dir - flatRight end
+    if UIS:IsKeyDown(Enum.KeyCode.D) then dir = dir + flatRight end
 
-    local __l_l1__A6 = 0
-    if _OOl1_O_16:IsKeyDown(Enum.KeyCode.Space) then __l_l1__A6 = 1 end
-    if _OOl1_O_16:IsKeyDown(Enum.KeyCode.LeftControl) or _OOl1_O_16:IsKeyDown(Enum.KeyCode.LeftShift) then __l_l1__A6 = -1 end
+    local vertical = 0
+    if UIS:IsKeyDown(Enum.KeyCode.Space) then vertical = 1 end
+    if UIS:IsKeyDown(Enum.KeyCode.LeftControl) or UIS:IsKeyDown(Enum.KeyCode.LeftShift) then vertical = -1 end
 
-    local _01OI0I_74 = ___11_0_C3 * 0.9
-    local _0l_IOI_A5 = Vector3.new(0, __l_l1__A6 * _01OI0I_74, 0)
-    if _l_l_II_1D.Magnitude > 0 then
-        _0l_IOI_A5 = _0l_IOI_A5 + _l_l_II_1D.Unit * ___11_0_C3
+    local vSpeed = walkSpeed * 0.9
+    local velocity = Vector3.new(0, vertical * vSpeed, 0)
+    if dir.Magnitude > 0 then
+        velocity = velocity + dir.Unit * walkSpeed
     end
-    _l0l1IO_D.VectorVelocity = _0l_IOI_A5
+    lv.VectorVelocity = velocity
     root.AssemblyAngularVelocity = Vector3.zero
 end)
 
 
-local function _OII_IO_BF(state) _OlO_ll_69 = state and true or false end
-_ll__OO_C4.Stepped:Connect(function()
-    if not _IIl1II_31 or not root then return end
-    for _, part in ipairs(_IIl1II_31:GetDescendants()) do
-        if part:IsA(_D("6D8C9E907B8C9D9F")) then
-            if _OlO_ll_69 then part.CanCollide = false end
+local function setNoclip(state) noclip = state and true or false end
+RunService.Stepped:Connect(function()
+    if not char or not root then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA(_D("7B9AAC9E899AABAD")) then
+            if noclip then part.CanCollide = false end
         end
     end
-    if not _OlO_ll_69 and root then root.CanCollide = true end
+    if not noclip and root then root.CanCollide = true end
 end)
 
 
-_OOl1_O_16.JumpRequest:Connect(function()
+UIS.JumpRequest:Connect(function()
     if not hum then return end
-    if _OOl1_O_16.TouchEnabled and _1OII0__F9 then
+    if UIS.TouchEnabled and infJumpMobile then
         hum:ChangeState(Enum.HumanoidStateType.Jumping)
-    elseif (not _OOl1_O_16.TouchEnabled) and _O__00__B4 then
+    elseif (not UIS.TouchEnabled) and infJumpPC then
         hum:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
-_OOl1_O_16.InputBegan:Connect(function(input, gp)
+UIS.InputBegan:Connect(function(input, gp)
     if gp then return end
-    if input.KeyCode == Enum.KeyCode.Space and (not _OOl1_O_16.TouchEnabled) and _O__00__B4 and hum then
+    if input.KeyCode == Enum.KeyCode.Space and (not UIS.TouchEnabled) and infJumpPC and hum then
         hum:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
 
-local function _0OO1OO_101()
+local function hookFallDamage()
     if not hum then return end
     hum.StateChanged:Connect(function(_, new)
         if new == Enum.HumanoidStateType.Freefall then
-            _l1OlOl_10C = hum.Health
+            lastFreefallHealth = hum.Health
             lastFreefallT = tick()
         elseif new == Enum.HumanoidStateType.Landed then
-            if _O_O0l0_F0 and _l1OlOl_10C and hum.Health < _l1OlOl_10C then
-                hum.Health = math.max(hum.Health, _l1OlOl_10C)
+            if noFallDamage and lastFreefallHealth and hum.Health < lastFreefallHealth then
+                hum.Health = math.max(hum.Health, lastFreefallHealth)
             end
         end
     end)
-    hum.HealthChanged:Connect(function(_1__0lI_6)
-        if _O_O0l0_F0 and lastFreefallT and (tick() - lastFreefallT) < 2.5 then
-            if _l1OlOl_10C and _1__0lI_6 < _l1OlOl_10C then hum.Health = _l1OlOl_10C end
+    hum.HealthChanged:Connect(function(h)
+        if noFallDamage and lastFreefallT and (tick() - lastFreefallT) < 2.5 then
+            if lastFreefallHealth and h < lastFreefallHealth then hum.Health = lastFreefallHealth end
         else
-            _l1OlOl_10C = _1__0lI_6
+            lastFreefallHealth = h
         end
     end)
 end
 
 
-local function _1OI0I__FE(state)
-    _1l000O_CB = state and true or false
-    local _01I1_O_17 = _0_OOOl_91:FindFirstChildOfClass(_D("6C9F989A9E9B93909D90"))
-    if _1l000O_CB then
-        if not _Il10O__FD then
-            _Il10O__FD = {
-                Brightness = _0_OOOl_91.Brightness,
-                ClockTime = _0_OOOl_91.ClockTime,
-                Ambient = _0_OOOl_91.Ambient,
-                OutdoorAmbient = _0_OOOl_91.OutdoorAmbient,
-                GlobalShadows = _0_OOOl_91.GlobalShadows,
-                FogEnd = _0_OOOl_91.FogEnd,
-                FogStart = _0_OOOl_91.FogStart,
+local function setFullBright(state)
+    fullBright = state and true or false
+    local atm = Lighting:FindFirstChildOfClass(_D("7AADA6A8ACA9A19EAB9E"))
+    if fullBright then
+        if not savedLighting then
+            savedLighting = {
+                Brightness = Lighting.Brightness,
+                ClockTime = Lighting.ClockTime,
+                Ambient = Lighting.Ambient,
+                OutdoorAmbient = Lighting.OutdoorAmbient,
+                GlobalShadows = Lighting.GlobalShadows,
+                FogEnd = Lighting.FogEnd,
+                FogStart = Lighting.FogStart,
             }
-            if _01I1_O_17 then _011_1__D6 = {Density = _01I1_O_17.Density, Haze = _01I1_O_17.Haze, Color = _01I1_O_17.Color} end
+            if atm then savedAtmos = {Density = atm.Density, Haze = atm.Haze, Color = atm.Color} end
         end
-        _0_OOOl_91.Brightness = 3
-        _0_OOOl_91.ClockTime = 14
-        _0_OOOl_91.Ambient = Color3.fromRGB(255,255,255)
-        _0_OOOl_91.OutdoorAmbient = Color3.fromRGB(255,255,255)
-        _0_OOOl_91.GlobalShadows = false
-        _0_OOOl_91.FogStart = 0
-        _0_OOOl_91.FogEnd = 1e6
-        if _01I1_O_17 then _01I1_O_17.Density = 0; _01I1_O_17.Haze = 0 end
+        Lighting.Brightness = 3
+        Lighting.ClockTime = 14
+        Lighting.Ambient = Color3.fromRGB(255,255,255)
+        Lighting.OutdoorAmbient = Color3.fromRGB(255,255,255)
+        Lighting.GlobalShadows = false
+        Lighting.FogStart = 0
+        Lighting.FogEnd = 1e6
+        if atm then atm.Density = 0; atm.Haze = 0 end
     else
-        if _Il10O__FD then
-            _0_OOOl_91.Brightness = _Il10O__FD.Brightness
-            _0_OOOl_91.ClockTime = _Il10O__FD.ClockTime
-            _0_OOOl_91.Ambient = _Il10O__FD.Ambient
-            _0_OOOl_91.OutdoorAmbient = _Il10O__FD.OutdoorAmbient
-            _0_OOOl_91.GlobalShadows = _Il10O__FD.GlobalShadows
-            _0_OOOl_91.FogStart = _Il10O__FD.FogStart
-            _0_OOOl_91.FogEnd = _Il10O__FD.FogEnd
+        if savedLighting then
+            Lighting.Brightness = savedLighting.Brightness
+            Lighting.ClockTime = savedLighting.ClockTime
+            Lighting.Ambient = savedLighting.Ambient
+            Lighting.OutdoorAmbient = savedLighting.OutdoorAmbient
+            Lighting.GlobalShadows = savedLighting.GlobalShadows
+            Lighting.FogStart = savedLighting.FogStart
+            Lighting.FogEnd = savedLighting.FogEnd
         end
-        if _011_1__D6 then
-            local _l_0Ill_1 = _0_OOOl_91:FindFirstChildOfClass(_D("6C9F989A9E9B93909D90"))
-            if _l_0Ill_1 then _l_0Ill_1.Density = _011_1__D6.Density; _l_0Ill_1.Haze = _011_1__D6.Haze; _l_0Ill_1.Color = _011_1__D6.Color end
+        if savedAtmos then
+            local a = Lighting:FindFirstChildOfClass(_D("7AADA6A8ACA9A19EAB9E"))
+            if a then a.Density = savedAtmos.Density; a.Haze = savedAtmos.Haze; a.Color = savedAtmos.Color end
         end
     end
 end
 
-local function _l11I1l_F4(state)
-    _lII_O__BB = state and true or false
-    local _01I1_O_17 = _0_OOOl_91:FindFirstChildOfClass(_D("6C9F989A9E9B93909D90"))
-    if _lII_O__BB then
-        _0_OOOl_91.FogStart = 0
-        _0_OOOl_91.FogEnd = 1e6
-        if _01I1_O_17 then _01I1_O_17.Density = 0; _01I1_O_17.Haze = 0 end
+local function setRemoveFog(state)
+    removeFog = state and true or false
+    local atm = Lighting:FindFirstChildOfClass(_D("7AADA6A8ACA9A19EAB9E"))
+    if removeFog then
+        Lighting.FogStart = 0
+        Lighting.FogEnd = 1e6
+        if atm then atm.Density = 0; atm.Haze = 0 end
     else
-        if not _1l000O_CB and _Il10O__FD then
-            _0_OOOl_91.FogStart = _Il10O__FD.FogStart
-            _0_OOOl_91.FogEnd = _Il10O__FD.FogEnd
-            if _011_1__D6 then
-                local _l_0Ill_1 = _0_OOOl_91:FindFirstChildOfClass(_D("6C9F989A9E9B93909D90"))
-                if _l_0Ill_1 then _l_0Ill_1.Density = _011_1__D6.Density; _l_0Ill_1.Haze = _011_1__D6.Haze end
+        if not fullBright and savedLighting then
+            Lighting.FogStart = savedLighting.FogStart
+            Lighting.FogEnd = savedLighting.FogEnd
+            if savedAtmos then
+                local a = Lighting:FindFirstChildOfClass(_D("7AADA6A8ACA9A19EAB9E"))
+                if a then a.Density = savedAtmos.Density; a.Haze = savedAtmos.Haze end
             end
         end
     end
 end
 
-local function _1I_0_1_6E(_lIOOl1_5C)
-    _1__OO1_C9 = _lIOOl1_5C
-    local __OlOIl_1A = workspace.CurrentCamera
-    if __OlOIl_1A then __OlOIl_1A.FieldOfView = _1__OO1_C9 end
+local function setFOV(value)
+    defaultFOV = value
+    local cam = workspace.CurrentCamera
+    if cam then cam.FieldOfView = defaultFOV end
 end
 
 
-local __OO0Ol_77
-local _OOl10O_DF
+local MainGUI
+local ShowPillGUI
 
 
 
-local _Il10I0_73 = _D("74999E9F8C999F")
-local _111I1O_FF = 1.0
-local _lO0l0l_CA = {
-    {_D("7CA08C8F7AA09F"),  Enum.EasingStyle.Quad,    Enum.EasingDirection.Out},
-    {_D("7CA08C8F7499"),   Enum.EasingStyle.Quad,    Enum.EasingDirection.In},
-    {_D("7E9499907AA09F"),  Enum.EasingStyle.Sine,    Enum.EasingDirection.Out},
-    {_D("779499908C9D"),   Enum.EasingStyle.Linear,  Enum.EasingDirection.InOut},
-    {_D("6D8C8E967AA09F"),  Enum.EasingStyle.Back,    Enum.EasingDirection.Out},
-    {_D("6EA08D948E7AA09F"), Enum.EasingStyle.Cubic,   Enum.EasingDirection.Out},
+local tpMode = _D("82A7ACAD9AA7AD")
+local tweenDuration = 1.0
+local easeStyles = {
+    {_D("8AAE9A9D88AEAD"),  Enum.EasingStyle.Quad,    Enum.EasingDirection.Out},
+    {_D("8AAE9A9D82A7"),   Enum.EasingStyle.Quad,    Enum.EasingDirection.In},
+    {_D("8CA2A79E88AEAD"),  Enum.EasingStyle.Sine,    Enum.EasingDirection.Out},
+    {_D("85A2A79E9AAB"),   Enum.EasingStyle.Linear,  Enum.EasingDirection.InOut},
+    {_D("7B9A9CA488AEAD"),  Enum.EasingStyle.Back,    Enum.EasingDirection.Out},
+    {_D("7CAE9BA29C88AEAD"), Enum.EasingStyle.Cubic,   Enum.EasingDirection.Out},
 }
-local _1lIl0l_7D = 1
-local _I0_1OI_E8 = false
-local function _1lOO0l_10F(_I0llIO_35)
+local easeIdx = 1
+local teleporting = false
+local function teleportToPosition(dest)
     if not root then return end
-    if _Il10I0_73 == _D("74999E9F8C999F") then
-        root.CFrame = CFrame.new(_I0llIO_35)
+    if tpMode == _D("82A7ACAD9AA7AD") then
+        root.CFrame = CFrame.new(dest)
         return
     end
-    if _I0_1OI_E8 then return end
-    _I0_1OI_E8 = true
-    local _1IIl10_75 = _OO00I__1E
-    if _1IIl10_75 then _llOlO__6F(false) end
-    local _1_1I0l_39 = TweenInfo.new(
-        math.max(0.05, _111I1O_FF),
-        _lO0l0l_CA[_1lIl0l_7D][2],
-        _lO0l0l_CA[_1lIl0l_7D][3],
+    if teleporting then return end
+    teleporting = true
+    local wasFly = fly
+    if wasFly then setFly(false) end
+    local info = TweenInfo.new(
+        math.max(0.05, tweenDuration),
+        easeStyles[easeIdx][2],
+        easeStyles[easeIdx][3],
         0,false,0
     )
-    local _l0O_1O_15 = _Ill110_EA:Create(root, _1_1I0l_39, {CFrame = CFrame.new(_I0llIO_35)})
-    _l0O_1O_15:Play()
-    _l0O_1O_15.Completed:Connect(function()
-        _I0_1OI_E8 = false
-        if _1IIl10_75 then _llOlO__6F(true) end
+    local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
+    tw:Play()
+    tw.Completed:Connect(function()
+        teleporting = false
+        if wasFly then setFly(true) end
     end)
 end
 
-local function _OllI0O_114(_I0llIO_35)
+local function teleportToPositionAndWait(dest)
     if not root then return end
-    if _Il10I0_73 == _D("74999E9F8C999F") then
-        root.CFrame = CFrame.new(_I0llIO_35)
+    if tpMode == _D("82A7ACAD9AA7AD") then
+        root.CFrame = CFrame.new(dest)
         return
     end
 
-    local _1IIl10_75 = _OO00I__1E
-    if _1IIl10_75 then _llOlO__6F(false) end
-    local _1_1I0l_39 = TweenInfo.new(
-        math.max(0.05, _111I1O_FF),
-        _lO0l0l_CA[_1lIl0l_7D][2],
-        _lO0l0l_CA[_1lIl0l_7D][3],
+    local wasFly = fly
+    if wasFly then setFly(false) end
+    local info = TweenInfo.new(
+        math.max(0.05, tweenDuration),
+        easeStyles[easeIdx][2],
+        easeStyles[easeIdx][3],
         0,false,0
     )
-    local _l0O_1O_15 = _Ill110_EA:Create(root, _1_1I0l_39, {CFrame = CFrame.new(_I0llIO_35)})
-    _l0O_1O_15:Play()
+    local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
+    tw:Play()
     
-    pcall(function() _l0O_1O_15.Completed:Wait() end)
-    if _1IIl10_75 then _llOlO__6F(true) end
+    pcall(function() tw.Completed:Wait() end)
+    if wasFly then setFly(true) end
 end
 
-local function _O1_1ll_9D()
-    if _OOl10O_DF then _OOl10O_DF:Destroy() end
-    local __IOO11_A7 = __1O__0_DD:WaitForChild(_D("7B978CA4909D72A094"))
-    local _l0000O_12 = Instance.new(_D("7E8E9D90909972A094"))
-    _l0000O_12.Name = _D("7BA09E9499927B949797")
-    _l0000O_12.ResetOnSpawn = false
-    _l0000O_12.IgnoreGuiInset = true
-    _l0000O_12.Parent = __IOO11_A7
+local function showPill()
+    if ShowPillGUI then ShowPillGUI:Destroy() end
+    local PlayerGui = LocalPlayer:WaitForChild(_D("89A59AB29EAB80AEA2"))
+    local sg = Instance.new(_D("8C9CAB9E9EA780AEA2"))
+    sg.Name = _D("89AEACA2A7A089A2A5A5")
+    sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true
+    sg.Parent = PlayerGui
 
-    local _0lIO0l_19 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _0lIO0l_19.Size = UDim2.fromOffset(160, 46)
-    _0lIO0l_19.Position = UDim2.new(0, 20, 0, 80)
-    _0lIO0l_19.BackgroundColor3 = Color3.fromRGB(40,40,48)
-    _0lIO0l_19.TextColor3 = Color3.fromRGB(230,230,240)
-    _0lIO0l_19.Text = _D("7E939AA24B7BA09E949992")
-    _0lIO0l_19.Font = Enum.Font.GothamBold
-    _0lIO0l_19.TextSize = 20
-    _0lIO0l_19.BorderSizePixel = 0
-    _0lIO0l_19.Parent = _l0000O_12
-    Instance.new(_D("80746E9A9D99909D"), _0lIO0l_19).CornerRadius = UDim.new(1,0)
+    local btn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    btn.Size = UDim2.fromOffset(160, 46)
+    btn.Position = UDim2.new(0, 20, 0, 80)
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,48)
+    btn.TextColor3 = Color3.fromRGB(230,230,240)
+    btn.Text = _D("8CA1A8B05989AEACA2A7A0")
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 20
+    btn.BorderSizePixel = 0
+    btn.Parent = sg
+    Instance.new(_D("8E827CA8ABA79EAB"), btn).CornerRadius = UDim.new(1,0)
 
-    _0lIO0l_19.MouseButton1Click:Connect(function()
-        if __OO0Ol_77 then __OO0Ol_77.Enabled = true end
-        if _OOl10O_DF then _OOl10O_DF:Destroy() _OOl10O_DF=nil end
+    btn.MouseButton1Click:Connect(function()
+        if MainGUI then MainGUI.Enabled = true end
+        if ShowPillGUI then ShowPillGUI:Destroy() ShowPillGUI=nil end
     end)
 
-    _OOl10O_DF = _l0000O_12
+    ShowPillGUI = sg
 end
 
-local function _1__01l_98()
-    local __IOO11_A7 = __1O__0_DD:WaitForChild(_D("7B978CA4909D72A094"))
+local function createUI()
+    local PlayerGui = LocalPlayer:WaitForChild(_D("89A59AB29EAB80AEA2"))
 
     
-    local _I_l00O_85 = Instance.new(_D("7E8E9D90909972A094"))
-    _I_l00O_85.Name = _D("7BA09E9499928D8C9F779A8C8F949992")
-    _I_l00O_85.ResetOnSpawn = false
-    _I_l00O_85.IgnoreGuiInset = true
-    _I_l00O_85.Parent = __IOO11_A7
+    local overlay = Instance.new(_D("8C9CAB9E9EA780AEA2"))
+    overlay.Name = _D("89AEACA2A7A09B9AAD85A89A9DA2A7A0")
+    overlay.ResetOnSpawn = false
+    overlay.IgnoreGuiInset = true
+    overlay.Parent = PlayerGui
 
-    local __llll1_1C = Instance.new(_D("719D8C9890"))
-    __llll1_1C.Size = UDim2.fromScale(1,1)
-    __llll1_1C.BackgroundColor3 = Color3.new(0,0,0)
-    __llll1_1C.BackgroundTransparency = 0.5
-    __llll1_1C.BorderSizePixel = 0
-    __llll1_1C.Parent = _I_l00O_85
+    local dim = Instance.new(_D("7FAB9AA69E"))
+    dim.Size = UDim2.fromScale(1,1)
+    dim.BackgroundColor3 = Color3.new(0,0,0)
+    dim.BackgroundTransparency = 0.5
+    dim.BorderSizePixel = 0
+    dim.Parent = overlay
 
-    local _OI1l0l_72 = Instance.new(_D("719D8C9890"))
-    _OI1l0l_72.AnchorPoint = Vector2.new(0.5,0.5)
-    _OI1l0l_72.Position = UDim2.fromScale(0.5,0.5)
-    _OI1l0l_72.Size = UDim2.fromOffset(520,100)
-    _OI1l0l_72.BackgroundColor3 = Color3.fromRGB(0,0,0)
-    _OI1l0l_72.BackgroundTransparency = 0.5
-    _OI1l0l_72.BorderSizePixel = 0
-    _OI1l0l_72.Parent = _I_l00O_85
-    Instance.new(_D("80746E9A9D99909D"), _OI1l0l_72).CornerRadius = UDim.new(0,18)
+    local textBg = Instance.new(_D("7FAB9AA69E"))
+    textBg.AnchorPoint = Vector2.new(0.5,0.5)
+    textBg.Position = UDim2.fromScale(0.5,0.5)
+    textBg.Size = UDim2.fromOffset(520,100)
+    textBg.BackgroundColor3 = Color3.fromRGB(0,0,0)
+    textBg.BackgroundTransparency = 0.5
+    textBg.BorderSizePixel = 0
+    textBg.Parent = overlay
+    Instance.new(_D("8E827CA8ABA79EAB"), textBg).CornerRadius = UDim.new(0,18)
 
-    local _I_0__O_46 = Instance.new(_D("7F90A39F778C8D9097"))
-    _I_0__O_46.Size = UDim2.fromScale(1,1)
-    _I_0__O_46.BackgroundTransparency = 1
-    _I_0__O_46.Text = _D("6E9D908C9F908F4B8DA44B7BA09E9499928D8C9F")
-    _I_0__O_46.Font = Enum.Font.GothamBlack
-    _I_0__O_46.TextSize = 42
-    _I_0__O_46.TextColor3 = Color3.fromRGB(255,255,255)
-    _I_0__O_46.Parent = _OI1l0l_72
-
-    
-    if __OO0Ol_77 then __OO0Ol_77:Destroy() end
-    __OO0Ol_77 = Instance.new(_D("7E8E9D90909972A094"))
-    __OO0Ol_77.Name = _D("7BA09E9499928D8C9F6E9A999F9D9A9797909D")
-    __OO0Ol_77.ResetOnSpawn = false
-    __OO0Ol_77.IgnoreGuiInset = true
-    __OO0Ol_77.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    __OO0Ol_77.Parent = __IOO11_A7
-    __OO0Ol_77.Enabled = false
-
-    local _IlII_0_4F = Instance.new(_D("719D8C9890"))
-    _IlII_0_4F.Name = _D("788C9499719D8C9890")
-    _IlII_0_4F.Size = UDim2.fromOffset(420, 360)
-    _IlII_0_4F.Position = UDim2.new(0, 24, 0, 120)
-    _IlII_0_4F.BackgroundColor3 = Color3.fromRGB(30,30,30)
-    _IlII_0_4F.BackgroundTransparency = 0.15
-    _IlII_0_4F.BorderSizePixel = 0
-    _IlII_0_4F.Active = true
-    _IlII_0_4F.ClipsDescendants = true
-    _IlII_0_4F.Parent = __OO0Ol_77
-    Instance.new(_D("80746E9A9D99909D"), _IlII_0_4F).CornerRadius = UDim.new(0, 12)
+    local text = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    text.Size = UDim2.fromScale(1,1)
+    text.BackgroundTransparency = 1
+    text.Text = _D("7CAB9E9AAD9E9D599BB25989AEACA2A7A09B9AAD")
+    text.Font = Enum.Font.GothamBlack
+    text.TextSize = 42
+    text.TextColor3 = Color3.fromRGB(255,255,255)
+    text.Parent = textBg
 
     
-    local ___IOOI_67 = Instance.new(_D("719D8C9890"))
-    ___IOOI_67.Size = UDim2.new(1, 0, 0, 40)
-    ___IOOI_67.BackgroundTransparency = 1
-    ___IOOI_67.Parent = _IlII_0_4F
+    if MainGUI then MainGUI:Destroy() end
+    MainGUI = Instance.new(_D("8C9CAB9E9EA780AEA2"))
+    MainGUI.Name = _D("89AEACA2A7A09B9AAD7CA8A7ADABA8A5A59EAB")
+    MainGUI.ResetOnSpawn = false
+    MainGUI.IgnoreGuiInset = true
+    MainGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    MainGUI.Parent = PlayerGui
+    MainGUI.Enabled = false
 
-    local _O10I0__5A = Instance.new(_D("7F90A39F778C8D9097"))
-    _O10I0__5A.BackgroundTransparency = 1
-    _O10I0__5A.Size = UDim2.new(1, -220, 1, 0)
-    _O10I0__5A.Position = UDim2.new(0, 10, 0, 0)
-    _O10I0__5A.Font = Enum.Font.GothamBold
-    _O10I0__5A.TextSize = 18
-    _O10I0__5A.TextXAlignment = Enum.TextXAlignment.Left
-    _O10I0__5A.TextColor3 = Color3.fromRGB(255,255,255)
-    _O10I0__5A.Text = _D("6E9D908C9F908F4B8DA44B9BA09E9499928D8C9F")
-    _O10I0__5A.Parent = ___IOOI_67
-
-    local __l1O_1_BD = Instance.new(_D("74988C92906DA09F9F9A99"))
-    __l1O_1_BD.Size = UDim2.fromOffset(26, 26)
-    __l1O_1_BD.Position = UDim2.new(1, -96, 0.5, -13)
-    __l1O_1_BD.BackgroundTransparency = 1
-    __l1O_1_BD.Image = _D("9D8DA38C9E9E909F948F655A5A615B5E5C5B6260645E63")
-    __l1O_1_BD.ImageColor3 = Color3.fromRGB(220,220,220)
-    __l1O_1_BD.Parent = ___IOOI_67
-
-    local _1Ol_IO_5F = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _1Ol_IO_5F.Size = UDim2.fromOffset(26, 26)
-    _1Ol_IO_5F.Position = UDim2.new(1, -64, 0.5, -13)
-    _1Ol_IO_5F.Text = _D("0DABBE")
-    _1Ol_IO_5F.Font = Enum.Font.GothamBlack
-    _1Ol_IO_5F.TextSize = 18
-    _1Ol_IO_5F.TextColor3 = Color3.fromRGB(255,255,255)
-    _1Ol_IO_5F.BackgroundColor3 = Color3.fromRGB(70,70,80)
-    _1Ol_IO_5F.BorderSizePixel = 0
-    _1Ol_IO_5F.Parent = ___IOOI_67
-    Instance.new(_D("80746E9A9D99909D"), _1Ol_IO_5F).CornerRadius = UDim.new(1,0)
-
-    local __ll_I1_95 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    __ll_I1_95.Size = UDim2.fromOffset(26, 26)
-    __ll_I1_95.Position = UDim2.new(1, -32, 0.5, -13)
-    __ll_I1_95.Text = _D("A3")
-    __ll_I1_95.Font = Enum.Font.GothamBlack
-    __ll_I1_95.TextSize = 16
-    __ll_I1_95.TextColor3 = Color3.fromRGB(255,255,255)
-    __ll_I1_95.BackgroundColor3 = Color3.fromRGB(90,50,50)
-    __ll_I1_95.BorderSizePixel = 0
-    __ll_I1_95.Parent = ___IOOI_67
-    Instance.new(_D("80746E9A9D99909D"), __ll_I1_95).CornerRadius = UDim.new(1,0)
+    local frame = Instance.new(_D("7FAB9AA69E"))
+    frame.Name = _D("869AA2A77FAB9AA69E")
+    frame.Size = UDim2.fromOffset(420, 360)
+    frame.Position = UDim2.new(0, 24, 0, 120)
+    frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    frame.BackgroundTransparency = 0.15
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.ClipsDescendants = true
+    frame.Parent = MainGUI
+    Instance.new(_D("8E827CA8ABA79EAB"), frame).CornerRadius = UDim.new(0, 12)
 
     
-    local _l1O_O__E7 = Instance.new(_D("719D8C9890"))
-    _l1O_O__E7.Size = UDim2.fromOffset(220, 36)
-    _l1O_O__E7.Position = UDim2.new(1, -346, 0, 42)
-    _l1O_O__E7.BackgroundColor3 = Color3.fromRGB(45,45,50)
-    _l1O_O__E7.Visible = false
-    _l1O_O__E7.Parent = _IlII_0_4F
-    Instance.new(_D("80746E9A9D99909D"), _l1O_O__E7).CornerRadius = UDim.new(0, 8)
+    local header = Instance.new(_D("7FAB9AA69E"))
+    header.Size = UDim2.new(1, 0, 0, 40)
+    header.BackgroundTransparency = 1
+    header.Parent = frame
 
-    local _1_0OOI_BC = Instance.new(_D("7F90A39F6D9AA3"))
-    _1_0OOI_BC.Size = UDim2.new(1, -12, 1, -12)
-    _1_0OOI_BC.Position = UDim2.new(0, 6, 0, 6)
-    _1_0OOI_BC.BackgroundColor3 = Color3.fromRGB(55,55,60)
-    _1_0OOI_BC.PlaceholderText = _D("7E908C9D8E934B91908C9FA09D90")
-    _1_0OOI_BC.Text = _D("")
-    _1_0OOI_BC.Font = Enum.Font.Gotham
-    _1_0OOI_BC.TextSize = 14
-    _1_0OOI_BC.TextColor3 = Color3.fromRGB(230,230,230)
-    _1_0OOI_BC.ClearTextOnFocus = false
-    _1_0OOI_BC.Parent = _l1O_O__E7
-    Instance.new(_D("80746E9A9D99909D"), _1_0OOI_BC).CornerRadius = UDim.new(0, 6)
+    local title = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    title.BackgroundTransparency = 1
+    title.Size = UDim2.new(1, -220, 1, 0)
+    title.Position = UDim2.new(0, 10, 0, 0)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.TextColor3 = Color3.fromRGB(255,255,255)
+    title.Text = _D("7CAB9E9AAD9E9D599BB259A9AEACA2A7A09B9AAD")
+    title.Parent = header
 
-    __l1O_1_BD.MouseButton1Click:Connect(function()
-        _l1O_O__E7.Visible = not _l1O_O__E7.Visible
-        if _l1O_O__E7.Visible then _1_0OOI_BC:CaptureFocus() end
+    local searchBtn = Instance.new(_D("82A69AA09E7BAEADADA8A7"))
+    searchBtn.Size = UDim2.fromOffset(26, 26)
+    searchBtn.Position = UDim2.new(1, -96, 0.5, -13)
+    searchBtn.BackgroundTransparency = 1
+    searchBtn.Image = _D("AB9BB19AACAC9EADA29D7368686F696C6A69706E726C71")
+    searchBtn.ImageColor3 = Color3.fromRGB(220,220,220)
+    searchBtn.Parent = header
+
+    local btnMin = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    btnMin.Size = UDim2.fromOffset(26, 26)
+    btnMin.Position = UDim2.new(1, -64, 0.5, -13)
+    btnMin.Text = _D("1BB9CC")
+    btnMin.Font = Enum.Font.GothamBlack
+    btnMin.TextSize = 18
+    btnMin.TextColor3 = Color3.fromRGB(255,255,255)
+    btnMin.BackgroundColor3 = Color3.fromRGB(70,70,80)
+    btnMin.BorderSizePixel = 0
+    btnMin.Parent = header
+    Instance.new(_D("8E827CA8ABA79EAB"), btnMin).CornerRadius = UDim.new(1,0)
+
+    local btnClose = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    btnClose.Size = UDim2.fromOffset(26, 26)
+    btnClose.Position = UDim2.new(1, -32, 0.5, -13)
+    btnClose.Text = _D("B1")
+    btnClose.Font = Enum.Font.GothamBlack
+    btnClose.TextSize = 16
+    btnClose.TextColor3 = Color3.fromRGB(255,255,255)
+    btnClose.BackgroundColor3 = Color3.fromRGB(90,50,50)
+    btnClose.BorderSizePixel = 0
+    btnClose.Parent = header
+    Instance.new(_D("8E827CA8ABA79EAB"), btnClose).CornerRadius = UDim.new(1,0)
+
+    
+    local searchPanel = Instance.new(_D("7FAB9AA69E"))
+    searchPanel.Size = UDim2.fromOffset(220, 36)
+    searchPanel.Position = UDim2.new(1, -346, 0, 42)
+    searchPanel.BackgroundColor3 = Color3.fromRGB(45,45,50)
+    searchPanel.Visible = false
+    searchPanel.Parent = frame
+    Instance.new(_D("8E827CA8ABA79EAB"), searchPanel).CornerRadius = UDim.new(0, 8)
+
+    local searchBox = Instance.new(_D("8D9EB1AD7BA8B1"))
+    searchBox.Size = UDim2.new(1, -12, 1, -12)
+    searchBox.Position = UDim2.new(0, 6, 0, 6)
+    searchBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
+    searchBox.PlaceholderText = _D("8C9E9AAB9CA1599F9E9AADAEAB9E")
+    searchBox.Text = _D("")
+    searchBox.Font = Enum.Font.Gotham
+    searchBox.TextSize = 14
+    searchBox.TextColor3 = Color3.fromRGB(230,230,230)
+    searchBox.ClearTextOnFocus = false
+    searchBox.Parent = searchPanel
+    Instance.new(_D("8E827CA8ABA79EAB"), searchBox).CornerRadius = UDim.new(0, 6)
+
+    searchBtn.MouseButton1Click:Connect(function()
+        searchPanel.Visible = not searchPanel.Visible
+        if searchPanel.Visible then searchBox:CaptureFocus() end
     end)
 
     
-    local _0I__10_36 = Instance.new(_D("719D8C9890"))
-    _0I__10_36.BackgroundTransparency = 1
-    _0I__10_36.Size = UDim2.new(1, -240, 1, 0)
-    _0I__10_36.Position = UDim2.new(0, 0, 0, 0)
-    _0I__10_36.Parent = ___IOOI_67
+    local drag = Instance.new(_D("7FAB9AA69E"))
+    drag.BackgroundTransparency = 1
+    drag.Size = UDim2.new(1, -240, 1, 0)
+    drag.Position = UDim2.new(0, 0, 0, 0)
+    drag.Parent = header
 
     
-    local _10llOI_45 = Instance.new(_D("719D8C9890"))
-    _10llOI_45.Size = UDim2.new(1, -16, 0, 30)
-    _10llOI_45.Position = UDim2.new(0, 8, 0, 44)
-    _10llOI_45.BackgroundTransparency = 1
-    _10llOI_45.Parent = _IlII_0_4F
+    local tabs = Instance.new(_D("7FAB9AA69E"))
+    tabs.Size = UDim2.new(1, -16, 0, 30)
+    tabs.Position = UDim2.new(0, 8, 0, 44)
+    tabs.BackgroundTransparency = 1
+    tabs.Parent = frame
 
-    local function _l_lO_1_FA(_I_0__O_46, xOffset)
-        local __1O_lO_2 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-        __1O_lO_2.Size = UDim2.fromOffset(100, 28)
-        __1O_lO_2.Position = UDim2.new(0, xOffset, 0, 0)
-        __1O_lO_2.BackgroundColor3 = Color3.fromRGB(45,45,50)
-        __1O_lO_2.TextColor3 = Color3.fromRGB(230,230,230)
-        __1O_lO_2.Text = _I_0__O_46
-        __1O_lO_2.Font = Enum.Font.GothamBold
-        __1O_lO_2.TextSize = 14
-        __1O_lO_2.BorderSizePixel = 0
-        __1O_lO_2.Parent = _10llOI_45
-        Instance.new(_D("80746E9A9D99909D"), __1O_lO_2).CornerRadius = UDim.new(1,0)
-        return __1O_lO_2
+    local function makeTabButton(text, xOffset)
+        local b = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+        b.Size = UDim2.fromOffset(100, 28)
+        b.Position = UDim2.new(0, xOffset, 0, 0)
+        b.BackgroundColor3 = Color3.fromRGB(45,45,50)
+        b.TextColor3 = Color3.fromRGB(230,230,230)
+        b.Text = text
+        b.Font = Enum.Font.GothamBold
+        b.TextSize = 14
+        b.BorderSizePixel = 0
+        b.Parent = tabs
+        Instance.new(_D("8E827CA8ABA79EAB"), b).CornerRadius = UDim.new(1,0)
+        return b
     end
 
-    local _001_IO_D9 = _l_lO_1_FA(_D("788C9499"), 0)
-    local _IOOIlO_DA = _l_lO_1_FA(_D("78949E8E"), 108)
-    local _10O100_A0   = _l_lO_1_FA(_D("7F9097909B9A9D9F"), 216)
-    local __10O10_C1  = _l_lO_1_FA(_D("6E9A99919492"), 324)
+    local tabMainBtn = makeTabButton(_D("869AA2A7"), 0)
+    local tabMiscBtn = makeTabButton(_D("86A2AC9C"), 108)
+    local tabTpBtn   = makeTabButton(_D("8D9EA59EA9A8ABAD"), 216)
+    local tabCfgBtn  = makeTabButton(_D("7CA8A79FA2A0"), 324)
 
     
-    local function __IIlIO_CF()
-        local _1_IOl1_6D = Instance.new(_D("7E8E9D9A9797949992719D8C9890"))
-        _1_IOl1_6D.Size = UDim2.new(1, -16, 1, -88)
-        _1_IOl1_6D.Position = UDim2.new(0, 8, 0, 78)
-        _1_IOl1_6D.BackgroundTransparency = 1
-        _1_IOl1_6D.BorderSizePixel = 0
-        _1_IOl1_6D.CanvasSize = UDim2.new(0,0,0,0)
-        _1_IOl1_6D.ScrollBarThickness = 6
-        _1_IOl1_6D.Visible = false
-        _1_IOl1_6D.ClipsDescendants = true
-        _1_IOl1_6D.AutomaticCanvasSize = Enum.AutomaticSize.None
-        _1_IOl1_6D.Parent = _IlII_0_4F
+    local function makeScroll()
+        local scroll = Instance.new(_D("8C9CABA8A5A5A2A7A07FAB9AA69E"))
+        scroll.Size = UDim2.new(1, -16, 1, -88)
+        scroll.Position = UDim2.new(0, 8, 0, 78)
+        scroll.BackgroundTransparency = 1
+        scroll.BorderSizePixel = 0
+        scroll.CanvasSize = UDim2.new(0,0,0,0)
+        scroll.ScrollBarThickness = 6
+        scroll.Visible = false
+        scroll.ClipsDescendants = true
+        scroll.AutomaticCanvasSize = Enum.AutomaticSize.None
+        scroll.Parent = frame
 
-        local _0lO0O__68 = Instance.new(_D("807477949E9F778CA49AA09F"))
-        _0lO0O__68.FillDirection = Enum.FillDirection.Vertical
-        _0lO0O__68.Padding = UDim.new(0, 8)
-        _0lO0O__68.SortOrder = Enum.SortOrder.LayoutOrder
-        _0lO0O__68.Parent = _1_IOl1_6D
+        local layout = Instance.new(_D("8E8285A2ACAD859AB2A8AEAD"))
+        layout.FillDirection = Enum.FillDirection.Vertical
+        layout.Padding = UDim.new(0, 8)
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Parent = scroll
 
-        local __0ll10_23 = Instance.new(_D("80747B8C8F8F949992"))
-        __0ll10_23.PaddingTop = UDim.new(0, 6)
-        __0ll10_23.PaddingBottom = UDim.new(0, 12)
-        __0ll10_23.PaddingLeft = UDim.new(0, 4)
-        __0ll10_23.PaddingRight = UDim.new(0, 4)
-        __0ll10_23.Parent = _1_IOl1_6D
+        local pad = Instance.new(_D("8E82899A9D9DA2A7A0"))
+        pad.PaddingTop = UDim.new(0, 6)
+        pad.PaddingBottom = UDim.new(0, 12)
+        pad.PaddingLeft = UDim.new(0, 4)
+        pad.PaddingRight = UDim.new(0, 4)
+        pad.Parent = scroll
 
-        local function _I1OI01_6B()
-            _1_IOl1_6D.CanvasSize = UDim2.new(0,0,0, _0lO0O__68.AbsoluteContentSize.Y + __0ll10_23.PaddingBottom.Offset)
+        local function recalc()
+            scroll.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + pad.PaddingBottom.Offset)
         end
-        _0lO0O__68:GetPropertyChangedSignal(_D("6C8D9E9A97A09F906E9A999F90999F7E94A590")):Connect(_I1OI01_6B)
-        return _1_IOl1_6D, _0lO0O__68, _I1OI01_6B
+        layout:GetPropertyChangedSignal(_D("7A9BACA8A5AEAD9E7CA8A7AD9EA7AD8CA2B39E")):Connect(recalc)
+        return scroll, layout, recalc
     end
 
-    local _lIOOll_CE, _, recalcMain = __IIlIO_CF()
-    local _Ol_0lO_D2, _, recalcMisc = __IIlIO_CF()
-    local _01IlOl_A3, _, recalcTp = __IIlIO_CF()
-    local _Il__lO_AA, _, recalcCfg = __IIlIO_CF()
+    local mainScroll, _, recalcMain = makeScroll()
+    local miscScroll, _, recalcMisc = makeScroll()
+    local tpScroll, _, recalcTp = makeScroll()
+    local cfgScroll, _, recalcCfg = makeScroll()
 
-    local function _l_1____AC(parent, height)
-        local _II0Il__2B = Instance.new(_D("719D8C9890"))
-        _II0Il__2B.Size = UDim2.new(1, 0, 0, height)
-        _II0Il__2B.BackgroundColor3 = Color3.fromRGB(38,38,42)
-        _II0Il__2B.BackgroundTransparency = 0.2
-        _II0Il__2B.BorderSizePixel = 0
-        _II0Il__2B.Parent = parent
-        Instance.new(_D("80746E9A9D99909D"), _II0Il__2B).CornerRadius = UDim.new(0, 8)
-        return _II0Il__2B
+    local function createRow(parent, height)
+        local row = Instance.new(_D("7FAB9AA69E"))
+        row.Size = UDim2.new(1, 0, 0, height)
+        row.BackgroundColor3 = Color3.fromRGB(38,38,42)
+        row.BackgroundTransparency = 0.2
+        row.BorderSizePixel = 0
+        row.Parent = parent
+        Instance.new(_D("8E827CA8ABA79EAB"), row).CornerRadius = UDim.new(0, 8)
+        return row
     end
 
-    local function _10OI0__D1(parent, labelText, initial, callback)
-        local _II0Il__2B = _l_1____AC(parent, 40)
-        local _OI01O0_21 = Instance.new(_D("7F90A39F778C8D9097"))
-        _OI01O0_21.BackgroundTransparency = 1
-        _OI01O0_21.Size = UDim2.new(1, -120, 1, 0)
-        _OI01O0_21.Position = UDim2.new(0, 10, 0, 0)
-        _OI01O0_21.Font = Enum.Font.Gotham
-        _OI01O0_21.TextSize = 16
-        _OI01O0_21.TextXAlignment = Enum.TextXAlignment.Left
-        _OI01O0_21.TextColor3 = Color3.fromRGB(235,235,235)
-        _OI01O0_21.Text = labelText
-        _OI01O0_21.Parent = _II0Il__2B
+    local function makeSwitch(parent, labelText, initial, callback)
+        local row = createRow(parent, 40)
+        local lbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+        lbl.BackgroundTransparency = 1
+        lbl.Size = UDim2.new(1, -120, 1, 0)
+        lbl.Position = UDim2.new(0, 10, 0, 0)
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 16
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextColor3 = Color3.fromRGB(235,235,235)
+        lbl.Text = labelText
+        lbl.Parent = row
 
-        local _011_l0_70 = Instance.new(_D("719D8C9890"))
-        _011_l0_70.Size = UDim2.fromOffset(58, 24)
-        _011_l0_70.Position = UDim2.new(1, -70, 0.5, -12)
-        _011_l0_70.BackgroundColor3 = initial and Color3.fromRGB(60,180,75) or Color3.fromRGB(120,120,120)
-        _011_l0_70.BorderSizePixel = 0
-        _011_l0_70.Parent = _II0Il__2B
-        Instance.new(_D("80746E9A9D99909D"), _011_l0_70).CornerRadius = UDim.new(1,0)
+        local switch = Instance.new(_D("7FAB9AA69E"))
+        switch.Size = UDim2.fromOffset(58, 24)
+        switch.Position = UDim2.new(1, -70, 0.5, -12)
+        switch.BackgroundColor3 = initial and Color3.fromRGB(60,180,75) or Color3.fromRGB(120,120,120)
+        switch.BorderSizePixel = 0
+        switch.Parent = row
+        Instance.new(_D("8E827CA8ABA79EAB"), switch).CornerRadius = UDim.new(1,0)
 
-        local _lI0I_I_3C = Instance.new(_D("719D8C9890"))
-        _lI0I_I_3C.Size = UDim2.fromOffset(20,20)
-        _lI0I_I_3C.Position = initial and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10)
-        _lI0I_I_3C.BackgroundColor3 = Color3.fromRGB(255,255,255)
-        _lI0I_I_3C.BorderSizePixel = 0
-        _lI0I_I_3C.Parent = _011_l0_70
-        Instance.new(_D("80746E9A9D99909D"), _lI0I_I_3C).CornerRadius = UDim.new(1,0)
+        local knob = Instance.new(_D("7FAB9AA69E"))
+        knob.Size = UDim2.fromOffset(20,20)
+        knob.Position = initial and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10)
+        knob.BackgroundColor3 = Color3.fromRGB(255,255,255)
+        knob.BorderSizePixel = 0
+        knob.Parent = switch
+        Instance.new(_D("8E827CA8ABA79EAB"), knob).CornerRadius = UDim.new(1,0)
 
-        local _lIOOl1_5C = initial
-        local function _10ll10_6C()
-            _011_l0_70.BackgroundColor3 = _lIOOl1_5C and Color3.fromRGB(60,180,75) or Color3.fromRGB(120,120,120)
-            _lI0I_I_3C:TweenPosition(_lIOOl1_5C and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true)
+        local value = initial
+        local function redraw()
+            switch.BackgroundColor3 = value and Color3.fromRGB(60,180,75) or Color3.fromRGB(120,120,120)
+            knob:TweenPosition(value and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.1, true)
         end
-        _011_l0_70.InputBegan:Connect(function(input)
+        switch.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                _lIOOl1_5C = not _lIOOl1_5C
-                _10ll10_6C()
-                if callback then task.spawn(callback, _lIOOl1_5C) end
+                value = not value
+                redraw()
+                if callback then task.spawn(callback, value) end
             end
         end)
 
-        _II0Il__2B:SetAttribute(_D("978C8D9097"), labelText)
-        return {Row=_II0Il__2B, Set=function(__IlIO__A) _lIOOl1_5C=__IlIO__A and true or false; _10ll10_6C(); if callback then task.spawn(callback, _lIOOl1_5C) end end}
+        row:SetAttribute(_D("A59A9B9EA5"), labelText)
+        return {Row=row, Set=function(v) value=v and true or false; redraw(); if callback then task.spawn(callback, value) end end}
     end
 
-    local function _01111I_D0(parent, labelText, minV, maxV, initial, callback)
-        local _II0Il__2B = _l_1____AC(parent, 58)
-        local _OI01O0_21 = Instance.new(_D("7F90A39F778C8D9097"))
-        _OI01O0_21.BackgroundTransparency = 1
-        _OI01O0_21.Size = UDim2.new(1, 0, 0, 20)
-        _OI01O0_21.Position = UDim2.new(0, 10, 0, 6)
-        _OI01O0_21.Font = Enum.Font.Gotham
-        _OI01O0_21.TextSize = 16
-        _OI01O0_21.TextXAlignment = Enum.TextXAlignment.Left
-        _OI01O0_21.TextColor3 = Color3.fromRGB(235,235,235)
-        _OI01O0_21.Text = string.format(_D("509E654B508F"), labelText, initial)
-        _OI01O0_21.Parent = _II0Il__2B
+    local function makeSlider(parent, labelText, minV, maxV, initial, callback)
+        local row = createRow(parent, 58)
+        local lbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+        lbl.BackgroundTransparency = 1
+        lbl.Size = UDim2.new(1, 0, 0, 20)
+        lbl.Position = UDim2.new(0, 10, 0, 6)
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 16
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextColor3 = Color3.fromRGB(235,235,235)
+        lbl.Text = string.format(_D("5EAC73595E9D"), labelText, initial)
+        lbl.Parent = row
 
-        local _O_0l0O_18 = Instance.new(_D("719D8C9890"))
-        _O_0l0O_18.Size = UDim2.new(1, -20, 0, 8)
-        _O_0l0O_18.Position = UDim2.new(0, 10, 0, 34)
-        _O_0l0O_18.BackgroundColor3 = Color3.fromRGB(60,60,60)
-        _O_0l0O_18.BorderSizePixel = 0
-        _O_0l0O_18.Parent = _II0Il__2B
-        Instance.new(_D("80746E9A9D99909D"), _O_0l0O_18).CornerRadius = UDim.new(0,8)
+        local bar = Instance.new(_D("7FAB9AA69E"))
+        bar.Size = UDim2.new(1, -20, 0, 8)
+        bar.Position = UDim2.new(0, 10, 0, 34)
+        bar.BackgroundColor3 = Color3.fromRGB(60,60,60)
+        bar.BorderSizePixel = 0
+        bar.Parent = row
+        Instance.new(_D("8E827CA8ABA79EAB"), bar).CornerRadius = UDim.new(0,8)
 
-        local __O_01l_42 = (initial - minV) / (maxV - minV)
-        local _OOO_l0_38 = Instance.new(_D("719D8C9890"))
-        _OOO_l0_38.Size = UDim2.new(__O_01l_42, 0, 1, 0)
-        _OOO_l0_38.BackgroundColor3 = Color3.fromRGB(0,170,255)
-        _OOO_l0_38.BorderSizePixel = 0
-        _OOO_l0_38.Parent = _O_0l0O_18
-        Instance.new(_D("80746E9A9D99909D"), _OOO_l0_38).CornerRadius = UDim.new(0,8)
+        local pct0 = (initial - minV) / (maxV - minV)
+        local fill = Instance.new(_D("7FAB9AA69E"))
+        fill.Size = UDim2.new(pct0, 0, 1, 0)
+        fill.BackgroundColor3 = Color3.fromRGB(0,170,255)
+        fill.BorderSizePixel = 0
+        fill.Parent = bar
+        Instance.new(_D("8E827CA8ABA79EAB"), fill).CornerRadius = UDim.new(0,8)
 
-        local _lI0I_I_3C = Instance.new(_D("719D8C9890"))
-        _lI0I_I_3C.Size = UDim2.fromOffset(18,18)
-        _lI0I_I_3C.Position = UDim2.new(__O_01l_42, -9, 0.5, -9)
-        _lI0I_I_3C.BackgroundColor3 = Color3.fromRGB(240,240,240)
-        _lI0I_I_3C.BorderSizePixel = 0
-        _lI0I_I_3C.Parent = _O_0l0O_18
-        Instance.new(_D("80746E9A9D99909D"), _lI0I_I_3C).CornerRadius = UDim.new(1,0)
+        local knob = Instance.new(_D("7FAB9AA69E"))
+        knob.Size = UDim2.fromOffset(18,18)
+        knob.Position = UDim2.new(pct0, -9, 0.5, -9)
+        knob.BackgroundColor3 = Color3.fromRGB(240,240,240)
+        knob.BorderSizePixel = 0
+        knob.Parent = bar
+        Instance.new(_D("8E827CA8ABA79EAB"), knob).CornerRadius = UDim.new(1,0)
 
-        local _l100___99 = false
-        local function _1_l0II_D8(_1IlOO0_24)
-            _1IlOO0_24 = math.clamp(_1IlOO0_24, 0, 1)
-            local ___O1lO_2D = math.floor(minV + (maxV - minV) * _1IlOO0_24 + 0.5)
-            _OOO_l0_38.Size = UDim2.new(_1IlOO0_24, 0, 1, 0)
-            _lI0I_I_3C.Position = UDim2.new(_1IlOO0_24, -9, 0.5, -9)
-            _OI01O0_21.Text = string.format(_D("509E654B508F"), labelText, ___O1lO_2D)
-            if callback then callback(___O1lO_2D) end
+        local dragging = false
+        local function setFromPct(pct)
+            pct = math.clamp(pct, 0, 1)
+            local val = math.floor(minV + (maxV - minV) * pct + 0.5)
+            fill.Size = UDim2.new(pct, 0, 1, 0)
+            knob.Position = UDim2.new(pct, -9, 0.5, -9)
+            lbl.Text = string.format(_D("5EAC73595E9D"), labelText, val)
+            if callback then callback(val) end
         end
 
-        _O_0l0O_18.InputBegan:Connect(function(input)
+        bar.InputBegan:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                _l100___99 = true
-                local _II1OOl_28 = (input.Position.X - _O_0l0O_18.AbsolutePosition.X) / _O_0l0O_18.AbsoluteSize.X
-                _1_l0II_D8(_II1OOl_28)
+                dragging = true
+                local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
+                setFromPct(rel)
             end
         end)
-        _OOl1_O_16.InputChanged:Connect(function(input)
-            if _l100___99 and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                local _II1OOl_28 = (input.Position.X - _O_0l0O_18.AbsolutePosition.X) / _O_0l0O_18.AbsoluteSize.X
-                _1_l0II_D8(_II1OOl_28)
+        UIS.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
+                setFromPct(rel)
             end
         end)
-        _O_0l0O_18.InputEnded:Connect(function(input)
+        bar.InputEnded:Connect(function(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                _l100___99 = false
+                dragging = false
             end
         end)
 
-        _II0Il__2B:SetAttribute(_D("978C8D9097"), labelText)
-        return {Row=_II0Il__2B, Set=function(__IlIO__A) local _1IlOO0_24=(math.clamp(__IlIO__A,minV,maxV)-minV)/(maxV-minV); _1_l0II_D8(_1IlOO0_24) end}
+        row:SetAttribute(_D("A59A9B9EA5"), labelText)
+        return {Row=row, Set=function(v) local pct=(math.clamp(v,minV,maxV)-minV)/(maxV-minV); setFromPct(pct) end}
     end
 
 
-    local _1_Ol11_4D = _10OI0__D1(_lIOOll_CE, _D("7197A4"), false, function(__IlIO__A) _llOlO__6F(__IlIO__A) end)
-    local _O0l0___41  = _10OI0__D1(_lIOOll_CE, _D("799A6E97949B4B539F90988DA09E54"), false, function(__IlIO__A) _OII_IO_BF(__IlIO__A) end)
-    local _O_I0lI_47  = _01111I_D0(_lIOOll_CE, _D("828C97964B7E9B90908F4B539E9FA08F9E54"), __1l_OO_93, MAX_WALK, ___11_0_C3, function(__IlIO__A) ___11_0_C3 = __IlIO__A; __O__II_F8() end)
-    local _O__O0I_3B  = _01111I_D0(_lIOOll_CE, _D("75A0989B4B7B9AA2909D4B539E9FA08F9E54"), _001lIO_92, MAX_JUMP, _I1100I_B5, function(__IlIO__A) _I1100I_B5 = __IlIO__A; __O__II_F8() end)
-    local _lIlO_I_52 = _10OI0__D1(_lIOOll_CE, _D("7499914B75A0989B4B53789A8D94979054"), false, function(__IlIO__A) _1OII0__F9 = __IlIO__A end)
-    local _lll0Il_53 = _10OI0__D1(_lIOOll_CE, _D("7499914B75A0989B4B537B6E54"), false, function(__IlIO__A) _O__00__B4 = __IlIO__A end)
-    local _OlI0I__56 = _10OI0__D1(_lIOOll_CE, _D("799A4B718C97974B6F8C988C9290"), false, function(__IlIO__A) _O_O0l0_F0 = __IlIO__A end)
+    local flySw = makeSwitch(mainScroll, _D("7FA5B2"), false, function(v) setFly(v) end)
+    local ncSw  = makeSwitch(mainScroll, _D("87A87CA5A2A95961AD9EA69BAEAC62"), false, function(v) setNoclip(v) end)
+    local wsSl  = makeSlider(mainScroll, _D("909AA5A4598CA99E9E9D5961ACADAE9DAC62"), MIN_WALK, MAX_WALK, walkSpeed, function(v) walkSpeed = v; ensurePhysics() end)
+    local jpSl  = makeSlider(mainScroll, _D("83AEA6A95989A8B09EAB5961ACADAE9DAC62"), MIN_JUMP, MAX_JUMP, jumpPower, function(v) jumpPower = v; ensurePhysics() end)
+    local ijmSw = makeSwitch(mainScroll, _D("82A79F5983AEA6A9596186A89BA2A59E62"), false, function(v) infJumpMobile = v end)
+    local ijpSw = makeSwitch(mainScroll, _D("82A79F5983AEA6A95961897C62"), false, function(v) infJumpPC = v end)
+    local nfdSw = makeSwitch(mainScroll, _D("87A8597F9AA5A5597D9AA69AA09E"), false, function(v) noFallDamage = v end)
 
     
-    local _1O10II_37  = _10OI0__D1(_Ol_0lO_D2, _D("71A097978D9D9492939F4B537F909D8C99924B7F909DA09E54"), false, function(__IlIO__A) _1OI0I__FE(__IlIO__A) end)
-    local _001l0l_4E = _01111I_D0(_Ol_0lO_D2, _D("719490978F4B9A914B819490A2"), 60, 120, _1__OO1_C9, function(__IlIO__A) _1I_0_1_6E(__IlIO__A) end)
-    local _l__0IO_43  = _10OI0__D1(_Ol_0lO_D2, _D("7D90989AA1904B719A92"), false, function(__IlIO__A) _l11I1l_F4(__IlIO__A) end)
+    local fbSw  = makeSwitch(miscScroll, _D("7FAEA5A59BABA2A0A1AD59618D9EAB9AA7A0598D9EABAEAC62"), false, function(v) setFullBright(v) end)
+    local fovSl = makeSlider(miscScroll, _D("7FA29EA59D59A89F598FA29EB0"), 60, 120, defaultFOV, function(v) setFOV(v) end)
+    local rfSw  = makeSwitch(miscScroll, _D("8B9EA6A8AF9E597FA8A0"), false, function(v) setRemoveFog(v) end)
 
     
-    local function _0llOOI_E1(_1__0lI_6) 
-        return _l_1____AC(_01IlOl_A3, _1__0lI_6) 
+    local function createTpRow(h) 
+        return createRow(tpScroll, h) 
     end
 
     
-    local _1IO_01_A2 = {}  
+    local tourList = {}  
 
-    local function _0ll1lI_8A(_OO10O1_3D)
-        _1IO_01_A2 = _OO10O1_3D or {}
+    local function setTour(list)
+        tourList = list or {}
     end
     
     
     
-    local _0I_I0__107 = _0llOOI_E1(28)
-    _0I_I0__107.BackgroundTransparency = 1
-    local _l1OI0I_C2 = Instance.new(_D("7F90A39F778C8D9097"))
-    _l1OI0I_C2.BackgroundTransparency = 1
-    _l1OI0I_C2.Size = UDim2.new(1, -20, 1, 0)
-    _l1OI0I_C2.Position = UDim2.new(0,10,0,0)
-    _l1OI0I_C2.Text = _D("7F9097909B9A9D9F4B9F9A4B7B978CA4909D")
-    _l1OI0I_C2.TextColor3 = Color3.new(1,1,1)
-    _l1OI0I_C2.TextXAlignment = Enum.TextXAlignment.Left
-    _l1OI0I_C2.Font = Enum.Font.GothamBold
-    _l1OI0I_C2.TextSize = 14
-    _l1OI0I_C2.Parent = _0I_I0__107
+    local tpToPlayerTitle = createTpRow(28)
+    tpToPlayerTitle.BackgroundTransparency = 1
+    local tptpLabel = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    tptpLabel.BackgroundTransparency = 1
+    tptpLabel.Size = UDim2.new(1, -20, 1, 0)
+    tptpLabel.Position = UDim2.new(0,10,0,0)
+    tptpLabel.Text = _D("8D9EA59EA9A8ABAD59ADA85989A59AB29EAB")
+    tptpLabel.TextColor3 = Color3.new(1,1,1)
+    tptpLabel.TextXAlignment = Enum.TextXAlignment.Left
+    tptpLabel.Font = Enum.Font.GothamBold
+    tptpLabel.TextSize = 14
+    tptpLabel.Parent = tpToPlayerTitle
 
-    local _IO0I_I_BA = _0llOOI_E1(56)
-    _IO0I_I_BA:SetAttribute(_D("978C8D9097"),_D("7F9097909B9A9D9F4B9F9A4B7B978CA4909D"))
+    local pickerRow = createTpRow(56)
+    pickerRow:SetAttribute(_D("A59A9B9EA5"),_D("8D9EA59EA9A8ABAD59ADA85989A59AB29EAB"))
 
-    local _I0_O0I_FC = Instance.new(_D("7F90A39F778C8D9097"))
-    _I0_O0I_FC.BackgroundTransparency = 1
-    _I0_O0I_FC.Size = UDim2.new(1, -140, 0.5, -2)
-    _I0_O0I_FC.Position = UDim2.new(0, 10, 0, 4)
-    _I0_O0I_FC.Text = _D("7F8C9D92909F654B538D9097A0984B8F949B9497949354")
-    _I0_O0I_FC.TextColor3 = Color3.fromRGB(235,235,235)
-    _I0_O0I_FC.TextXAlignment = Enum.TextXAlignment.Left
-    _I0_O0I_FC.Font = Enum.Font.Gotham
-    _I0_O0I_FC.TextSize = 15
-    _I0_O0I_FC.Parent = _IO0I_I_BA
+    local playerNameLbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    playerNameLbl.BackgroundTransparency = 1
+    playerNameLbl.Size = UDim2.new(1, -140, 0.5, -2)
+    playerNameLbl.Position = UDim2.new(0, 10, 0, 4)
+    playerNameLbl.Text = _D("8D9AABA09EAD7359619B9EA5AEA6599DA2A9A2A5A2A162")
+    playerNameLbl.TextColor3 = Color3.fromRGB(235,235,235)
+    playerNameLbl.TextXAlignment = Enum.TextXAlignment.Left
+    playerNameLbl.Font = Enum.Font.Gotham
+    playerNameLbl.TextSize = 15
+    playerNameLbl.Parent = pickerRow
 
-    local _01Il1O_E3 = Instance.new(_D("7F90A39F778C8D9097"))
-    _01Il1O_E3.BackgroundTransparency = 1
-    _01Il1O_E3.Size = UDim2.new(1, -140, 0.5, -2)
-    _01Il1O_E3.Position = UDim2.new(0, 10, 0.5, 0)
-    _01Il1O_E3.Text = _D("6F949E9F8C998E90654B58")
-    _01Il1O_E3.TextColor3 = Color3.fromRGB(200,200,200)
-    _01Il1O_E3.TextXAlignment = Enum.TextXAlignment.Left
-    _01Il1O_E3.Font = Enum.Font.Gotham
-    _01Il1O_E3.TextSize = 13
-    _01Il1O_E3.Parent = _IO0I_I_BA
+    local distanceLbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    distanceLbl.BackgroundTransparency = 1
+    distanceLbl.Size = UDim2.new(1, -140, 0.5, -2)
+    distanceLbl.Position = UDim2.new(0, 10, 0.5, 0)
+    distanceLbl.Text = _D("7DA2ACAD9AA79C9E735966")
+    distanceLbl.TextColor3 = Color3.fromRGB(200,200,200)
+    distanceLbl.TextXAlignment = Enum.TextXAlignment.Left
+    distanceLbl.Font = Enum.Font.Gotham
+    distanceLbl.TextSize = 13
+    distanceLbl.Parent = pickerRow
 
-    local _1l_1_O_86 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _1l_1_O_86.Size = UDim2.new(0, 100, 0, 26)
-    _1l_1_O_86.Position = UDim2.new(1, -120, 0, 6)
-    _1l_1_O_86.Text = _D("7B949794934B7B978CA4909D")
-    _1l_1_O_86.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
-    _1l_1_O_86.TextColor3 = Color3.new(1,1,1)
-    _1l_1_O_86.BorderSizePixel = 0
-    _1l_1_O_86.Parent = _IO0I_I_BA
-    Instance.new(_D("80746E9A9D99909D"), _1l_1_O_86).CornerRadius = UDim.new(0,6)
+    local pickBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    pickBtn.Size = UDim2.new(0, 100, 0, 26)
+    pickBtn.Position = UDim2.new(1, -120, 0, 6)
+    pickBtn.Text = _D("89A2A5A2A15989A59AB29EAB")
+    pickBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
+    pickBtn.TextColor3 = Color3.new(1,1,1)
+    pickBtn.BorderSizePixel = 0
+    pickBtn.Parent = pickerRow
+    Instance.new(_D("8E827CA8ABA79EAB"), pickBtn).CornerRadius = UDim.new(0,6)
 
-    local _O_I0___D5 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _O_I0___D5.Size = UDim2.new(0, 100, 0, 26)
-    _O_I0___D5.Position = UDim2.new(1, -120, 0, 30)
-    _O_I0___D5.Text = _D("7D90919D909E93")
-    _O_I0___D5.BackgroundColor3 = Color3.fromRGB(60,60,70)
-    _O_I0___D5.TextColor3 = Color3.new(1,1,1)
-    _O_I0___D5.BorderSizePixel = 0
-    _O_I0___D5.Parent = _IO0I_I_BA
-    Instance.new(_D("80746E9A9D99909D"), _O_I0___D5).CornerRadius = UDim.new(0,6)
+    local refreshBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    refreshBtn.Size = UDim2.new(0, 100, 0, 26)
+    refreshBtn.Position = UDim2.new(1, -120, 0, 30)
+    refreshBtn.Text = _D("8B9E9FAB9EACA1")
+    refreshBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
+    refreshBtn.TextColor3 = Color3.new(1,1,1)
+    refreshBtn.BorderSizePixel = 0
+    refreshBtn.Parent = pickerRow
+    Instance.new(_D("8E827CA8ABA79EAB"), refreshBtn).CornerRadius = UDim.new(0,6)
 
-    local _IIl10O_10E = nil
-    local function _IIlO0l_106()
-        local _0I0O0l_11 = __1O__0_DD:WaitForChild(_D("7B978CA4909D72A094"))
-        local _1ll0I0_26 = Instance.new(_D("7E8E9D90909972A094"))
-        _1ll0I0_26.Name = _D("7B6D8A7B978CA4909D7B948E96909D")
-        _1ll0I0_26.ResetOnSpawn = false
-        _1ll0I0_26.Parent = _0I0O0l_11
+    local selectedPlayerName = nil
+    local function openPlayerPopup()
+        local pg = LocalPlayer:WaitForChild(_D("89A59AB29EAB80AEA2"))
+        local pop = Instance.new(_D("8C9CAB9E9EA780AEA2"))
+        pop.Name = _D("897B9889A59AB29EAB89A29CA49EAB")
+        pop.ResetOnSpawn = false
+        pop.Parent = pg
 
-        local _OOOll0_4 = Instance.new(_D("719D8C9890"))
-        _OOOll0_4.Size = UDim2.fromOffset(300, 320)
-        _OOOll0_4.Position = UDim2.new(0.5, -150, 0.5, -160)
-        _OOOll0_4.BackgroundColor3 = Color3.fromRGB(45,45,50)
-        _OOOll0_4.BorderSizePixel = 0
-        _OOOll0_4.Parent = _1ll0I0_26
-        _OOOll0_4.ClipsDescendants = true
-        Instance.new(_D("80746E9A9D99909D"), _OOOll0_4).CornerRadius = UDim.new(0, 10)
+        local f = Instance.new(_D("7FAB9AA69E"))
+        f.Size = UDim2.fromOffset(300, 320)
+        f.Position = UDim2.new(0.5, -150, 0.5, -160)
+        f.BackgroundColor3 = Color3.fromRGB(45,45,50)
+        f.BorderSizePixel = 0
+        f.Parent = pop
+        f.ClipsDescendants = true
+        Instance.new(_D("8E827CA8ABA79EAB"), f).CornerRadius = UDim.new(0, 10)
 
-        local _O10I0__5A = Instance.new(_D("7F90A39F778C8D9097"))
-        _O10I0__5A.Size = UDim2.new(1, -12, 0, 30)
-        _O10I0__5A.Position = UDim2.new(0,6,0,6)
-        _O10I0__5A.BackgroundColor3 = Color3.fromRGB(70,70,70)
-        _O10I0__5A.Text = _D("7B949794934B7B978CA4909D")
-        _O10I0__5A.TextColor3 = Color3.new(1,1,1)
-        _O10I0__5A.Font = Enum.Font.GothamBold
-        _O10I0__5A.TextSize = 14
-        _O10I0__5A.Parent = _OOOll0_4
-        Instance.new(_D("80746E9A9D99909D"), _O10I0__5A).CornerRadius = UDim.new(0,6)
+        local title = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+        title.Size = UDim2.new(1, -12, 0, 30)
+        title.Position = UDim2.new(0,6,0,6)
+        title.BackgroundColor3 = Color3.fromRGB(70,70,70)
+        title.Text = _D("89A2A5A2A15989A59AB29EAB")
+        title.TextColor3 = Color3.new(1,1,1)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 14
+        title.Parent = f
+        Instance.new(_D("8E827CA8ABA79EAB"), title).CornerRadius = UDim.new(0,6)
 
-        local _OO10O1_3D = Instance.new(_D("7E8E9D9A9797949992719D8C9890"))
-        _OO10O1_3D.Size = UDim2.new(1, -12, 1, -80)
-        _OO10O1_3D.Position = UDim2.new(0,6,0,42)
-        _OO10O1_3D.BackgroundTransparency = 1
-        _OO10O1_3D.ScrollBarThickness = 6
-        _OO10O1_3D.ClipsDescendants = true
-        _OO10O1_3D.Parent = _OOOll0_4
-        local _1OlOOI_20 = Instance.new(_D("807477949E9F778CA49AA09F"))
-        _1OlOOI_20.Padding = UDim.new(0,6)
-        _1OlOOI_20.Parent = _OO10O1_3D
+        local list = Instance.new(_D("8C9CABA8A5A5A2A7A07FAB9AA69E"))
+        list.Size = UDim2.new(1, -12, 1, -80)
+        list.Position = UDim2.new(0,6,0,42)
+        list.BackgroundTransparency = 1
+        list.ScrollBarThickness = 6
+        list.ClipsDescendants = true
+        list.Parent = f
+        local lay = Instance.new(_D("8E8285A2ACAD859AB2A8AEAD"))
+        lay.Padding = UDim.new(0,6)
+        lay.Parent = list
 
-        local _O_l011_4A = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-        _O_l011_4A.Size = UDim2.new(1, -12, 0, 30)
-        _O_l011_4A.Position = UDim2.new(0,6,1,-36)
-        _O_l011_4A.Text = _D("7FA09FA09B")
-        _O_l011_4A.BackgroundColor3 = Color3.fromRGB(90,60,60)
-        _O_l011_4A.TextColor3 = Color3.new(1,1,1)
-        _O_l011_4A.Parent = _OOOll0_4
-        Instance.new(_D("80746E9A9D99909D"), _O_l011_4A).CornerRadius = UDim.new(0,6)
+        local close = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+        close.Size = UDim2.new(1, -12, 0, 30)
+        close.Position = UDim2.new(0,6,1,-36)
+        close.Text = _D("8DAEADAEA9")
+        close.BackgroundColor3 = Color3.fromRGB(90,60,60)
+        close.TextColor3 = Color3.new(1,1,1)
+        close.Parent = f
+        Instance.new(_D("8E827CA8ABA79EAB"), close).CornerRadius = UDim.new(0,6)
 
-        local function __OI1OI_49()
-            for _,ch in ipairs(_OO10O1_3D:GetChildren()) do
-                if ch:IsA(_D("7F90A39F6DA09F9F9A99")) then ch:Destroy() end
+        local function build()
+            for _,ch in ipairs(list:GetChildren()) do
+                if ch:IsA(_D("8D9EB1AD7BAEADADA8A7")) then ch:Destroy() end
             end
-            for _,_0I01l__25 in ipairs(_O11IlI_78:GetPlayers()) do
-                if _0I01l__25 ~= __1O__0_DD then
-                    local __1O_lO_2 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-                    __1O_lO_2.Size = UDim2.new(1, -4, 0, 28)
-                    __1O_lO_2.Text = _0I01l__25.Name
-                    __1O_lO_2.BackgroundColor3 = Color3.fromRGB(60,60,70)
-                    __1O_lO_2.TextColor3 = Color3.new(1,1,1)
-                    __1O_lO_2.Parent = _OO10O1_3D
-                    Instance.new(_D("80746E9A9D99909D"), __1O_lO_2).CornerRadius = UDim.new(0,6)
-                    __1O_lO_2.MouseButton1Click:Connect(function()
-                        _IIl10O_10E = _0I01l__25.Name
-                        _I0_O0I_FC.Text = _D("7F8C9D92909F654B").._IIl10O_10E
-                        _1ll0I0_26:Destroy()
+            for _,plr in ipairs(Players:GetPlayers()) do
+                if plr ~= LocalPlayer then
+                    local b = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+                    b.Size = UDim2.new(1, -4, 0, 28)
+                    b.Text = plr.Name
+                    b.BackgroundColor3 = Color3.fromRGB(60,60,70)
+                    b.TextColor3 = Color3.new(1,1,1)
+                    b.Parent = list
+                    Instance.new(_D("8E827CA8ABA79EAB"), b).CornerRadius = UDim.new(0,6)
+                    b.MouseButton1Click:Connect(function()
+                        selectedPlayerName = plr.Name
+                        playerNameLbl.Text = _D("8D9AABA09EAD7359")..selectedPlayerName
+                        pop:Destroy()
                     end)
                 end
             end
         end
-        __OI1OI_49()
-        _O_l011_4A.MouseButton1Click:Connect(function() _1ll0I0_26:Destroy() end)
+        build()
+        close.MouseButton1Click:Connect(function() pop:Destroy() end)
     end
 
-    _1l_1_O_86.MouseButton1Click:Connect(_IIlO0l_106)
-    _O_I0___D5.MouseButton1Click:Connect(function()
-        if _IIl10O_10E then
-            _I0_O0I_FC.Text = _D("7F8C9D92909F654B").._IIl10O_10E
+    pickBtn.MouseButton1Click:Connect(openPlayerPopup)
+    refreshBtn.MouseButton1Click:Connect(function()
+        if selectedPlayerName then
+            playerNameLbl.Text = _D("8D9AABA09EAD7359")..selectedPlayerName
         end
     end)
 
-    _ll__OO_C4.RenderStepped:Connect(function()
-        if not _01IlOl_A3.Visible then return end
-        if _IIl10O_10E and root then
-            local _0OI0I1_71 = _O11IlI_78:FindFirstChild(_IIl10O_10E)
-            if _0OI0I1_71 and _0OI0I1_71.Character and _0OI0I1_71.Character:FindFirstChild(_D("73A0988C999A948F7D9A9A9F7B8C9D9F")) then
-                local _0Ol00I_3 = (root.Position - _0OI0I1_71.Character.HumanoidRootPart.Position).Magnitude
-                _01Il1O_E3.Text = string.format(_D("6F949E9F8C998E90654B50595C914B9E9FA08F9E"), _0Ol00I_3)
+    RunService.RenderStepped:Connect(function()
+        if not tpScroll.Visible then return end
+        if selectedPlayerName and root then
+            local target = Players:FindFirstChild(selectedPlayerName)
+            if target and target.Character and target.Character:FindFirstChild(_D("81AEA69AA7A8A29D8BA8A8AD899AABAD")) then
+                local d = (root.Position - target.Character.HumanoidRootPart.Position).Magnitude
+                distanceLbl.Text = string.format(_D("7DA2ACAD9AA79C9E73595E676A9F59ACADAE9DAC"), d)
             else
-                _01Il1O_E3.Text = _D("6F949E9F8C998E90654B58")
+                distanceLbl.Text = _D("7DA2ACAD9AA79C9E735966")
             end
         else
-            _01Il1O_E3.Text = _D("6F949E9F8C998E90654B58")
+            distanceLbl.Text = _D("7DA2ACAD9AA79C9E735966")
         end
     end)
 
     
-    local _00llI0_82 = _0llOOI_E1(40)
-    local _IllIO0_81 = Instance.new(_D("7F90A39F778C8D9097"))
-    _IllIO0_81.BackgroundTransparency = 1
-    _IllIO0_81.Size = UDim2.new(1, -140, 1, 0)
-    _IllIO0_81.Position = UDim2.new(0,10,0,0)
-    _IllIO0_81.Text = _D("789A8F904B7F9097909B9A9D9F")
-    _IllIO0_81.TextColor3 = Color3.fromRGB(235,235,235)
-    _IllIO0_81.TextXAlignment = Enum.TextXAlignment.Left
-    _IllIO0_81.Font = Enum.Font.Gotham
-    _IllIO0_81.TextSize = 16
-    _IllIO0_81.Parent = _00llI0_82
+    local modeRow = createTpRow(40)
+    local modeLbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    modeLbl.BackgroundTransparency = 1
+    modeLbl.Size = UDim2.new(1, -140, 1, 0)
+    modeLbl.Position = UDim2.new(0,10,0,0)
+    modeLbl.Text = _D("86A89D9E598D9EA59EA9A8ABAD")
+    modeLbl.TextColor3 = Color3.fromRGB(235,235,235)
+    modeLbl.TextXAlignment = Enum.TextXAlignment.Left
+    modeLbl.Font = Enum.Font.Gotham
+    modeLbl.TextSize = 16
+    modeLbl.Parent = modeRow
 
-    local _OI1O0I_E5 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _OI1O0I_E5.Size = UDim2.new(0, 86, 0, 26)
-    _OI1O0I_E5.Position = UDim2.new(1, -196, 0.5, -13)
-    _OI1O0I_E5.Text = _D("74999E9F8C999F")
-    _OI1O0I_E5.BackgroundColor3 = Color3.fromRGB(0,120,0)
-    _OI1O0I_E5.TextColor3 = Color3.new(1,1,1)
-    _OI1O0I_E5.Parent = _00llI0_82
-    Instance.new(_D("80746E9A9D99909D"), _OI1O0I_E5).CornerRadius = UDim.new(0,6)
+    local modeInstant = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    modeInstant.Size = UDim2.new(0, 86, 0, 26)
+    modeInstant.Position = UDim2.new(1, -196, 0.5, -13)
+    modeInstant.Text = _D("82A7ACAD9AA7AD")
+    modeInstant.BackgroundColor3 = Color3.fromRGB(0,120,0)
+    modeInstant.TextColor3 = Color3.new(1,1,1)
+    modeInstant.Parent = modeRow
+    Instance.new(_D("8E827CA8ABA79EAB"), modeInstant).CornerRadius = UDim.new(0,6)
 
-    local __ll1lI_B8 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    __ll1lI_B8.Size = UDim2.new(0, 86, 0, 26)
-    __ll1lI_B8.Position = UDim2.new(1, -100, 0.5, -13)
-    __ll1lI_B8.Text = _D("7FA2909099")
-    __ll1lI_B8.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    __ll1lI_B8.TextColor3 = Color3.new(1,1,1)
-    __ll1lI_B8.Parent = _00llI0_82
-    Instance.new(_D("80746E9A9D99909D"), __ll1lI_B8).CornerRadius = UDim.new(0,6)
+    local modeTween = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    modeTween.Size = UDim2.new(0, 86, 0, 26)
+    modeTween.Position = UDim2.new(1, -100, 0.5, -13)
+    modeTween.Text = _D("8DB09E9EA7")
+    modeTween.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    modeTween.TextColor3 = Color3.new(1,1,1)
+    modeTween.Parent = modeRow
+    Instance.new(_D("8E827CA8ABA79EAB"), modeTween).CornerRadius = UDim.new(0,6)
 
-    local function _101l_1_89(m)
-        _Il10I0_73 = m
-        _OI1O0I_E5.BackgroundColor3 = (m==_D("74999E9F8C999F")) and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
-        __ll1lI_B8.BackgroundColor3   = (m==_D("7FA2909099"))   and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
+    local function setMode(m)
+        tpMode = m
+        modeInstant.BackgroundColor3 = (m==_D("82A7ACAD9AA7AD")) and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
+        modeTween.BackgroundColor3   = (m==_D("8DB09E9EA7"))   and Color3.fromRGB(0,120,0) or Color3.fromRGB(70,70,70)
     end
-    _OI1O0I_E5.MouseButton1Click:Connect(function() _101l_1_89(_D("74999E9F8C999F")) end)
-    __ll1lI_B8.MouseButton1Click:Connect(function() _101l_1_89(_D("7FA2909099")) end)
+    modeInstant.MouseButton1Click:Connect(function() setMode(_D("82A7ACAD9AA7AD")) end)
+    modeTween.MouseButton1Click:Connect(function() setMode(_D("8DB09E9EA7")) end)
 
     
-    local _OIO10O_A4 = _0llOOI_E1(58)
-    _OIO10O_A4:SetAttribute(_D("978C8D9097"),_D("7FA29090994B7E909F9F9499929E"))
-    local _0_10_l_66 = Instance.new(_D("7F90A39F778C8D9097"))
-    _0_10_l_66.BackgroundTransparency = 1
-    _0_10_l_66.Size = UDim2.new(1, 0, 0, 20)
-    _0_10_l_66.Position = UDim2.new(0,10,0,6)
-    _0_10_l_66.Text = _D("7FA29090994B6FA09D8C9F949A99654B5C595B9E")
-    _0_10_l_66.TextColor3 = Color3.fromRGB(235,235,235)
-    _0_10_l_66.TextXAlignment = Enum.TextXAlignment.Left
-    _0_10_l_66.Font = Enum.Font.Gotham
-    _0_10_l_66.TextSize = 16
-    _0_10_l_66.Parent = _OIO10O_A4
+    local tweenRow = createTpRow(58)
+    tweenRow:SetAttribute(_D("A59A9B9EA5"),_D("8DB09E9EA7598C9EADADA2A7A0AC"))
+    local durLbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    durLbl.BackgroundTransparency = 1
+    durLbl.Size = UDim2.new(1, 0, 0, 20)
+    durLbl.Position = UDim2.new(0,10,0,6)
+    durLbl.Text = _D("8DB09E9EA7597DAEAB9AADA2A8A773596A6769AC")
+    durLbl.TextColor3 = Color3.fromRGB(235,235,235)
+    durLbl.TextXAlignment = Enum.TextXAlignment.Left
+    durLbl.Font = Enum.Font.Gotham
+    durLbl.TextSize = 16
+    durLbl.Parent = tweenRow
 
-    local _O_0l0O_18 = Instance.new(_D("719D8C9890"))
-    _O_0l0O_18.Size = UDim2.new(0.6, -20, 0, 8)
-    _O_0l0O_18.Position = UDim2.new(0,10,0,34)
-    _O_0l0O_18.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    _O_0l0O_18.BorderSizePixel = 0
-    _O_0l0O_18.Parent = _OIO10O_A4
-    Instance.new(_D("80746E9A9D99909D"), _O_0l0O_18).CornerRadius = UDim.new(0,8)
+    local bar = Instance.new(_D("7FAB9AA69E"))
+    bar.Size = UDim2.new(0.6, -20, 0, 8)
+    bar.Position = UDim2.new(0,10,0,34)
+    bar.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    bar.BorderSizePixel = 0
+    bar.Parent = tweenRow
+    Instance.new(_D("8E827CA8ABA79EAB"), bar).CornerRadius = UDim.new(0,8)
 
-    local _OOO_l0_38 = Instance.new(_D("719D8C9890"))
-    _OOO_l0_38.Size = UDim2.new(0.2, 0, 1, 0)
-    _OOO_l0_38.BackgroundColor3 = Color3.fromRGB(0,170,255)
-    _OOO_l0_38.BorderSizePixel = 0
-    _OOO_l0_38.Parent = _O_0l0O_18
-    Instance.new(_D("80746E9A9D99909D"), _OOO_l0_38).CornerRadius = UDim.new(0,8)
+    local fill = Instance.new(_D("7FAB9AA69E"))
+    fill.Size = UDim2.new(0.2, 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(0,170,255)
+    fill.BorderSizePixel = 0
+    fill.Parent = bar
+    Instance.new(_D("8E827CA8ABA79EAB"), fill).CornerRadius = UDim.new(0,8)
 
-    local _lI0I_I_3C = Instance.new(_D("719D8C9890"))
-    _lI0I_I_3C.Size = UDim2.fromOffset(18,18)
-    _lI0I_I_3C.Position = UDim2.new(0.2, -9, 0.5, -9)
-    _lI0I_I_3C.BackgroundColor3 = Color3.fromRGB(240,240,240)
-    _lI0I_I_3C.BorderSizePixel = 0
-    _lI0I_I_3C.Parent = _O_0l0O_18
-    Instance.new(_D("80746E9A9D99909D"), _lI0I_I_3C).CornerRadius = UDim.new(1,0)
+    local knob = Instance.new(_D("7FAB9AA69E"))
+    knob.Size = UDim2.fromOffset(18,18)
+    knob.Position = UDim2.new(0.2, -9, 0.5, -9)
+    knob.BackgroundColor3 = Color3.fromRGB(240,240,240)
+    knob.BorderSizePixel = 0
+    knob.Parent = bar
+    Instance.new(_D("8E827CA8ABA79EAB"), knob).CornerRadius = UDim.new(1,0)
 
-    local _l100___99 = false
-    local function _1OI0lO_BE(_I__010_8)
-        _I__010_8 = math.clamp(_I__010_8, 0, 1)
-        _111I1O_FF = math.floor(((0.2 + 4.8 * _I__010_8) * 10) + 0.5) / 10
-        _OOO_l0_38.Size = UDim2.new(_I__010_8, 0, 1, 0)
-        _lI0I_I_3C.Position = UDim2.new(_I__010_8, -9, 0.5, -9)
-        _0_10_l_66.Text = string.format(_D("7FA29090994B6FA09D8C9F949A99654B50595C919E"), _111I1O_FF)
+    local dragging = false
+    local function setDurPct(p)
+        p = math.clamp(p, 0, 1)
+        tweenDuration = math.floor(((0.2 + 4.8 * p) * 10) + 0.5) / 10
+        fill.Size = UDim2.new(p, 0, 1, 0)
+        knob.Position = UDim2.new(p, -9, 0.5, -9)
+        durLbl.Text = string.format(_D("8DB09E9EA7597DAEAB9AADA2A8A773595E676A9FAC"), tweenDuration)
     end
-    _O_0l0O_18.InputBegan:Connect(function(input)
+    bar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            _l100___99 = true
-            local _II1OOl_28 = (input.Position.X - _O_0l0O_18.AbsolutePosition.X) / _O_0l0O_18.AbsoluteSize.X
-            _1OI0lO_BE(_II1OOl_28)
+            dragging = true
+            local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
+            setDurPct(rel)
         end
     end)
-    _OOl1_O_16.InputChanged:Connect(function(input)
-        if _l100___99 and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local _II1OOl_28 = (input.Position.X - _O_0l0O_18.AbsolutePosition.X) / _O_0l0O_18.AbsoluteSize.X
-            _1OI0lO_BE(_II1OOl_28)
+    UIS.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
+            setDurPct(rel)
         end
     end)
-    _O_0l0O_18.InputEnded:Connect(function(input)
+    bar.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            _l100___99 = false
+            dragging = false
         end
     end)
 
-    local __0l_l0_7C = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    __0l_l0_7C.Size = UDim2.new(0.35, -10, 0, 26)
-    __0l_l0_7C.Position = UDim2.new(0.65, 0, 0, 30)
-    __0l_l0_7C.Text = _D("708C9E949992654B7CA08C8F7AA09F")
-    __0l_l0_7C.BackgroundColor3 = Color3.fromRGB(60,60,70)
-    __0l_l0_7C.TextColor3 = Color3.new(1,1,1)
-    __0l_l0_7C.BorderSizePixel = 0
-    __0l_l0_7C.Parent = _OIO10O_A4
-    Instance.new(_D("80746E9A9D99909D"), __0l_l0_7C).CornerRadius = UDim.new(0,6)
+    local easeBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    easeBtn.Size = UDim2.new(0.35, -10, 0, 26)
+    easeBtn.Position = UDim2.new(0.65, 0, 0, 30)
+    easeBtn.Text = _D("7E9AACA2A7A073598AAE9A9D88AEAD")
+    easeBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
+    easeBtn.TextColor3 = Color3.new(1,1,1)
+    easeBtn.BorderSizePixel = 0
+    easeBtn.Parent = tweenRow
+    Instance.new(_D("8E827CA8ABA79EAB"), easeBtn).CornerRadius = UDim.new(0,6)
 
-    local function _O1I_O1_AD()
-        _1lIl0l_7D = _1lIl0l_7D % #_lO0l0l_CA + 1
-        __0l_l0_7C.Text = _D("708C9E949992654B").._lO0l0l_CA[_1lIl0l_7D][1]
+    local function cycleEase()
+        easeIdx = easeIdx % #easeStyles + 1
+        easeBtn.Text = _D("7E9AACA2A7A07359")..easeStyles[easeIdx][1]
     end
-    __0l_l0_7C.MouseButton1Click:Connect(_O1I_O1_AD)
+    easeBtn.MouseButton1Click:Connect(cycleEase)
 
     
-    local _lOI1Ol_51 = _0llOOI_E1(40)
-    local _1_l1_0_50 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _1_l1_0_50.Size = UDim2.new(1, -20, 1, -10)
-    _1_l1_0_50.Position = UDim2.new(0,10,0,5)
-    _1_l1_0_50.Text = _D("7F9097909B9A9D9F4B9F9A4B7F8C9D92909F4B7B978CA4909D")
-    _1_l1_0_50.BackgroundColor3 = Color3.fromRGB(0,120,0)
-    _1_l1_0_50.TextColor3 = Color3.new(1,1,1)
-    _1_l1_0_50.BorderSizePixel = 0
-    _1_l1_0_50.Parent = _lOI1Ol_51
-    Instance.new(_D("80746E9A9D99909D"), _1_l1_0_50).CornerRadius = UDim.new(0,8)
+    local goRow = createTpRow(40)
+    local goBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    goBtn.Size = UDim2.new(1, -20, 1, -10)
+    goBtn.Position = UDim2.new(0,10,0,5)
+    goBtn.Text = _D("8D9EA59EA9A8ABAD59ADA8598D9AABA09EAD5989A59AB29EAB")
+    goBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+    goBtn.TextColor3 = Color3.new(1,1,1)
+    goBtn.BorderSizePixel = 0
+    goBtn.Parent = goRow
+    Instance.new(_D("8E827CA8ABA79EAB"), goBtn).CornerRadius = UDim.new(0,8)
 
-    local function __0_IO__108()
+    local function teleportToTarget()
         if not root then return end
-        if not _IIl10O_10E then return end
-        local _0I01l__25 = _O11IlI_78:FindFirstChild(_IIl10O_10E)
-        if not _0I01l__25 or not _0I01l__25.Character then return end
-        local _OlO_0__1F = _0I01l__25.Character:FindFirstChild(_D("73A0988C999A948F7D9A9A9F7B8C9D9F"))
-        if not _OlO_0__1F then return end
-        _1lOO0l_10F(_OlO_0__1F.Position + Vector3.new(0,3,0))
+        if not selectedPlayerName then return end
+        local plr = Players:FindFirstChild(selectedPlayerName)
+        if not plr or not plr.Character then return end
+        local hrp = plr.Character:FindFirstChild(_D("81AEA69AA7A8A29D8BA8A8AD899AABAD"))
+        if not hrp then return end
+        teleportToPosition(hrp.Position + Vector3.new(0,3,0))
     end
-    _1_l1_0_50.MouseButton1Click:Connect(__0_IO__108)
+    goBtn.MouseButton1Click:Connect(teleportToTarget)
 
     
-    local function _OI0l01_102()
-        if _IIl10O_10E then
-            local _OIl00l_59 = _O11IlI_78:FindFirstChild(_IIl10O_10E)
-            if not _OIl00l_59 then
-                _IIl10O_10E = nil
-                _I0_O0I_FC.Text = _D("7F8C9D92909F654B538D9097A0984B8F949B9497949354")
+    local function onRosterChange()
+        if selectedPlayerName then
+            local still = Players:FindFirstChild(selectedPlayerName)
+            if not still then
+                selectedPlayerName = nil
+                playerNameLbl.Text = _D("8D9AABA09EAD7359619B9EA5AEA6599DA2A9A2A5A2A162")
             end
         end
     end
-    _O11IlI_78.PlayerAdded:Connect(_OI0l01_102)
-    _O11IlI_78.PlayerRemoving:Connect(_OI0l01_102)
+    Players.PlayerAdded:Connect(onRosterChange)
+    Players.PlayerRemoving:Connect(onRosterChange)
 
     
     
     
-    local _1I_101_5E = _0llOOI_E1(40)
-    _1I_101_5E.BackgroundTransparency = 1
-    local _0ll_1I_5D = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _0ll_1I_5D.Size = UDim2.new(0.5, -6, 1, 0)
-    _0ll_1I_5D.Text = _D("6C8F8F4B6EA09D9D90999F4B779A8E8C9F949A99")
-    _0ll_1I_5D.Font = Enum.Font.GothamBold
-    _0ll_1I_5D.TextSize = 14
-    _0ll_1I_5D.TextColor3 = Color3.new(1,1,1)
-    _0ll_1I_5D.BackgroundColor3 = Color3.fromRGB(0,120,0)
-    _0ll_1I_5D.BorderSizePixel = 0
-    _0ll_1I_5D.Parent = _1I_101_5E
-    Instance.new(_D("80746E9A9D99909D"), _0ll_1I_5D).CornerRadius = UDim.new(0,8)
+    local btnBar = createTpRow(40)
+    btnBar.BackgroundTransparency = 1
+    local addBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    addBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    addBtn.Text = _D("7A9D9D597CAEABAB9EA7AD5985A89C9AADA2A8A7")
+    addBtn.Font = Enum.Font.GothamBold
+    addBtn.TextSize = 14
+    addBtn.TextColor3 = Color3.new(1,1,1)
+    addBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+    addBtn.BorderSizePixel = 0
+    addBtn.Parent = btnBar
+    Instance.new(_D("8E827CA8ABA79EAB"), addBtn).CornerRadius = UDim.new(0,8)
 
-    local _l00001_64 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _l00001_64.Size = UDim2.new(0.5, -6, 1, 0)
-    _l00001_64.Position = UDim2.new(0.5, 6, 0, 0)
-    _l00001_64.Text = _D("6F9097909F904B7E9097908E9F908F")
-    _l00001_64.Font = Enum.Font.GothamBold
-    _l00001_64.TextSize = 14
-    _l00001_64.TextColor3 = Color3.new(1,1,1)
-    _l00001_64.BackgroundColor3 = Color3.fromRGB(120,0,0)
-    _l00001_64.BorderSizePixel = 0
-    _l00001_64.Parent = _1I_101_5E
-    Instance.new(_D("80746E9A9D99909D"), _l00001_64).CornerRadius = UDim.new(0,8)
-
-    
-    
-    
-    local _0__1l1_7E = _0llOOI_E1(40)
-    _0__1l1_7E.BackgroundTransparency = 1
-    local ___I0O0_B0 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    ___I0O0_B0.Size = UDim2.new(0.5, -6, 1, 0)
-    ___I0O0_B0.Text = _D("70A39B9A9D9F4B779A8E8C9F949A999E")
-    ___I0O0_B0.Font = Enum.Font.GothamBold
-    ___I0O0_B0.TextSize = 14
-    ___I0O0_B0.TextColor3 = Color3.new(1,1,1)
-    ___I0O0_B0.BackgroundColor3 = Color3.fromRGB(0,90,140)
-    ___I0O0_B0.BorderSizePixel = 0
-    ___I0O0_B0.Parent = _0__1l1_7E
-    Instance.new(_D("80746E9A9D99909D"), ___I0O0_B0).CornerRadius = UDim.new(0,8)
-
-    local _1l_O01_B3 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _1l_O01_B3.Size = UDim2.new(0.5, -6, 1, 0)
-    _1l_O01_B3.Position = UDim2.new(0.5, 6, 0, 0)
-    _1l_O01_B3.Text = _D("74989B9A9D9F4B779A8E8C9F949A999E4B537E909DA1909D54")
-    _1l_O01_B3.Font = Enum.Font.GothamBold
-    _1l_O01_B3.TextSize = 14
-    _1l_O01_B3.TextColor3 = Color3.new(1,1,1)
-    _1l_O01_B3.BackgroundColor3 = Color3.fromRGB(90,90,90)
-    _1l_O01_B3.BorderSizePixel = 0
-    _1l_O01_B3.Parent = _0__1l1_7E
-    Instance.new(_D("80746E9A9D99909D"), _1l_O01_B3).CornerRadius = UDim.new(0,8)
+    local delBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    delBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    delBtn.Position = UDim2.new(0.5, 6, 0, 0)
+    delBtn.Text = _D("7D9EA59EAD9E598C9EA59E9CAD9E9D")
+    delBtn.Font = Enum.Font.GothamBold
+    delBtn.TextSize = 14
+    delBtn.TextColor3 = Color3.new(1,1,1)
+    delBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
+    delBtn.BorderSizePixel = 0
+    delBtn.Parent = btnBar
+    Instance.new(_D("8E827CA8ABA79EAB"), delBtn).CornerRadius = UDim.new(0,8)
 
     
     
     
-    local function _1Ol11I_112(_Il_1_l_EF)
-        local _0lOl0I_4C = _0llOOI_E1(56)
+    local eximBar = createTpRow(40)
+    eximBar.BackgroundTransparency = 1
+    local exportBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    exportBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    exportBtn.Text = _D("7EB1A9A8ABAD5985A89C9AADA2A8A7AC")
+    exportBtn.Font = Enum.Font.GothamBold
+    exportBtn.TextSize = 14
+    exportBtn.TextColor3 = Color3.new(1,1,1)
+    exportBtn.BackgroundColor3 = Color3.fromRGB(0,90,140)
+    exportBtn.BorderSizePixel = 0
+    exportBtn.Parent = eximBar
+    Instance.new(_D("8E827CA8ABA79EAB"), exportBtn).CornerRadius = UDim.new(0,8)
 
-        local _l_I111_96 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-        _l_I111_96.Size = UDim2.fromOffset(26, 26)
-        _l_I111_96.Position = UDim2.new(0, 10, 0.5, -13)
-        _l_I111_96.Text = _D("")
-        _l_I111_96.BackgroundColor3 = Color3.fromRGB(80,80,80)
-        _l_I111_96.BorderSizePixel = 0
-        _l_I111_96.Parent = _0lOl0I_4C
-        Instance.new(_D("80746E9A9D99909D"), _l_I111_96).CornerRadius = UDim.new(0, 6)
-        _Il_1_l_EF._l_I111_96 = _l_I111_96
+    local importBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    importBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    importBtn.Position = UDim2.new(0.5, 6, 0, 0)
+    importBtn.Text = _D("82A6A9A8ABAD5985A89C9AADA2A8A7AC59618C9EABAF9EAB62")
+    importBtn.Font = Enum.Font.GothamBold
+    importBtn.TextSize = 14
+    importBtn.TextColor3 = Color3.new(1,1,1)
+    importBtn.BackgroundColor3 = Color3.fromRGB(90,90,90)
+    importBtn.BorderSizePixel = 0
+    importBtn.Parent = eximBar
+    Instance.new(_D("8E827CA8ABA79EAB"), importBtn).CornerRadius = UDim.new(0,8)
 
-        local _OO00II_5B = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-        _OO00II_5B.Size = UDim2.new(1, -56, 0.5, -4)
-        _OO00II_5B.Position = UDim2.new(0, 46, 0, 6)
-        _OO00II_5B.Text = _Il_1_l_EF._O1O_I1_40
-        _OO00II_5B.Font = Enum.Font.GothamBold
-        _OO00II_5B.TextSize = 14
-        _OO00II_5B.TextColor3 = Color3.new(1,1,1)
-        _OO00II_5B.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
-        _OO00II_5B.BorderSizePixel = 0
-        _OO00II_5B.Parent = _0lOl0I_4C
-        Instance.new(_D("80746E9A9D99909D"), _OO00II_5B).CornerRadius = UDim.new(0, 6)
+    
+    
+    
+    local function createLocationEntry(locationData)
+        local entry = createTpRow(56)
 
-        local _1_1I0l_39 = Instance.new(_D("7F90A39F778C8D9097"))
-        _1_1I0l_39.Size = UDim2.new(1, -56, 0.5, -4)
-        _1_1I0l_39.Position = UDim2.new(0, 46, 0.5, 2)
-        _1_1I0l_39.BackgroundTransparency = 1
-        _1_1I0l_39.TextColor3 = Color3.fromRGB(200,200,200)
-        _1_1I0l_39.TextXAlignment = Enum.TextXAlignment.Left
-        _1_1I0l_39.Font = Enum.Font.Gotham
-        _1_1I0l_39.TextSize = 13
-        _1_1I0l_39.Parent = _0lOl0I_4C
+        local checkbox = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+        checkbox.Size = UDim2.fromOffset(26, 26)
+        checkbox.Position = UDim2.new(0, 10, 0.5, -13)
+        checkbox.Text = _D("")
+        checkbox.BackgroundColor3 = Color3.fromRGB(80,80,80)
+        checkbox.BorderSizePixel = 0
+        checkbox.Parent = entry
+        Instance.new(_D("8E827CA8ABA79EAB"), checkbox).CornerRadius = UDim.new(0, 6)
+        locationData.checkbox = checkbox
 
-        local function _0100ll_105(pos)
-            local __IlIO__A = (typeof(pos)==_D("81908E9F9A9D5E")) and pos or _Ol_OIO_DB(pos)
-            if __IlIO__A then
-                _1_1I0l_39.Text = string.format(_D("83654B50595C91574B84654B50595C91574B85654B50595C91"), __IlIO__A.X, __IlIO__A.Y, __IlIO__A.Z)
+        local tpBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+        tpBtn.Size = UDim2.new(1, -56, 0.5, -4)
+        tpBtn.Position = UDim2.new(0, 46, 0, 6)
+        tpBtn.Text = locationData.name
+        tpBtn.Font = Enum.Font.GothamBold
+        tpBtn.TextSize = 14
+        tpBtn.TextColor3 = Color3.new(1,1,1)
+        tpBtn.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
+        tpBtn.BorderSizePixel = 0
+        tpBtn.Parent = entry
+        Instance.new(_D("8E827CA8ABA79EAB"), tpBtn).CornerRadius = UDim.new(0, 6)
+
+        local info = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+        info.Size = UDim2.new(1, -56, 0.5, -4)
+        info.Position = UDim2.new(0, 46, 0.5, 2)
+        info.BackgroundTransparency = 1
+        info.TextColor3 = Color3.fromRGB(200,200,200)
+        info.TextXAlignment = Enum.TextXAlignment.Left
+        info.Font = Enum.Font.Gotham
+        info.TextSize = 13
+        info.Parent = entry
+
+        local function setInfoFromPos(pos)
+            local v = (typeof(pos)==_D("8F9E9CADA8AB6C")) and pos or unpackVec3(pos)
+            if v then
+                info.Text = string.format(_D("9173595E676A9F65599273595E676A9F65599373595E676A9F"), v.X, v.Y, v.Z)
             else
-                _1_1I0l_39.Text = _D("7499A18C97948F4B9B9A9E949F949A99")
+                info.Text = _D("82A7AF9AA5A29D59A9A8ACA2ADA2A8A7")
             end
         end
-        _0100ll_105(_Il_1_l_EF.position)
+        setInfoFromPos(locationData.position)
 
-        _l_I111_96.MouseButton1Click:Connect(function()
-            _Il_1_l_EF.selected = not _Il_1_l_EF.selected
-            _l_I111_96.BackgroundColor3 = _Il_1_l_EF.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+        checkbox.MouseButton1Click:Connect(function()
+            locationData.selected = not locationData.selected
+            checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
         end)
 
-        _OO00II_5B.MouseButton1Click:Connect(function()
-            local _110OOO_AB = __1O__0_DD.Character or __1O__0_DD.CharacterAdded:Wait()
-            local _OlO_0__1F = _110OOO_AB:WaitForChild(_D("73A0988C999A948F7D9A9A9F7B8C9D9F"))
-            local __IlIO__A = (typeof(_Il_1_l_EF.position)==_D("81908E9F9A9D5E")) and _Il_1_l_EF.position or _Ol_OIO_DB(_Il_1_l_EF.position)
-            if __IlIO__A then
-                local _I0llIO_35 = Vector3.new(__IlIO__A.X, __IlIO__A.Y, __IlIO__A.Z) + Vector3.new(0,3,0)
-                if _Il10I0_73 == _D("74999E9F8C999F") then
-                    _1lOO0l_10F(_I0llIO_35)
+        tpBtn.MouseButton1Click:Connect(function()
+            local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+            local hrp = character:WaitForChild(_D("81AEA69AA7A8A29D8BA8A8AD899AABAD"))
+            local v = (typeof(locationData.position)==_D("8F9E9CADA8AB6C")) and locationData.position or unpackVec3(locationData.position)
+            if v then
+                local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
+                if tpMode == _D("82A7ACAD9AA7AD") then
+                    teleportToPosition(dest)
                 else
-                    _OllI0O_114(_I0llIO_35)
+                    teleportToPositionAndWait(dest)
                 end
             end
         end)
 
-        _0lOl0I_4C:SetAttribute(_D("978C8D9097"), string.lower(_Il_1_l_EF._O1O_I1_40))
-        return _0lOl0I_4C
+        entry:SetAttribute(_D("A59A9B9EA5"), string.lower(locationData.name))
+        return entry
     end
 
     
     
     
-    local function __l00lI_D3(defaultText, titleText, onSave)
-        local _O___O1_6A = Instance.new(_D("7E8E9D90909972A094"))
-        _O___O1_6A.Name = _D("7B6D8A7B9D9A989B9F")
-        _O___O1_6A.Parent = __IOO11_A7
-        local _OOOll0_4 = Instance.new(_D("719D8C9890"))
-        _OOOll0_4.Size = UDim2.fromOffset(300, 150)
-        _OOOll0_4.Position = UDim2.new(0.5, -150, 0.5, -75)
-        _OOOll0_4.BackgroundColor3 = Color3.fromRGB(50,50,50)
-        _OOOll0_4.BorderSizePixel = 0
-        _OOOll0_4.Parent = _O___O1_6A
-        Instance.new(_D("80746E9A9D99909D"), _OOOll0_4).CornerRadius = UDim.new(0, 10)
-        local __0Il0l_A1 = Instance.new(_D("7F90A39F778C8D9097"))
-        __0Il0l_A1.Size = UDim2.new(1, 0, 0, 30)
-        __0Il0l_A1.BackgroundColor3 = Color3.fromRGB(70,70,70)
-        __0Il0l_A1.Text = titleText
-        __0Il0l_A1.TextColor3 = Color3.new(1,1,1)
-        __0Il0l_A1.Parent = _OOOll0_4
-        local _1ll1_1_14 = Instance.new(_D("7F90A39F6D9AA3"))
-        _1ll1_1_14.Size = UDim2.new(1, -20, 0, 30)
-        _1ll1_1_14.Position = UDim2.new(0, 10, 0, 40)
-        _1ll1_1_14.Text = defaultText
-        _1ll1_1_14.BackgroundColor3 = Color3.fromRGB(30,30,30)
-        _1ll1_1_14.TextColor3 = Color3.new(1,1,1)
-        _1ll1_1_14.Parent = _OOOll0_4
-        local _IO0l1__44 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-        _IO0l1__44.Size = UDim2.new(0.5, -15, 0, 30)
-        _IO0l1__44.Position = UDim2.new(0, 10, 1, -40)
-        _IO0l1__44.Text = _D("7E8CA190")
-        _IO0l1__44.BackgroundColor3 = Color3.fromRGB(0,120,0)
-        _IO0l1__44.TextColor3 = Color3.new(1,1,1)
-        _IO0l1__44.Parent = _OOOll0_4
-        local __l0l_0_61 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-        __l0l_0_61.Size = UDim2.new(0.5, -15, 0, 30)
-        __l0l_0_61.Position = UDim2.new(0.5, 5, 1, -40)
-        __l0l_0_61.Text = _D("6E8C998E9097")
-        __l0l_0_61.BackgroundColor3 = Color3.fromRGB(120,0,0)
-        __l0l_0_61.TextColor3 = Color3.new(1,1,1)
-        __l0l_0_61.Parent = _OOOll0_4
+    local function promptName(defaultText, titleText, onSave)
+        local prompt = Instance.new(_D("8C9CAB9E9EA780AEA2"))
+        prompt.Name = _D("897B9889ABA8A6A9AD")
+        prompt.Parent = PlayerGui
+        local f = Instance.new(_D("7FAB9AA69E"))
+        f.Size = UDim2.fromOffset(300, 150)
+        f.Position = UDim2.new(0.5, -150, 0.5, -75)
+        f.BackgroundColor3 = Color3.fromRGB(50,50,50)
+        f.BorderSizePixel = 0
+        f.Parent = prompt
+        Instance.new(_D("8E827CA8ABA79EAB"), f).CornerRadius = UDim.new(0, 10)
+        local titleLbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+        titleLbl.Size = UDim2.new(1, 0, 0, 30)
+        titleLbl.BackgroundColor3 = Color3.fromRGB(70,70,70)
+        titleLbl.Text = titleText
+        titleLbl.TextColor3 = Color3.new(1,1,1)
+        titleLbl.Parent = f
+        local tb = Instance.new(_D("8D9EB1AD7BA8B1"))
+        tb.Size = UDim2.new(1, -20, 0, 30)
+        tb.Position = UDim2.new(0, 10, 0, 40)
+        tb.Text = defaultText
+        tb.BackgroundColor3 = Color3.fromRGB(30,30,30)
+        tb.TextColor3 = Color3.new(1,1,1)
+        tb.Parent = f
+        local save = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+        save.Size = UDim2.new(0.5, -15, 0, 30)
+        save.Position = UDim2.new(0, 10, 1, -40)
+        save.Text = _D("8C9AAF9E")
+        save.BackgroundColor3 = Color3.fromRGB(0,120,0)
+        save.TextColor3 = Color3.new(1,1,1)
+        save.Parent = f
+        local cancel = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+        cancel.Size = UDim2.new(0.5, -15, 0, 30)
+        cancel.Position = UDim2.new(0.5, 5, 1, -40)
+        cancel.Text = _D("7C9AA79C9EA5")
+        cancel.BackgroundColor3 = Color3.fromRGB(120,0,0)
+        cancel.TextColor3 = Color3.new(1,1,1)
+        cancel.Parent = f
 
-        _IO0l1__44.MouseButton1Click:Connect(function()
-            local _O1O_I1_40 = (_1ll1_1_14.Text ~= _D("") and _1ll1_1_14.Text) or defaultText
-            _O___O1_6A:Destroy()
-            onSave(_O1O_I1_40)
+        save.MouseButton1Click:Connect(function()
+            local name = (tb.Text ~= _D("") and tb.Text) or defaultText
+            prompt:Destroy()
+            onSave(name)
         end)
-        __l0l_0_61.MouseButton1Click:Connect(function() _O___O1_6A:Destroy() end)
+        cancel.MouseButton1Click:Connect(function() prompt:Destroy() end)
     end
 
     
     
     
-    _0ll_1I_5D.MouseButton1Click:Connect(function()
-        local _110OOO_AB = __1O__0_DD.Character or __1O__0_DD.CharacterAdded:Wait()
-        local _OlO_0__1F = _110OOO_AB:WaitForChild(_D("73A0988C999A948F7D9A9A9F7B8C9D9F"))
-        local __Il0O0_E2 = _D("779A8E8C9F949A994B")..tostring(#_O111II_104 + 1)
-        __l00lI_D3(__Il0O0_E2, _D("798C98904B9F93949E4B979A8E8C9F949A9965"), function(_O1O_I1_40)
-            local _Il_1_l_EF = {_O1O_I1_40=_O1O_I1_40, position=_OlO_0__1F.Position, selected=false}
-            table.insert(_O111II_104, _Il_1_l_EF)
-            _1Ol11I_112(_Il_1_l_EF)
+    addBtn.MouseButton1Click:Connect(function()
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = character:WaitForChild(_D("81AEA69AA7A8A29D8BA8A8AD899AABAD"))
+        local defaultName = _D("85A89C9AADA2A8A759")..tostring(#savedLocations + 1)
+        promptName(defaultName, _D("879AA69E59ADA1A2AC59A5A89C9AADA2A8A773"), function(name)
+            local locationData = {name=name, position=hrp.Position, selected=false}
+            table.insert(savedLocations, locationData)
+            createLocationEntry(locationData)
             recalcTp()
         end)
     end)
 
-    _l00001_64.MouseButton1Click:Connect(function()
-        for i = #_O111II_104, 1, -1 do
-            if _O111II_104[i].selected then
-                local _lOOOO0_1B = _O111II_104[i]._l_I111_96
-                if _lOOOO0_1B and _lOOOO0_1B.Parent then _lOOOO0_1B.Parent:Destroy() end
-                table.remove(_O111II_104, i)
+    delBtn.MouseButton1Click:Connect(function()
+        for i = #savedLocations, 1, -1 do
+            if savedLocations[i].selected then
+                local chk = savedLocations[i].checkbox
+                if chk and chk.Parent then chk.Parent:Destroy() end
+                table.remove(savedLocations, i)
             end
         end
         recalcTp()
@@ -1375,720 +1375,702 @@ local function _1__01l_98()
     
     
     
-    ___I0O0_B0.MouseButton1Click:Connect(function()
-        if #_O111II_104 == 0 then return end
-        if not _lll_I1_F3 then __l_0I0_65(_D("90A39B9A9D9F654B9E909DA1909D4B9A919197949990")); return end
+    exportBtn.MouseButton1Click:Connect(function()
+        if #savedLocations == 0 then return end
+        if not serverOnline then dprint(_D("9EB1A9A8ABAD7359AC9EABAF9EAB59A89F9FA5A2A79E")); return end
 
-        local __Il0O0_E2 = _D("70A39B9A9D9F4B")..tostring(os.time())
-        __l00lI_D3(__Il0O0_E2, _D("70A39B9A9D9F4B8C9E65"), function(_O1O_I1_40)
-            local _l_IO1l_32 = {}
-            for _, loc in ipairs(_O111II_104) do
-                local _I__010_8 = _I_O_ll_9C(loc.position)
-                if _I__010_8 then
-                    _l_IO1l_32[#_l_IO1l_32+1] = { _O1O_I1_40 = loc._O1O_I1_40, position = _I__010_8 }
+        local defaultName = _D("7EB1A9A8ABAD59")..tostring(os.time())
+        promptName(defaultName, _D("7EB1A9A8ABAD599AAC73"), function(name)
+            local copy = {}
+            for _, loc in ipairs(savedLocations) do
+                local p = packVec3(loc.position)
+                if p then
+                    copy[#copy+1] = { name = loc.name, position = p }
                 else
-                    __l_0I0_65(_D("9E96949B4B90A39B9A9D9F664B9499A18C97948F4B9B9A9E949F949A994B9A99"), loc._O1O_I1_40)
+                    dprint(_D("ACA4A2A9599EB1A9A8ABAD7459A2A7AF9AA5A29D59A9A8ACA2ADA2A8A759A8A7"), loc.name)
                 end
             end
-            _1IIIII_ED[_O1O_I1_40] = _l_IO1l_32
+            exportedSets[name] = copy
 
-            local _III0l0_30 = {
-                autoload = _10I10__EC,
-                __0O_l__7B  = __0O_l__7B,
-                exports  = _II0l_0_113(_1IIIII_ED),
-                meta     = { username = _0_ll11_94 }
+            local body = {
+                autoload = autoloadName,
+                configs  = configs,
+                exports  = normalizeExportsForSend(exportedSets),
+                meta     = { username = USERNAME }
             }
-            _01O0Il_C7(_l1OIlI_2F, _III0l0_30)
+            apiPutUser(HWID, body)
         end)
     end)
 
     
     
     
-    _1l_O01_B3.MouseButton1Click:Connect(function()
-        if _lll_I1_F3 then
-            local _O_0O___10,_lOl_l__33 = _0O0OI__C5(_l1OIlI_2F)
-            if _O_0O___10 and _lOl_l__33 then
-                _1IIIII_ED = _lOl_l__33.exports or _1IIIII_ED
+    importBtn.MouseButton1Click:Connect(function()
+        if serverOnline then
+            local ok,data = apiGetUser(HWID)
+            if ok and data then
+                exportedSets = data.exports or exportedSets
             end
         end
 
-        local _I__I0I_57 = Instance.new(_D("7E8E9D90909972A094"))
-        _I__I0I_57.Name = _D("7B6D8A74989B9A9D9F77949E9F")
-        _I__I0I_57.ResetOnSpawn = false
-        _I__I0I_57.Parent = __IOO11_A7
+        local popup = Instance.new(_D("8C9CAB9E9EA780AEA2"))
+        popup.Name = _D("897B9882A6A9A8ABAD85A2ACAD")
+        popup.ResetOnSpawn = false
+        popup.Parent = PlayerGui
 
-        local _OOOll0_4 = Instance.new(_D("719D8C9890"))
-        _OOOll0_4.Size = UDim2.fromOffset(360, 320)
-        _OOOll0_4.Position = UDim2.new(0.5, -180, 0.5, -160)
-        _OOOll0_4.BackgroundColor3 = Color3.fromRGB(45,45,50)
-        _OOOll0_4.BorderSizePixel = 0
-        _OOOll0_4.Parent = _I__I0I_57
-        _OOOll0_4.ClipsDescendants = true
-        Instance.new(_D("80746E9A9D99909D"), _OOOll0_4).CornerRadius = UDim.new(0, 10)
+        local f = Instance.new(_D("7FAB9AA69E"))
+        f.Size = UDim2.fromOffset(360, 320)
+        f.Position = UDim2.new(0.5, -180, 0.5, -160)
+        f.BackgroundColor3 = Color3.fromRGB(45,45,50)
+        f.BorderSizePixel = 0
+        f.Parent = popup
+        f.ClipsDescendants = true
+        Instance.new(_D("8E827CA8ABA79EAB"), f).CornerRadius = UDim.new(0, 10)
 
-        local _OI01O0_21 = Instance.new(_D("7F90A39F778C8D9097"))
-        _OI01O0_21.Size = UDim2.new(1, -12, 0, 30)
-        _OI01O0_21.Position = UDim2.new(0, 6, 0, 6)
-        _OI01O0_21.BackgroundColor3 = Color3.fromRGB(70,70,70)
-        _OI01O0_21.Text = _D("6E939A9A9E904B90A39B9A9D9F4B9F9A4B94989B9A9D9F")
-        _OI01O0_21.TextColor3 = Color3.new(1,1,1)
-        _OI01O0_21.Font = Enum.Font.GothamBold
-        _OI01O0_21.TextSize = 14
-        _OI01O0_21.Parent = _OOOll0_4
-        Instance.new(_D("80746E9A9D99909D"), _OI01O0_21).CornerRadius = UDim.new(0,6)
+        local lbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+        lbl.Size = UDim2.new(1, -12, 0, 30)
+        lbl.Position = UDim2.new(0, 6, 0, 6)
+        lbl.BackgroundColor3 = Color3.fromRGB(70,70,70)
+        lbl.Text = _D("7CA1A8A8AC9E599EB1A9A8ABAD59ADA859A2A6A9A8ABAD")
+        lbl.TextColor3 = Color3.new(1,1,1)
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 14
+        lbl.Parent = f
+        Instance.new(_D("8E827CA8ABA79EAB"), lbl).CornerRadius = UDim.new(0,6)
 
-        local _OO10O1_3D = Instance.new(_D("7E8E9D9A9797949992719D8C9890"))
-        _OO10O1_3D.Size = UDim2.new(1, -12, 1, -106)
-        _OO10O1_3D.Position = UDim2.new(0, 6, 0, 42)
-        _OO10O1_3D.BackgroundTransparency = 1
-        _OO10O1_3D.ScrollBarThickness = 6
-        _OO10O1_3D.ClipsDescendants = true
-        _OO10O1_3D.Parent = _OOOll0_4
+        local list = Instance.new(_D("8C9CABA8A5A5A2A7A07FAB9AA69E"))
+        list.Size = UDim2.new(1, -12, 1, -106)
+        list.Position = UDim2.new(0, 6, 0, 42)
+        list.BackgroundTransparency = 1
+        list.ScrollBarThickness = 6
+        list.ClipsDescendants = true
+        list.Parent = f
 
-        local _1OlOOI_20 = Instance.new(_D("807477949E9F778CA49AA09F"))
-        _1OlOOI_20.Parent = _OO10O1_3D
-        _1OlOOI_20.Padding = UDim.new(0,6)
+        local lay = Instance.new(_D("8E8285A2ACAD859AB2A8AEAD"))
+        lay.Parent = list
+        lay.Padding = UDim.new(0,6)
 
-        local _lOl_Ol_60 = Instance.new(_D("719D8C9890"))
-        _lOl_Ol_60.Size = UDim2.new(1, -12, 0, 36)
-        _lOl_Ol_60.Position = UDim2.new(0, 6, 1, -42)
-        _lOl_Ol_60.BackgroundTransparency = 1
-        _lOl_Ol_60.Parent = _OOOll0_4
+        local btnRow = Instance.new(_D("7FAB9AA69E"))
+        btnRow.Size = UDim2.new(1, -12, 0, 36)
+        btnRow.Position = UDim2.new(0, 6, 1, -42)
+        btnRow.BackgroundTransparency = 1
+        btnRow.Parent = f
 
-        local function _l1I011_9F(__1O_lO_2)
-            __1O_lO_2.AutoButtonColor = true
-            __1O_lO_2.BorderSizePixel = 0
-            Instance.new(_D("80746E9A9D99909D"), __1O_lO_2).CornerRadius = UDim.new(0,6)
-            return __1O_lO_2
+        local function styleBtn(b)
+            b.AutoButtonColor = true
+            b.BorderSizePixel = 0
+            Instance.new(_D("8E827CA8ABA79EAB"), b).CornerRadius = UDim.new(0,6)
+            return b
         end
 
-        local _1IlOlI_80 = _l1I011_9F(Instance.new(_D("7F90A39F6DA09F9F9A99")))
-        _1IlOlI_80.Size = UDim2.new(0.4, -4, 1, 0)
-        _1IlOlI_80.Position = UDim2.new(0, 0, 0, 0)
-        _1IlOlI_80.Text = _D("779A8C8F")
-        _1IlOlI_80.TextColor3 = Color3.new(1,1,1)
-        _1IlOlI_80.BackgroundColor3 = Color3.fromRGB(0,120,0)
-        _1IlOlI_80.Parent = _lOl_Ol_60
+        local loadBtn = styleBtn(Instance.new(_D("8D9EB1AD7BAEADADA8A7")))
+        loadBtn.Size = UDim2.new(0.4, -4, 1, 0)
+        loadBtn.Position = UDim2.new(0, 0, 0, 0)
+        loadBtn.Text = _D("85A89A9D")
+        loadBtn.TextColor3 = Color3.new(1,1,1)
+        loadBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+        loadBtn.Parent = btnRow
 
-        local __00lO0_AE = _l1I011_9F(Instance.new(_D("7F90A39F6DA09F9F9A99")))
-        __00lO0_AE.Size = UDim2.new(0.4, -4, 1, 0)
-        __00lO0_AE.Position = UDim2.new(0.4, 8, 0, 0)
-        __00lO0_AE.Text = _D("6F9097909F90")
-        __00lO0_AE.TextColor3 = Color3.new(1,1,1)
-        __00lO0_AE.BackgroundColor3 = Color3.fromRGB(120,0,0)
-        __00lO0_AE.Parent = _lOl_Ol_60
+        local deleteBtn = styleBtn(Instance.new(_D("8D9EB1AD7BAEADADA8A7")))
+        deleteBtn.Size = UDim2.new(0.4, -4, 1, 0)
+        deleteBtn.Position = UDim2.new(0.4, 8, 0, 0)
+        deleteBtn.Text = _D("7D9EA59EAD9E")
+        deleteBtn.TextColor3 = Color3.new(1,1,1)
+        deleteBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
+        deleteBtn.Parent = btnRow
 
-        local __0111l_63 = _l1I011_9F(Instance.new(_D("7F90A39F6DA09F9F9A99")))
-        __0111l_63.Size = UDim2.new(0.2, -4, 1, 0)
-        __0111l_63.Position = UDim2.new(0.8, 8, 0, 0)
-        __0111l_63.Text = _D("6E979A9E90")
-        __0111l_63.TextColor3 = Color3.new(1,1,1)
-        __0111l_63.BackgroundColor3 = Color3.fromRGB(90,60,60)
-        __0111l_63.Parent = _lOl_Ol_60
+        local closeB = styleBtn(Instance.new(_D("8D9EB1AD7BAEADADA8A7")))
+        closeB.Size = UDim2.new(0.2, -4, 1, 0)
+        closeB.Position = UDim2.new(0.8, 8, 0, 0)
+        closeB.Text = _D("7CA5A8AC9E")
+        closeB.TextColor3 = Color3.new(1,1,1)
+        closeB.BackgroundColor3 = Color3.fromRGB(90,60,60)
+        closeB.Parent = btnRow
 
-        local function _O0O1_l_D7(_0lIO0l_19, enabled, activeColor, disabledColor)
-            _0lIO0l_19.Active = enabled
-            _0lIO0l_19.AutoButtonColor = enabled
-            _0lIO0l_19.BackgroundColor3 = enabled and activeColor or disabledColor
-            _0lIO0l_19.TextTransparency = enabled and 0 or 0.35
+        local function setEnabled(btn, enabled, activeColor, disabledColor)
+            btn.Active = enabled
+            btn.AutoButtonColor = enabled
+            btn.BackgroundColor3 = enabled and activeColor or disabledColor
+            btn.TextTransparency = enabled and 0 or 0.35
         end
 
-        _O0O1_l_D7(_1IlOlI_80, false, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
-        _O0O1_l_D7(__00lO0_AE, false, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
+        setEnabled(loadBtn, false, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
+        setEnabled(deleteBtn, false, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
 
-        local _11O1I__F2, selectedBtn
+        local selectedName, selectedBtn
 
-        local function _1lIO1O_E6()
-            for _,ch in ipairs(_OO10O1_3D:GetChildren()) do
-                if ch:IsA(_D("7F90A39F6DA09F9F9A99")) then ch:Destroy() end
+        local function rebuildList()
+            for _,ch in ipairs(list:GetChildren()) do
+                if ch:IsA(_D("8D9EB1AD7BAEADADA8A7")) then ch:Destroy() end
             end
-            _11O1I__F2, selectedBtn = nil, nil
-            _O0O1_l_D7(_1IlOlI_80, false, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
-            _O0O1_l_D7(__00lO0_AE, false, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
+            selectedName, selectedBtn = nil, nil
+            setEnabled(loadBtn, false, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
+            setEnabled(deleteBtn, false, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
 
-            for _O1O_I1_40,_set in pairs(_1IIIII_ED) do
-                local __1O_lO_2 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-                __1O_lO_2.Size = UDim2.new(1, -4, 0, 28)
-                __1O_lO_2.Text = _O1O_I1_40
-                __1O_lO_2.BackgroundColor3 = Color3.fromRGB(60,60,70)
-                __1O_lO_2.TextColor3 = Color3.new(1,1,1)
-                __1O_lO_2.Parent = _OO10O1_3D
-                Instance.new(_D("80746E9A9D99909D"), __1O_lO_2).CornerRadius = UDim.new(0,6)
+            for name,_set in pairs(exportedSets) do
+                local b = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+                b.Size = UDim2.new(1, -4, 0, 28)
+                b.Text = name
+                b.BackgroundColor3 = Color3.fromRGB(60,60,70)
+                b.TextColor3 = Color3.new(1,1,1)
+                b.Parent = list
+                Instance.new(_D("8E827CA8ABA79EAB"), b).CornerRadius = UDim.new(0,6)
 
-                __1O_lO_2.MouseButton1Click:Connect(function()
-                    if selectedBtn and selectedBtn ~= __1O_lO_2 then
+                b.MouseButton1Click:Connect(function()
+                    if selectedBtn and selectedBtn ~= b then
                         selectedBtn.BackgroundColor3 = Color3.fromRGB(60,60,70)
                     end
-                    selectedBtn = __1O_lO_2
-                    _11O1I__F2 = _O1O_I1_40
-                    __1O_lO_2.BackgroundColor3 = Color3.fromRGB(0,140,200)
-                    _O0O1_l_D7(_1IlOlI_80, true, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
-                    _O0O1_l_D7(__00lO0_AE, true, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
+                    selectedBtn = b
+                    selectedName = name
+                    b.BackgroundColor3 = Color3.fromRGB(0,140,200)
+                    setEnabled(loadBtn, true, Color3.fromRGB(0,120,0), Color3.fromRGB(70,70,70))
+                    setEnabled(deleteBtn, true, Color3.fromRGB(120,0,0), Color3.fromRGB(70,70,70))
                 end)
             end
         end
 
-        _1lIO1O_E6()
+        rebuildList()
 
-        _1IlOlI_80.MouseButton1Click:Connect(function()
-            if not _11O1I__F2 then return end
-            local _I__0Ol_2C = _1IIIII_ED[_11O1I__F2]
-            if not _I__0Ol_2C then return end
+        loadBtn.MouseButton1Click:Connect(function()
+            if not selectedName then return end
+            local set = exportedSets[selectedName]
+            if not set then return end
 
-            for i=#_O111II_104,1,-1 do
-                local _lOOOO0_1B = _O111II_104[i]._l_I111_96
-                if _lOOOO0_1B and _lOOOO0_1B.Parent then _lOOOO0_1B.Parent:Destroy() end
-                table.remove(_O111II_104,i)
+            for i=#savedLocations,1,-1 do
+                local chk = savedLocations[i].checkbox
+                if chk and chk.Parent then chk.Parent:Destroy() end
+                table.remove(savedLocations,i)
             end
 
-            for _,loc in ipairs(_I__0Ol_2C) do
-                local __IlIO__A = _Ol_OIO_DB(loc.position)
-                if __IlIO__A then
-                    local _l1_IO__E = { _O1O_I1_40=loc._O1O_I1_40, position=__IlIO__A, selected=false }
-                    table.insert(_O111II_104, _l1_IO__E)
-                    _1Ol11I_112(_l1_IO__E)
+            for _,loc in ipairs(set) do
+                local v = unpackVec3(loc.position)
+                if v then
+                    local nd = { name=loc.name, position=v, selected=false }
+                    table.insert(savedLocations, nd)
+                    createLocationEntry(nd)
                 else
-                    __l_0I0_65(_D("9E96949B4B94989B9A9D9F664B9499A18C97948F4B9B8C8E96908F4B9B9A9E949F949A994B9A99"), tostring(loc._O1O_I1_40))
+                    dprint(_D("ACA4A2A959A2A6A9A8ABAD7459A2A7AF9AA5A29D59A99A9CA49E9D59A9A8ACA2ADA2A8A759A8A7"), tostring(loc.name))
                 end
             end
             recalcTp()
-            _I__I0I_57:Destroy()
+            popup:Destroy()
         end)
 
-        __00lO0_AE.MouseButton1Click:Connect(function()
-            if not _11O1I__F2 then return end
-            if not _lll_I1_F3 then __l_0I0_65(_D("8F9097909F904B90A39B9A9D9F654B9E909DA1909D4B9A919197949990")); return end
+        deleteBtn.MouseButton1Click:Connect(function()
+            if not selectedName then return end
+            if not serverOnline then dprint(_D("9D9EA59EAD9E599EB1A9A8ABAD7359AC9EABAF9EAB59A89F9FA5A2A79E")); return end
 
-            _1IIIII_ED[_11O1I__F2] = nil
+            exportedSets[selectedName] = nil
 
-            local _III0l0_30 = {
-                autoload = _10I10__EC,
-                __0O_l__7B  = __0O_l__7B,
-                exports  = _II0l_0_113(_1IIIII_ED),
-                meta     = { username = _0_ll11_94 }
+            local body = {
+                autoload = autoloadName,
+                configs  = configs,
+                exports  = normalizeExportsForSend(exportedSets),
+                meta     = { username = USERNAME }
             }
-            local _O_0O___10,_ = _01O0Il_C7(_l1OIlI_2F, _III0l0_30)
-            if not _O_0O___10 then
-                __l_0I0_65(_D("8F9097909F904B90A39B9A9D9F4B7B807F4B918C9497908F"))
+            local ok,_ = apiPutUser(HWID, body)
+            if not ok then
+                dprint(_D("9D9EA59EAD9E599EB1A9A8ABAD59898E8D599F9AA2A59E9D"))
                 return
             end
 
-            _1lIO1O_E6()
+            rebuildList()
         end)
 
-        __0111l_63.MouseButton1Click:Connect(function() _I__I0I_57:Destroy() end)
+        closeB.MouseButton1Click:Connect(function() popup:Destroy() end)
     end)
 
     
     
     
-    local _O000_I_8F = _0llOOI_E1(58)
-    _O000_I_8F:SetAttribute(_D("978C8D9097"),_D("6CA09F9A4B7F9AA09D"))
-    local _IIOl11_8E = Instance.new(_D("7F90A39F778C8D9097"))
-    _IIOl11_8E.BackgroundTransparency = 1
-    _IIOl11_8E.Size = UDim2.new(1, 0, 0, 20)
-    _IIOl11_8E.Position = UDim2.new(0,10,0,6)
-    _IIOl11_8E.Text = _D("6CA09F9A4B7F9AA09D4B538C9F8C9E4B0DB1BD4B8D8CA28C9354")
-    _IIOl11_8E.TextColor3 = Color3.fromRGB(235,235,235)
-    _IIOl11_8E.TextXAlignment = Enum.TextXAlignment.Left
-    _IIOl11_8E.Font = Enum.Font.Gotham
-    _IIOl11_8E.TextSize = 16
-    _IIOl11_8E.Parent = _O000_I_8F
+    local tourRow = createTpRow(58)
+    tourRow:SetAttribute(_D("A59A9B9EA5"),_D("7AAEADA8598DA8AEAB"))
+    local tourLbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    tourLbl.BackgroundTransparency = 1
+    tourLbl.Size = UDim2.new(1, 0, 0, 20)
+    tourLbl.Position = UDim2.new(0,10,0,6)
+    tourLbl.Text = _D("7AAEADA8598DA8AEAB59619AAD9AAC591BBFCB599B9AB09AA162")
+    tourLbl.TextColor3 = Color3.fromRGB(235,235,235)
+    tourLbl.TextXAlignment = Enum.TextXAlignment.Left
+    tourLbl.Font = Enum.Font.Gotham
+    tourLbl.TextSize = 16
+    tourLbl.Parent = tourRow
 
-    local ___IOll_E4 = Instance.new(_D("7F90A39F6D9AA3"))
-    ___IOll_E4.Size = UDim2.new(0.4, -20, 0, 26)
-    ___IOll_E4.Position = UDim2.new(0,10,0,30)
-    ___IOll_E4.Text = _D("5E")
-    ___IOll_E4.PlaceholderText = _D("74999F909DA18C974B8F909F9496")
-    ___IOll_E4.TextColor3 = Color3.new(1,1,1)
-    ___IOll_E4.BackgroundColor3 = Color3.fromRGB(55,55,60)
-    ___IOll_E4.BorderSizePixel = 0
-    ___IOll_E4.Parent = _O000_I_8F
-    Instance.new(_D("80746E9A9D99909D"), ___IOll_E4).CornerRadius = UDim.new(0,6)
+    local intervalBox = Instance.new(_D("8D9EB1AD7BA8B1"))
+    intervalBox.Size = UDim2.new(0.4, -20, 0, 26)
+    intervalBox.Position = UDim2.new(0,10,0,30)
+    intervalBox.Text = _D("6C")
+    intervalBox.PlaceholderText = _D("82A7AD9EABAF9AA5599D9EADA2A4")
+    intervalBox.TextColor3 = Color3.new(1,1,1)
+    intervalBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
+    intervalBox.BorderSizePixel = 0
+    intervalBox.Parent = tourRow
+    Instance.new(_D("8E827CA8ABA79EAB"), intervalBox).CornerRadius = UDim.new(0,6)
     
     
-    local _0_1O1__8C = _0llOOI_E1(40)
-    _0_1O1__8C:SetAttribute(_D("978C8D9097"),_D("7F9AA09D4B7E998C9B9E939A9F"))
+    local snapRow = createTpRow(40)
+    snapRow:SetAttribute(_D("A59A9B9EA5"),_D("8DA8AEAB598CA79AA9ACA1A8AD"))
 
-    local _1l01Il_B2 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _1l01Il_B2.Size = UDim2.new(0.35, -8, 1, -10)
-    _1l01Il_B2.Position = UDim2.new(0,10,0,5)
-    _1l01Il_B2.Text = _D("72909F4B6C97974B7B9A9E949F949A999E")
-    _1l01Il_B2.BackgroundColor3 = Color3.fromRGB(0,90,140)
-    _1l01Il_B2.TextColor3 = Color3.new(1,1,1)
-    _1l01Il_B2.BorderSizePixel = 0
-    _1l01Il_B2.Parent = _0_1O1__8C
-    Instance.new(_D("80746E9A9D99909D"), _1l01Il_B2).CornerRadius = UDim.new(0,8)
+    local getAllBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    getAllBtn.Size = UDim2.new(0.35, -8, 1, -10)
+    getAllBtn.Position = UDim2.new(0,10,0,5)
+    getAllBtn.Text = _D("809EAD597AA5A55989A8ACA2ADA2A8A7AC")
+    getAllBtn.BackgroundColor3 = Color3.fromRGB(0,90,140)
+    getAllBtn.TextColor3 = Color3.new(1,1,1)
+    getAllBtn.BorderSizePixel = 0
+    getAllBtn.Parent = snapRow
+    Instance.new(_D("8E827CA8ABA79EAB"), getAllBtn).CornerRadius = UDim.new(0,8)
 
-    local _OOO_00_97 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _OOO_00_97.Size = UDim2.new(0.25, -8, 1, -10)
-    _OOO_00_97.Position = UDim2.new(0.37, 0, 0, 5)
-    _OOO_00_97.Text = _D("6E97908C9D")
-    _OOO_00_97.BackgroundColor3 = Color3.fromRGB(90,60,60)
-    _OOO_00_97.TextColor3 = Color3.new(1,1,1)
-    _OOO_00_97.BorderSizePixel = 0
-    _OOO_00_97.Parent = _0_1O1__8C
-    Instance.new(_D("80746E9A9D99909D"), _OOO_00_97).CornerRadius = UDim.new(0,8)
+    local clearBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    clearBtn.Size = UDim2.new(0.25, -8, 1, -10)
+    clearBtn.Position = UDim2.new(0.37, 0, 0, 5)
+    clearBtn.Text = _D("7CA59E9AAB")
+    clearBtn.BackgroundColor3 = Color3.fromRGB(90,60,60)
+    clearBtn.TextColor3 = Color3.new(1,1,1)
+    clearBtn.BorderSizePixel = 0
+    clearBtn.Parent = snapRow
+    Instance.new(_D("8E827CA8ABA79EAB"), clearBtn).CornerRadius = UDim.new(0,8)
 
-    local __O_O___F5 = Instance.new(_D("7F90A39F778C8D9097"))
-    __O_O___F5.BackgroundTransparency = 1
-    __O_O___F5.Size = UDim2.new(0.35, -10, 1, 0)
-    __O_O___F5.Position = UDim2.new(0.64, 0, 0, 0)
-    __O_O___F5.Text = _D("7F9AA09D4B8E9AA0999F654B5B")
-    __O_O___F5.TextXAlignment = Enum.TextXAlignment.Right
-    __O_O___F5.TextColor3 = Color3.fromRGB(220,220,220)
-    __O_O___F5.Font = Enum.Font.Gotham
-    __O_O___F5.TextSize = 14
-    __O_O___F5.Parent = _0_1O1__8C
+    local tourCountLbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    tourCountLbl.BackgroundTransparency = 1
+    tourCountLbl.Size = UDim2.new(0.35, -10, 1, 0)
+    tourCountLbl.Position = UDim2.new(0.64, 0, 0, 0)
+    tourCountLbl.Text = _D("8DA8AEAB599CA8AEA7AD735969")
+    tourCountLbl.TextXAlignment = Enum.TextXAlignment.Right
+    tourCountLbl.TextColor3 = Color3.fromRGB(220,220,220)
+    tourCountLbl.Font = Enum.Font.Gotham
+    tourCountLbl.TextSize = 14
+    tourCountLbl.Parent = snapRow
 
-    local function __IO1OI_10D()
-        __O_O___F5.Text = (_D("7F9AA09D4B8E9AA0999F654B508F")):format(#_1IO_01_A2)
+    local function rebuildTourCounter()
+        tourCountLbl.Text = (_D("8DA8AEAB599CA8AEA7AD73595E9D")):format(#tourList)
     end
 
     
-    local function _OI00Ol_10A()
-        local _OO10O1_3D = {}
-        for _, loc in ipairs(_O111II_104) do
-            local __IlIO__A = (typeof(loc.position) == _D("81908E9F9A9D5E")) and loc.position or _Ol_OIO_DB(loc.position)
-            if __IlIO__A then
-                _OO10O1_3D[#_OO10O1_3D+1] = { _O1O_I1_40 = loc._O1O_I1_40, pos = Vector3.new(__IlIO__A.X, __IlIO__A.Y, __IlIO__A.Z) }
+    local function buildTourFromSaved()
+        local list = {}
+        for _, loc in ipairs(savedLocations) do
+            local v = (typeof(loc.position) == _D("8F9E9CADA8AB6C")) and loc.position or unpackVec3(loc.position)
+            if v then
+                list[#list+1] = { name = loc.name, pos = Vector3.new(v.X, v.Y, v.Z) }
             end
         end
-        return _OO10O1_3D
+        return list
     end
 
-    _1l01Il_B2.MouseButton1Click:Connect(function()
-        _0ll1lI_8A(_OI00Ol_10A())
-        __IO1OI_10D()
-        _1IO_11_C0.Text = _D("7E9F8C9FA09E654B7E998C9B9E939A9F4BA09B8F8C9F908F")
+    getAllBtn.MouseButton1Click:Connect(function()
+        setTour(buildTourFromSaved())
+        rebuildTourCounter()
+        statusLbl.Text = _D("8CAD9AADAEAC73598CA79AA9ACA1A8AD59AEA99D9AAD9E9D")
     end)
 
-    _OOO_00_97.MouseButton1Click:Connect(function()
-        _0ll1lI_8A({})
-        __IO1OI_10D()
-        _1IO_11_C0.Text = _D("7E9F8C9FA09E654B7E998C9B9E939A9F4B8E97908C9D908F")
+    clearBtn.MouseButton1Click:Connect(function()
+        setTour({})
+        rebuildTourCounter()
+        statusLbl.Text = _D("8CAD9AADAEAC73598CA79AA9ACA1A8AD599CA59E9AAB9E9D")
     end)
 
-    local _11l1Ol_9E = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _11l1Ol_9E.Size = UDim2.new(0.25, -8, 0, 26)
-    _11l1Ol_9E.Position = UDim2.new(0.42, 0, 0, 30)
-    _11l1Ol_9E.Text = _D("7E9F8C9D9F")
-    _11l1Ol_9E.BackgroundColor3 = Color3.fromRGB(0,120,0)
-    _11l1Ol_9E.TextColor3 = Color3.new(1,1,1)
-    _11l1Ol_9E.BorderSizePixel = 0
-    _11l1Ol_9E.Parent = _O000_I_8F
-    Instance.new(_D("80746E9A9D99909D"), _11l1Ol_9E).CornerRadius = UDim.new(0,6)
+    local startBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    startBtn.Size = UDim2.new(0.25, -8, 0, 26)
+    startBtn.Position = UDim2.new(0.42, 0, 0, 30)
+    startBtn.Text = _D("8CAD9AABAD")
+    startBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+    startBtn.TextColor3 = Color3.new(1,1,1)
+    startBtn.BorderSizePixel = 0
+    startBtn.Parent = tourRow
+    Instance.new(_D("8E827CA8ABA79EAB"), startBtn).CornerRadius = UDim.new(0,6)
 
-    local _I1O_ll_8D = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _I1O_ll_8D.Size = UDim2.new(0.25, -8, 0, 26)
-    _I1O_ll_8D.Position = UDim2.new(0.69, 8, 0, 30)
-    _I1O_ll_8D.Text = _D("7E9F9A9B")
-    _I1O_ll_8D.BackgroundColor3 = Color3.fromRGB(120,0,0)
-    _I1O_ll_8D.TextColor3 = Color3.new(1,1,1)
-    _I1O_ll_8D.BorderSizePixel = 0
-    _I1O_ll_8D.Parent = _O000_I_8F
-    Instance.new(_D("80746E9A9D99909D"), _I1O_ll_8D).CornerRadius = UDim.new(0,6)
+    local stopBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    stopBtn.Size = UDim2.new(0.25, -8, 0, 26)
+    stopBtn.Position = UDim2.new(0.69, 8, 0, 30)
+    stopBtn.Text = _D("8CADA8A9")
+    stopBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
+    stopBtn.TextColor3 = Color3.new(1,1,1)
+    stopBtn.BorderSizePixel = 0
+    stopBtn.Parent = tourRow
+    Instance.new(_D("8E827CA8ABA79EAB"), stopBtn).CornerRadius = UDim.new(0,6)
 
-    local _1IO_11_C0 = Instance.new(_D("7F90A39F778C8D9097"))
-    _1IO_11_C0.BackgroundTransparency = 1
-    _1IO_11_C0.Size = UDim2.new(1, -20, 0, 18)
-    _1IO_11_C0.Position = UDim2.new(0,10,0, 30+26+6)
-    _1IO_11_C0.Text = _D("7E9F8C9FA09E654B748F9790")
-    _1IO_11_C0.TextColor3 = Color3.fromRGB(200,200,200)
-    _1IO_11_C0.TextXAlignment = Enum.TextXAlignment.Left
-    _1IO_11_C0.Font = Enum.Font.Gotham
-    _1IO_11_C0.TextSize = 13
-    _1IO_11_C0.Parent = _O000_I_8F
+    local statusLbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    statusLbl.BackgroundTransparency = 1
+    statusLbl.Size = UDim2.new(1, -20, 0, 18)
+    statusLbl.Position = UDim2.new(0,10,0, 30+26+6)
+    statusLbl.Text = _D("8CAD9AADAEAC7359829DA59E")
+    statusLbl.TextColor3 = Color3.fromRGB(200,200,200)
+    statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+    statusLbl.Font = Enum.Font.Gotham
+    statusLbl.TextSize = 13
+    statusLbl.Parent = tourRow
 
-    local _Il0IlI_E9 = false
-    local function _IO10l1_FB()
-        local _I11IOO_27 = (___IOll_E4 and ___IOll_E4.Text) or _D("")
-        local _OO0_lI_7A = _I11IOO_27:gsub(_D("8689508F505988"), _D(""))  
-        local _1I1O11_7 = tonumber(_OO0_lI_7A)
-        if not _1I1O11_7 or _1I1O11_7 < 0.1 then _1I1O11_7 = 0.1 end
-        return _1I1O11_7
+    local tourRunning = false
+    local function parseInterval()
+        local raw = (intervalBox and intervalBox.Text) or _D("")
+        local cleaned = raw:gsub(_D("94975E9D5E6796"), _D(""))  
+        local n = tonumber(cleaned)
+        if not n or n < 0.1 then n = 0.1 end
+        return n
     end
 
 
-    local function _I1IIIO_F1(_I0llIO_35)
+    local function safeTeleport(dest)
         
         if (not root) or (not root.Parent) or (not hum) or hum.Health <= 0 then
-            _II0OI__EE()
+            getCharacter()
         end
-        if _Il10I0_73 == _D("74999E9F8C999F") then
-            _1lOO0l_10F(_I0llIO_35)
+        if tpMode == _D("82A7ACAD9AA7AD") then
+            teleportToPosition(dest)
         else
-            _OllI0O_114(_I0llIO_35)
+            teleportToPositionAndWait(dest)
         end
     end
 
-    _11l1Ol_9E.MouseButton1Click:Connect(function()
-        if _Il0IlI_E9 then return end
+    startBtn.MouseButton1Click:Connect(function()
+        if tourRunning then return end
 
-        if #_1IO_01_A2 == 0 then
-            _1IO_11_C0.Text = _D("7E9F8C9FA09E654B7F9AA09D4B97949E9F4B969A9E9A99924B0DABBF4B9F90968C994B72909F4B6C97974B8FA097A0")
+        if #tourList == 0 then
+            statusLbl.Text = _D("8CAD9AADAEAC73598DA8AEAB59A5A2ACAD59A4A8ACA8A7A0591BB9CD59AD9EA49AA759809EAD597AA5A5599DAEA5AE")
             return
         end
 
-        _Il0IlI_E9 = true
-        _1IO_11_C0.Text = _D("7E9F8C9FA09E654B7DA09999949992")
+        tourRunning = true
+        statusLbl.Text = _D("8CAD9AADAEAC73598BAEA7A7A2A7A0")
 
         task.spawn(function()
-            while _Il0IlI_E9 do
-                for i = 1, #_1IO_01_A2 do
-                    if not _Il0IlI_E9 then break end
+            while tourRunning do
+                for i = 1, #tourList do
+                    if not tourRunning then break end
 
-                    local _OI0I_O_3A = _1IO_01_A2[i]
-                    local _I0llIO_35 = _OI0I_O_3A.pos + Vector3.new(0, 3, 0)
+                    local item = tourList[i]
+                    local dest = item.pos + Vector3.new(0, 3, 0)
 
                     
                     pcall(function()
-                        _I1IIIO_F1(_I0llIO_35)
+                        safeTeleport(dest)
                     end)
 
                     
-                    local _OOI01__90 = _IO10l1_FB()
-                    if _OOI01__90 < 0.1 then _OOI01__90 = 0.1 end
-                    local _ll0_1I_13 = tick()
-                    while _Il0IlI_E9 and (tick() - _ll0_1I_13) < _OOI01__90 do
+                    local waitSec = parseInterval()
+                    if waitSec < 0.1 then waitSec = 0.1 end
+                    local t0 = tick()
+                    while tourRunning and (tick() - t0) < waitSec do
                         task.wait(0.05)
                     end
                 end
             end
-            _1IO_11_C0.Text = _D("7E9F8C9FA09E654B7E9F9A9B9B908F")
+            statusLbl.Text = _D("8CAD9AADAEAC73598CADA8A9A99E9D")
         end)
     end)
 
-    _I1O_ll_8D.MouseButton1Click:Connect(function()
-        _Il0IlI_E9 = false
-        _1IO_11_C0.Text = _D("7E9F8C9FA09E654B7E9F9A9B9B949992595959")
+    stopBtn.MouseButton1Click:Connect(function()
+        tourRunning = false
+        statusLbl.Text = _D("8CAD9AADAEAC73598CADA8A9A9A2A7A0676767")
     end)
 
     
     
     
-    local function _Ol1l_l_111(_1_IOl1_6D, _I1OI01_6B)
-        local _0O1lO__9 = string.lower(_1_0OOI_BC.Text or _D(""))
-        for _,_II0Il__2B in ipairs(_1_IOl1_6D:GetChildren()) do
-            if _II0Il__2B:IsA(_D("719D8C9890")) then
-                local __lOlI0_54 = string.lower(tostring(_II0Il__2B:GetAttribute(_D("978C8D9097")) or _II0Il__2B.Name or _D("")))
-                _II0Il__2B.Visible = (_0O1lO__9 == _D("")) or (string.find(__lOlI0_54, _0O1lO__9, 1, true) ~= nil)
+    local function applySearchToScroll(scroll, recalc)
+        local q = string.lower(searchBox.Text or _D(""))
+        for _,row in ipairs(scroll:GetChildren()) do
+            if row:IsA(_D("7FAB9AA69E")) then
+                local label = string.lower(tostring(row:GetAttribute(_D("A59A9B9EA5")) or row.Name or _D("")))
+                row.Visible = (q == _D("")) or (string.find(label, q, 1, true) ~= nil)
             end
         end
-        if _I1OI01_6B then _I1OI01_6B() end
+        if recalc then recalc() end
     end
 
-    local __l00O0_A8 = _D("788C9499")
-    local function _l_I1I0_E0()
-        if __l00O0_A8 == _D("788C9499") then
-            _Ol1l_l_111(_lIOOll_CE, recalcMain)
-        elseif __l00O0_A8 == _D("78949E8E") then
-            _Ol1l_l_111(_Ol_0lO_D2, recalcMisc)
-        elseif __l00O0_A8 == _D("7F9097909B9A9D9F") then
-            local _0O1lO__9 = string.lower(_1_0OOI_BC.Text or _D(""))
-            for _,_II0Il__2B in ipairs(_01IlOl_A3:GetChildren()) do
-                if _II0Il__2B:IsA(_D("719D8C9890")) and (_II0Il__2B ~= nil) then
-                    local __lOlI0_54 = tostring(_II0Il__2B:GetAttribute(_D("978C8D9097")) or _D(""))
-                    _II0Il__2B.Visible = (_0O1lO__9 == _D("")) or (string.find(__lOlI0_54, _0O1lO__9, 1, true) ~= nil)
+    local activeTab = _D("869AA2A7")
+    local function applySearch()
+        if activeTab == _D("869AA2A7") then
+            applySearchToScroll(mainScroll, recalcMain)
+        elseif activeTab == _D("86A2AC9C") then
+            applySearchToScroll(miscScroll, recalcMisc)
+        elseif activeTab == _D("8D9EA59EA9A8ABAD") then
+            local q = string.lower(searchBox.Text or _D(""))
+            for _,row in ipairs(tpScroll:GetChildren()) do
+                if row:IsA(_D("7FAB9AA69E")) and (row ~= nil) then
+                    local label = tostring(row:GetAttribute(_D("A59A9B9EA5")) or _D(""))
+                    row.Visible = (q == _D("")) or (string.find(label, q, 1, true) ~= nil)
                 end
             end
             recalcTp()
         else
-            _Ol1l_l_111(_Il__lO_AA, recalcCfg)
+            applySearchToScroll(cfgScroll, recalcCfg)
         end
     end
-    _1_0OOI_BC:GetPropertyChangedSignal(_D("7F90A39F")):Connect(_l_I1I0_E0)
+    searchBox:GetPropertyChangedSignal(_D("8D9EB1AD")):Connect(applySearch)
 
     
     
     
-    local function _0__1_0_10B()
+    local function getCurrentSettings()
         return {
-            _OO00I__1E=_OO00I__1E, _OlO_ll_69=_OlO_ll_69, _1OII0__F9=_1OII0__F9, _O__00__B4=_O__00__B4, _O_O0l0_F0=_O_O0l0_F0,
-            ___11_0_C3=___11_0_C3, _I1100I_B5=_I1100I_B5,
-            _1l000O_CB=_1l000O_CB, _lII_O__BB=_lII_O__BB, fov=_1__OO1_C9,
+            fly=fly, noclip=noclip, infJumpMobile=infJumpMobile, infJumpPC=infJumpPC, noFallDamage=noFallDamage,
+            walkSpeed=walkSpeed, jumpPower=jumpPower,
+            fullBright=fullBright, removeFog=removeFog, fov=defaultFOV,
         }
     end
-    local function __l_I_I_F6(s)
+    local function applySettings(s)
         if not s then return end
-        _O_I0lI_47.Set(s.___11_0_C3 or ___11_0_C3)
-        _O__O0I_3B.Set(s._I1100I_B5 or _I1100I_B5)
-        _1I_0_1_6E(s.fov or _1__OO1_C9)
-        _1O10II_37.Set(s._1l000O_CB or false)
-        _l__0IO_43.Set(s._lII_O__BB or false)
-        _1_Ol11_4D.Set(s._OO00I__1E or false)
-        _O0l0___41.Set(s._OlO_ll_69 or false)
-        _lIlO_I_52.Set(s._1OII0__F9 or false)
-        _lll0Il_53.Set(s._O__00__B4 or false)
-        _OlI0I__56.Set(s._O_O0l0_F0 or false)
+        wsSl.Set(s.walkSpeed or walkSpeed)
+        jpSl.Set(s.jumpPower or jumpPower)
+        setFOV(s.fov or defaultFOV)
+        fbSw.Set(s.fullBright or false)
+        rfSw.Set(s.removeFog or false)
+        flySw.Set(s.fly or false)
+        ncSw.Set(s.noclip or false)
+        ijmSw.Set(s.infJumpMobile or false)
+        ijpSw.Set(s.infJumpPC or false)
+        nfdSw.Set(s.noFallDamage or false)
     end
 
-    local __1I__l_84 = _l_1____AC(_Il__lO_AA, 58)
-    __1I__l_84:SetAttribute(_D("978C8D9097"),_D("6E9A999194924B798C9890"))
-    local _OI_00l_9B = Instance.new(_D("7F90A39F778C8D9097"))
-    _OI_00l_9B.BackgroundTransparency = 1
-    _OI_00l_9B.Size = UDim2.new(1, 0, 0, 20)
-    _OI_00l_9B.Position = UDim2.new(0,10,0,6)
-    _OI_00l_9B.Text = _D("6E9A999194924B798C9890")
-    _OI_00l_9B.TextColor3 = Color3.fromRGB(235,235,235)
-    _OI_00l_9B.Font = Enum.Font.Gotham
-    _OI_00l_9B.TextSize = 16
-    _OI_00l_9B.Parent = __1I__l_84
-    local _00l01I_83 = Instance.new(_D("7F90A39F6D9AA3"))
-    _00l01I_83.Size = UDim2.new(1, -20, 0, 28)
-    _00l01I_83.Position = UDim2.new(0,10,0,28)
-    _00l01I_83.PlaceholderText = _D("98A4588E9A99919492")
-    _00l01I_83.Text = _D("")
-    _00l01I_83.TextColor3 = Color3.new(1,1,1)
-    _00l01I_83.BackgroundColor3 = Color3.fromRGB(55,55,60)
-    _00l01I_83.BorderSizePixel = 0
-    _00l01I_83.Parent = __1I__l_84
-    Instance.new(_D("80746E9A9D99909D"), _00l01I_83).CornerRadius = UDim.new(0,6)
+    local nameRow = createRow(cfgScroll, 58)
+    nameRow:SetAttribute(_D("A59A9B9EA5"),_D("7CA8A79FA2A059879AA69E"))
+    local nameLbl2 = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    nameLbl2.BackgroundTransparency = 1
+    nameLbl2.Size = UDim2.new(1, 0, 0, 20)
+    nameLbl2.Position = UDim2.new(0,10,0,6)
+    nameLbl2.Text = _D("7CA8A79FA2A059879AA69E")
+    nameLbl2.TextColor3 = Color3.fromRGB(235,235,235)
+    nameLbl2.Font = Enum.Font.Gotham
+    nameLbl2.TextSize = 16
+    nameLbl2.Parent = nameRow
+    local nameBox = Instance.new(_D("8D9EB1AD7BA8B1"))
+    nameBox.Size = UDim2.new(1, -20, 0, 28)
+    nameBox.Position = UDim2.new(0,10,0,28)
+    nameBox.PlaceholderText = _D("A6B2669CA8A79FA2A0")
+    nameBox.Text = _D("")
+    nameBox.TextColor3 = Color3.new(1,1,1)
+    nameBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
+    nameBox.BorderSizePixel = 0
+    nameBox.Parent = nameRow
+    Instance.new(_D("8E827CA8ABA79EAB"), nameBox).CornerRadius = UDim.new(0,6)
 
-    local _01O00l_88 = _l_1____AC(_Il__lO_AA, 40)
-    _01O00l_88:SetAttribute(_D("978C8D9097"),_D("7E8CA1904B6E9A99919492"))
-    local _lI_Il__87 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-    _lI_Il__87.Size = UDim2.new(1, -20, 1, -10)
-    _lI_Il__87.Position = UDim2.new(0,10,0,5)
-    _lI_Il__87.Text = _D("7E8CA1904B6E9A999194924B537E909DA1909D54")
-    _lI_Il__87.BackgroundColor3 = Color3.fromRGB(0,120,0)
-    _lI_Il__87.TextColor3 = Color3.new(1,1,1)
-    _lI_Il__87.BorderSizePixel = 0
-    _lI_Il__87.Parent = _01O00l_88
-    Instance.new(_D("80746E9A9D99909D"), _lI_Il__87).CornerRadius = UDim.new(0,8)
+    local saveRow = createRow(cfgScroll, 40)
+    saveRow:SetAttribute(_D("A59A9B9EA5"),_D("8C9AAF9E597CA8A79FA2A0"))
+    local saveBtn = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+    saveBtn.Size = UDim2.new(1, -20, 1, -10)
+    saveBtn.Position = UDim2.new(0,10,0,5)
+    saveBtn.Text = _D("8C9AAF9E597CA8A79FA2A059618C9EABAF9EAB62")
+    saveBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+    saveBtn.TextColor3 = Color3.new(1,1,1)
+    saveBtn.BorderSizePixel = 0
+    saveBtn.Parent = saveRow
+    Instance.new(_D("8E827CA8ABA79EAB"), saveBtn).CornerRadius = UDim.new(0,8)
 
-    local _I0I01I_B6 = _l_1____AC(_Il__lO_AA, 28)
-    local _OI1I0I_C = Instance.new(_D("7F90A39F778C8D9097"))
-    _OI1I0I_C.BackgroundTransparency = 1
-    _OI1I0I_C.Size = UDim2.new(1, -20, 1, 0)
-    _OI1I0I_C.Position = UDim2.new(0,10,0,0)
-    _OI1I0I_C.Text = _D("7E8CA1908F4B6E9A999194929E4B537E909DA1909D54")
-    _OI1I0I_C.TextColor3 = Color3.new(1,1,1)
-    _OI1I0I_C.TextXAlignment = Enum.TextXAlignment.Left
-    _OI1I0I_C.Font = Enum.Font.GothamBold
-    _OI1I0I_C.TextSize = 14
-    _OI1I0I_C.Parent = _I0I01I_B6
+    local listTitle = createRow(cfgScroll, 28)
+    local lt = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+    lt.BackgroundTransparency = 1
+    lt.Size = UDim2.new(1, -20, 1, 0)
+    lt.Position = UDim2.new(0,10,0,0)
+    lt.Text = _D("8C9AAF9E9D597CA8A79FA2A0AC59618C9EABAF9EAB62")
+    lt.TextColor3 = Color3.new(1,1,1)
+    lt.TextXAlignment = Enum.TextXAlignment.Left
+    lt.Font = Enum.Font.GothamBold
+    lt.TextSize = 14
+    lt.Parent = listTitle
 
-    local _0l111l_79 = _l_1____AC(_Il__lO_AA, 180)
-    _0l111l_79.BackgroundTransparency = 1
-    local _IllOOO_100 = Instance.new(_D("7E8E9D9A9797949992719D8C9890"))
-    _IllOOO_100.Size = UDim2.new(1, -12, 1, 0)
-    _IllOOO_100.Position = UDim2.new(0,6,0,0)
-    _IllOOO_100.BackgroundTransparency = 1
-    _IllOOO_100.ScrollBarThickness = 6
-    _IllOOO_100.ClipsDescendants = true
-    _IllOOO_100.Parent = _0l111l_79
-    local _OllOII_62 = Instance.new(_D("807477949E9F778CA49AA09F"))
-    _OllOII_62.Parent = _IllOOO_100
-    _OllOII_62.Padding = UDim.new(0,6)
+    local cfgList = createRow(cfgScroll, 180)
+    cfgList.BackgroundTransparency = 1
+    local cfgScrollInner = Instance.new(_D("8C9CABA8A5A5A2A7A07FAB9AA69E"))
+    cfgScrollInner.Size = UDim2.new(1, -12, 1, 0)
+    cfgScrollInner.Position = UDim2.new(0,6,0,0)
+    cfgScrollInner.BackgroundTransparency = 1
+    cfgScrollInner.ScrollBarThickness = 6
+    cfgScrollInner.ClipsDescendants = true
+    cfgScrollInner.Parent = cfgList
+    local cfgLay = Instance.new(_D("8E8285A2ACAD859AB2A8AEAD"))
+    cfgLay.Parent = cfgScrollInner
+    cfgLay.Padding = UDim.new(0,6)
 
-    local function _1_lOlI_103()
-        for _,ch in ipairs(_IllOOO_100:GetChildren()) do
-            if ch:IsA(_D("7F90A39F6DA09F9F9A99")) or ch:IsA(_D("719D8C9890")) then ch:Destroy() end
+    local function rebuildCfgList()
+        for _,ch in ipairs(cfgScrollInner:GetChildren()) do
+            if ch:IsA(_D("8D9EB1AD7BAEADADA8A7")) or ch:IsA(_D("7FAB9AA69E")) then ch:Destroy() end
         end
-        for _O1O_I1_40, s in pairs(__0O_l__7B) do
-            local _II0Il__2B = Instance.new(_D("719D8C9890"))
-            _II0Il__2B.Size = UDim2.new(1, -4, 0, 32)
-            _II0Il__2B.BackgroundColor3 = Color3.fromRGB(50,50,58)
-            _II0Il__2B.Parent = _IllOOO_100
-            Instance.new(_D("80746E9A9D99909D"), _II0Il__2B).CornerRadius = UDim.new(0,6)
+        for name, s in pairs(configs) do
+            local row = Instance.new(_D("7FAB9AA69E"))
+            row.Size = UDim2.new(1, -4, 0, 32)
+            row.BackgroundColor3 = Color3.fromRGB(50,50,58)
+            row.Parent = cfgScrollInner
+            Instance.new(_D("8E827CA8ABA79EAB"), row).CornerRadius = UDim.new(0,6)
 
-            local _lO01l1_3F = Instance.new(_D("7F90A39F778C8D9097"))
-            _lO01l1_3F.BackgroundTransparency = 1
-            _lO01l1_3F.Size = UDim2.new(0.5, -10, 1, 0)
-            _lO01l1_3F.Position = UDim2.new(0,10,0,0)
-            _lO01l1_3F.Text = _O1O_I1_40 .. (_10I10__EC==_O1O_I1_40 and _D("4B4B536CA09F9A54") or _D(""))
-            _lO01l1_3F.TextXAlignment = Enum.TextXAlignment.Left
-            _lO01l1_3F.TextColor3 = Color3.new(1,1,1)
-            _lO01l1_3F.Parent = _II0Il__2B
+            local nLbl = Instance.new(_D("8D9EB1AD859A9B9EA5"))
+            nLbl.BackgroundTransparency = 1
+            nLbl.Size = UDim2.new(0.5, -10, 1, 0)
+            nLbl.Position = UDim2.new(0,10,0,0)
+            nLbl.Text = name .. (autoloadName==name and _D("5959617AAEADA862") or _D(""))
+            nLbl.TextXAlignment = Enum.TextXAlignment.Left
+            nLbl.TextColor3 = Color3.new(1,1,1)
+            nLbl.Parent = row
 
-            local _O1I1_1_55 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-            _O1I1_1_55.Size = UDim2.new(0.2, -6, 0, 26)
-            _O1I1_1_55.Position = UDim2.new(0.5, 0, 0.5, -13)
-            _O1I1_1_55.Text = _D("779A8C8F")
-            _O1I1_1_55.BackgroundColor3 = Color3.fromRGB(0,90,140)
-            _O1I1_1_55.TextColor3 = Color3.new(1,1,1)
-            _O1I1_1_55.Parent = _II0Il__2B
-            Instance.new(_D("80746E9A9D99909D"), _O1I1_1_55).CornerRadius = UDim.new(0,6)
+            local loadB = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+            loadB.Size = UDim2.new(0.2, -6, 0, 26)
+            loadB.Position = UDim2.new(0.5, 0, 0.5, -13)
+            loadB.Text = _D("85A89A9D")
+            loadB.BackgroundColor3 = Color3.fromRGB(0,90,140)
+            loadB.TextColor3 = Color3.new(1,1,1)
+            loadB.Parent = row
+            Instance.new(_D("8E827CA8ABA79EAB"), loadB).CornerRadius = UDim.new(0,6)
 
-            local _l_1_I0_48 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-            _l_1_I0_48.Size = UDim2.new(0.2, -6, 0, 26)
-            _l_1_I0_48.Position = UDim2.new(0.7, 0, 0.5, -13)
-            _l_1_I0_48.Text = _D("6CA09F9A")
-            _l_1_I0_48.BackgroundColor3 = _10I10__EC==_O1O_I1_40 and Color3.fromRGB(0,150,0) or Color3.fromRGB(70,70,70)
-            _l_1_I0_48.TextColor3 = Color3.new(1,1,1)
-            _l_1_I0_48.Parent = _II0Il__2B
-            Instance.new(_D("80746E9A9D99909D"), _l_1_I0_48).CornerRadius = UDim.new(0,6)
+            local autoB = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+            autoB.Size = UDim2.new(0.2, -6, 0, 26)
+            autoB.Position = UDim2.new(0.7, 0, 0.5, -13)
+            autoB.Text = _D("7AAEADA8")
+            autoB.BackgroundColor3 = autoloadName==name and Color3.fromRGB(0,150,0) or Color3.fromRGB(70,70,70)
+            autoB.TextColor3 = Color3.new(1,1,1)
+            autoB.Parent = row
+            Instance.new(_D("8E827CA8ABA79EAB"), autoB).CornerRadius = UDim.new(0,6)
 
-            local _IlIll0_34 = Instance.new(_D("7F90A39F6DA09F9F9A99"))
-            _IlIll0_34.Size = UDim2.new(0.1, -6, 0, 26)
-            _IlIll0_34.Position = UDim2.new(0.9, 0, 0.5, -13)
-            _IlIll0_34.Text = _D("6F9097")
-            _IlIll0_34.BackgroundColor3 = Color3.fromRGB(120,0,0)
-            _IlIll0_34.TextColor3 = Color3.new(1,1,1)
-            _IlIll0_34.Parent = _II0Il__2B
-            Instance.new(_D("80746E9A9D99909D"), _IlIll0_34).CornerRadius = UDim.new(0,6)
+            local delB = Instance.new(_D("8D9EB1AD7BAEADADA8A7"))
+            delB.Size = UDim2.new(0.1, -6, 0, 26)
+            delB.Position = UDim2.new(0.9, 0, 0.5, -13)
+            delB.Text = _D("7D9EA5")
+            delB.BackgroundColor3 = Color3.fromRGB(120,0,0)
+            delB.TextColor3 = Color3.new(1,1,1)
+            delB.Parent = row
+            Instance.new(_D("8E827CA8ABA79EAB"), delB).CornerRadius = UDim.new(0,6)
 
-            _O1I1_1_55.MouseButton1Click:Connect(function() __l_I_I_F6(s) end)
-            _l_1_I0_48.MouseButton1Click:Connect(function()
-                if not _lll_I1_F3 then __l_0I0_65(_D("8CA09F9A4B9E909F654B9E909DA1909D4B9A919197949990")); return end
-                _10I10__EC = (_10I10__EC==_O1O_I1_40) and nil or _O1O_I1_40
-                local _III0l0_30 = {
-                    autoload = _10I10__EC,
-                    __0O_l__7B  = __0O_l__7B,
-                    exports  = _II0l_0_113(_1IIIII_ED),
-                    meta     = { username = _0_ll11_94 }
+            loadB.MouseButton1Click:Connect(function() applySettings(s) end)
+            autoB.MouseButton1Click:Connect(function()
+                if not serverOnline then dprint(_D("9AAEADA859AC9EAD7359AC9EABAF9EAB59A89F9FA5A2A79E")); return end
+                autoloadName = (autoloadName==name) and nil or name
+                local body = {
+                    autoload = autoloadName,
+                    configs  = configs,
+                    exports  = normalizeExportsForSend(exportedSets),
+                    meta     = { username = USERNAME }
                 }
-                _01O0Il_C7(_l1OIlI_2F, _III0l0_30)
-                _1_lOlI_103()
+                apiPutUser(HWID, body)
+                rebuildCfgList()
             end)
-            _IlIll0_34.MouseButton1Click:Connect(function()
-                if not _lll_I1_F3 then __l_0I0_65(_D("8F9097909F904B8E9A99919492654B9E909DA1909D4B9A919197949990")); return end
-                __0O_l__7B[_O1O_I1_40] = nil
-                if _10I10__EC == _O1O_I1_40 then _10I10__EC = nil end
-                local _III0l0_30 = {
-                    autoload = _10I10__EC,
-                    __0O_l__7B  = __0O_l__7B,
-                    exports  = _II0l_0_113(_1IIIII_ED),
-                    meta     = { username = _0_ll11_94 }
+            delB.MouseButton1Click:Connect(function()
+                if not serverOnline then dprint(_D("9D9EA59EAD9E599CA8A79FA2A07359AC9EABAF9EAB59A89F9FA5A2A79E")); return end
+                configs[name] = nil
+                if autoloadName == name then autoloadName = nil end
+                local body = {
+                    autoload = autoloadName,
+                    configs  = configs,
+                    exports  = normalizeExportsForSend(exportedSets),
+                    meta     = { username = USERNAME }
                 }
-                _01O0Il_C7(_l1OIlI_2F, _III0l0_30)
-                _1_lOlI_103()
+                apiPutUser(HWID, body)
+                rebuildCfgList()
             end)
         end
     end
 
-    _lI_Il__87.MouseButton1Click:Connect(function()
-        if not _lll_I1_F3 then __l_0I0_65(_D("9E8CA1904B8E9A99919492654B9E909DA1909D4B9A919197949990")); return end
-        local _I1O0l__F = _00l01I_83.Text ~= _D("") and _00l01I_83.Text or (_D("8E9A9991949258")..tostring(os.time()))
-        __0O_l__7B[_I1O0l__F] = _0__1_0_10B()
-        local _III0l0_30 = {
-            autoload = _10I10__EC,
-            __0O_l__7B  = __0O_l__7B,
-            exports  = _II0l_0_113(_1IIIII_ED),
-            meta     = { username = _0_ll11_94 }
+    saveBtn.MouseButton1Click:Connect(function()
+        if not serverOnline then dprint(_D("AC9AAF9E599CA8A79FA2A07359AC9EABAF9EAB59A89F9FA5A2A79E")); return end
+        local nm = nameBox.Text ~= _D("") and nameBox.Text or (_D("9CA8A79FA2A066")..tostring(os.time()))
+        configs[nm] = getCurrentSettings()
+        local body = {
+            autoload = autoloadName,
+            configs  = configs,
+            exports  = normalizeExportsForSend(exportedSets),
+            meta     = { username = USERNAME }
         }
-        _01O0Il_C7(_l1OIlI_2F, _III0l0_30)
-        _1_lOlI_103()
+        apiPutUser(HWID, body)
+        rebuildCfgList()
     end)
 
     
-    local function _1l1Ol1_8B(_O1O_I1_40)
-        __l00O0_A8 = _O1O_I1_40
-        _lIOOll_CE.Visible = (_O1O_I1_40 == _D("788C9499"))
-        _Ol_0lO_D2.Visible = (_O1O_I1_40 == _D("78949E8E"))
-        _01IlOl_A3.Visible   = (_O1O_I1_40 == _D("7F9097909B9A9D9F"))
-        _Il__lO_AA.Visible  = (_O1O_I1_40 == _D("6E9A99919492"))
-        _l_I1I0_E0()
+    local function showTab(name)
+        activeTab = name
+        mainScroll.Visible = (name == _D("869AA2A7"))
+        miscScroll.Visible = (name == _D("86A2AC9C"))
+        tpScroll.Visible   = (name == _D("8D9EA59EA9A8ABAD"))
+        cfgScroll.Visible  = (name == _D("7CA8A79FA2A0"))
+        applySearch()
     end
-    _001_IO_D9.MouseButton1Click:Connect(function() _1l1Ol1_8B(_D("788C9499")) end)
-    _IOOIlO_DA.MouseButton1Click:Connect(function() _1l1Ol1_8B(_D("78949E8E")) end)
-    _10O100_A0.MouseButton1Click:Connect(function() _1l1Ol1_8B(_D("7F9097909B9A9D9F")) end)
-    __10O10_C1.MouseButton1Click:Connect(function() _1l1Ol1_8B(_D("6E9A99919492")) end)
-    _1l1Ol1_8B(_D("788C9499"))
+    tabMainBtn.MouseButton1Click:Connect(function() showTab(_D("869AA2A7")) end)
+    tabMiscBtn.MouseButton1Click:Connect(function() showTab(_D("86A2AC9C")) end)
+    tabTpBtn.MouseButton1Click:Connect(function() showTab(_D("8D9EA59EA9A8ABAD")) end)
+    tabCfgBtn.MouseButton1Click:Connect(function() showTab(_D("7CA8A79FA2A0")) end)
+    showTab(_D("869AA2A7"))
 
     
-    local _II1_1l_B7 = false
-    _1Ol_IO_5F.MouseButton1Click:Connect(function()
-        _II1_1l_B7 = not _II1_1l_B7
-        local _O1OOI__2E = not _II1_1l_B7
-        _10llOI_45.Visible = _O1OOI__2E
-        _lIOOll_CE.Visible = _O1OOI__2E and (__l00O0_A8 == _D("788C9499"))
-        _Ol_0lO_D2.Visible = _O1OOI__2E and (__l00O0_A8 == _D("78949E8E"))
-        _01IlOl_A3.Visible   = _O1OOI__2E and (__l00O0_A8 == _D("7F9097909B9A9D9F"))
-        _Il__lO_AA.Visible  = _O1OOI__2E and (__l00O0_A8 == _D("6E9A99919492"))
-        _IlII_0_4F.Size = _II1_1l_B7 and UDim2.fromOffset(420, 56) or UDim2.fromOffset(420, 360)
+    local minimized = false
+    btnMin.MouseButton1Click:Connect(function()
+        minimized = not minimized
+        local vis = not minimized
+        tabs.Visible = vis
+        mainScroll.Visible = vis and (activeTab == _D("869AA2A7"))
+        miscScroll.Visible = vis and (activeTab == _D("86A2AC9C"))
+        tpScroll.Visible   = vis and (activeTab == _D("8D9EA59EA9A8ABAD"))
+        cfgScroll.Visible  = vis and (activeTab == _D("7CA8A79FA2A0"))
+        frame.Size = minimized and UDim2.fromOffset(420, 56) or UDim2.fromOffset(420, 360)
     end)
-    __ll_I1_95.MouseButton1Click:Connect(function()
-        __OO0Ol_77.Enabled = false
-        _O1_1ll_9D()
+    btnClose.MouseButton1Click:Connect(function()
+        MainGUI.Enabled = false
+        showPill()
     end)
 
     
-    local __IIl10_F7 = false
-    local _100OOl_AF, startPos
-    _0I__10_36.InputBegan:Connect(function(input)
+    local draggingFrame = false
+    local dragStart, startPos
+    drag.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            __IIl10_F7 = true
-            _100OOl_AF = input.Position
-            startPos = _IlII_0_4F.Position
+            draggingFrame = true
+            dragStart = input.Position
+            startPos = frame.Position
         end
     end)
-    _OOl1_O_16.InputChanged:Connect(function(input)
-        if __IIl10_F7 and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local _O_O1II_4B = input.Position - _100OOl_AF
-            _IlII_0_4F.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + _O_O1II_4B.X, startPos.Y.Scale, startPos.Y.Offset + _O_O1II_4B.Y)
+    UIS.InputChanged:Connect(function(input)
+        if draggingFrame and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
-    _0I__10_36.InputEnded:Connect(function(input)
+    drag.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            __IIl10_F7 = false
+            draggingFrame = false
         end
     end)
 
     
     task.delay(5, function()
-        _I_l00O_85:Destroy()
-        __OO0Ol_77.Enabled = true
+        overlay:Destroy()
+        MainGUI.Enabled = true
 
-        if _10I10__EC and __0O_l__7B[_10I10__EC] then
-            task.defer(function() __l_I_I_F6(__0O_l__7B[_10I10__EC]) end)
+        if autoloadName and configs[autoloadName] then
+            task.defer(function() applySettings(configs[autoloadName]) end)
         end
 
-        _1I_0_1_6E(_1__OO1_C9)
-        _1_lOlI_103()
+        setFOV(defaultFOV)
+        rebuildCfgList()
     end)
 end
 
 
-_lI1O1I_109()
+tryLoadFromServer()
 
-_II0OI__EE()
-_1Il01O_A9()
-__O__II_F8()
-_0OO1OO_101()
+getCharacter()
+attachFly()
+ensurePhysics()
+hookFallDamage()
 
-__1O__0_DD.CharacterAdded:Connect(function()
-    _II0OI__EE()
-    _1Il01O_A9()
-    __O__II_F8()
-    _0OO1OO_101()
-    _OO00I__1E = false
-    _OlO_ll_69 = false
+LocalPlayer.CharacterAdded:Connect(function()
+    getCharacter()
+    attachFly()
+    ensurePhysics()
+    hookFallDamage()
+    fly = false
+    noclip = false
 end)
 
 
-_OOl1_O_16.InputBegan:Connect(function(input, gp)
+UIS.InputBegan:Connect(function(input, gp)
     if gp then return end
     if input.KeyCode == Enum.KeyCode.F then
-        _llOlO__6F(not _OO00I__1E)
+        setFly(not fly)
     end
 end)
 
 
-_1__01l_98()
+createUI()
 
 
 game:BindToClose(function()
-    _llOlO__6F(false)
-    _0_0OO0_C8()
+    setFly(false)
+    cleanupFly()
 end)
-do
-    local __x2511 = 2511; local __y8577 = 8577
-    if (__x2511 * 0 == 1) then
-        print(_DJ("debug:2511:8577"))
-    end
-    local __t2511 = {}
-    for i=1,3 do __t2511[i] = (__x2511 + __y8577) % 11088 end
-    if __t2511[1] == 3951 then return _DJ(nil) end
-end
-do
-    local __x4141 = 4141; local __y2342 = 2342
-    if (__x4141 * 0 == 1) then
-        print(_DJ("debug:4141:2342"))
-    end
-    local __t4141 = {}
-    for i=1,3 do __t4141[i] = (__x4141 + __y2342) % 6483 end
-    if __t4141[1] == 6137 then return _DJ(nil) end
-end
