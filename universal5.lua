@@ -394,6 +394,33 @@ end
 local MainGUI
 local ShowPillGUI
 
+-- taruh di dekat fungsi teleport existing
+local function refreshCharacterIfNeeded()
+    if not LocalPlayer.Character
+        or not LocalPlayer.Character:FindFirstChild("Humanoid")
+        or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    then
+        -- tunggu respawn
+        LocalPlayer.CharacterAdded:Wait()
+    end
+    -- update ref global
+    char = LocalPlayer.Character
+    hum  = char:WaitForChild("Humanoid")
+    root = char:WaitForChild("HumanoidRootPart")
+end
+
+local function safeTeleport(dest)
+    -- jaga-jaga kalau baru mati/respawn
+    if (not root) or (not root.Parent) or (not hum) or (hum.Health <= 0) then
+        refreshCharacterIfNeeded()
+    end
+    if tpMode == "Instant" then
+        teleportToPosition(dest)
+    else
+        teleportToPositionAndWait(dest) -- versi di bawah sudah di-patch timeout
+    end
+end
+
 -- ========= Shared Teleport Settings (mode, duration, easing) =========
 -- dipakai oleh teleport ke Player dan teleport ke Location
 local tpMode = "Instant"
@@ -432,15 +459,13 @@ local function teleportToPosition(dest)
     end)
 end
 
+-- ganti fungsi teleportToPositionAndWait yang lama dengan ini
 local function teleportToPositionAndWait(dest)
     if not root then return end
-    if tpMode == "Instant" then
-        root.CFrame = CFrame.new(dest)
-        return
-    end
 
     local wasFly = fly
     if wasFly then setFly(false) end
+
     local info = TweenInfo.new(
         math.max(0.05, tweenDuration),
         easeStyles[easeIdx][2],
@@ -448,9 +473,24 @@ local function teleportToPositionAndWait(dest)
         0,false,0
     )
     local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
+
+    local done = false
+    tw.Completed:Connect(function()
+        done = true
+    end)
+
     tw:Play()
-    -- tunggu tween selesai
-    pcall(function() tw.Completed:Wait() end)
+
+    -- tunggu sampai selesai ATAU timeout (durasi + 1.5s safety)
+    local timeout = tick() + tweenDuration + 1.5
+    while not done and tick() < timeout do
+        -- kalau HRP keburu hilang (mati/respawn), hentikan tunggu
+        if (not root) or (not root.Parent) or (not hum) or (hum.Health <= 0) then
+            break
+        end
+        task.wait(0.05)
+    end
+
     if wasFly then setFly(true) end
 end
 
@@ -1635,12 +1675,14 @@ local function createUI()
         end
     end
 
+    -- GANTI handler Start lama dengan ini
     startBtn.MouseButton1Click:Connect(function()
         if tourRunning then return end
         if #savedLocations == 0 then
             statusLbl.Text = "Status: tidak ada lokasi"
             return
         end
+
         tourRunning = true
         statusLbl.Text = "Status: Running"
 
@@ -1654,24 +1696,39 @@ local function createUI()
                     if v then
                         local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0, 3, 0)
 
-                        -- Kunci: kalau mati/respawn di tengah, safeTeleport akan tunggu character baru lalu lanjut.
-                        -- pcall supaya kalau ada error kecil (objek keburu nil), loop tidak putus
-                        pcall(function()
+                        -- status debug biar keliatan progressnya
+                        statusLbl.Text = string.format("Status: TP %d/%d → %s", i, #savedLocations, tostring(loc.name))
+
+                        -- jangan sampai error kecil ngehentikan tour
+                        local ok, err = pcall(function()
                             safeTeleport(dest)
                         end)
-                    end
+                        -- kalau error, tulis di status tapi lanjut list berikutnya
+                        if not ok then
+                            statusLbl.Text = ("Status: error di '%s' (lanjut)"):format(tostring(loc.name))
+                        end
 
-                    -- Tunggu sesuai interval setelah sampai (Instant langsung, Tween setelah Completed)
-                    local waitSec = parseInterval()
-                    local t0 = tick()
-                    while tourRunning and (tick() - t0) < waitSec do
-                        task.wait(0.05)
+                        -- jeda kecil biar physics settle, trus interval
+                        task.wait(0.1)
+
+                        local waitSec = tonumber((intervalBox.Text or ""):gsub("[^%d%.]","")) or 3
+                        if waitSec < 0.1 then waitSec = 0.1 end
+                        local tEnd = tick() + waitSec
+                        while tourRunning and tick() < tEnd do
+                            task.wait(0.05)
+                            -- kalau di tengah jeda karakter mati, langsung refresh,
+                            -- tapi TETAP lanjut ke lokasi berikutnya (tidak reset i)
+                            if hum and hum.Health <= 0 then
+                                refreshCharacterIfNeeded()
+                            end
+                        end
                     end
                 end
             end
             statusLbl.Text = "Status: Stopped"
         end)
     end)
+
 
 
     stopBtn.MouseButton1Click:Connect(function()
