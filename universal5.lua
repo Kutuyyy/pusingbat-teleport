@@ -1268,7 +1268,6 @@ local function createUI()
                     teleportToPositionAndWait(dest)
                 end
             end
-            local waitSec = parseInterval()
         end)
 
         entry:SetAttribute("label", string.lower(locationData.name))
