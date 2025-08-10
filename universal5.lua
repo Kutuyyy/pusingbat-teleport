@@ -22,7 +22,7 @@ local LocalPlayer = Players.LocalPlayer
 local USERNAME = LocalPlayer and LocalPlayer.Name or "unknown"
 
 -- ========== Util ==========
-local function dprint(...) -- aktifkan jika perlu
+local function dprint(...) print("[PB]", ...) end  -- aktifkan
     -- print("[PB]", ...)
 end
 
@@ -441,16 +441,44 @@ local function teleportToPositionAndWait(dest)
 
     local wasFly = fly
     if wasFly then setFly(false) end
+
+    -- revalidate HRP sebelum tween
+    if not root or not root.Parent then getCharacter() end
+
     local info = TweenInfo.new(
         math.max(0.05, tweenDuration),
         easeStyles[easeIdx][2],
         easeStyles[easeIdx][3],
         0,false,0
     )
-    local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
+    local tw = TweenService:Create(root, info, { CFrame = CFrame.new(dest) })
+    local done = false
+
+    local conn
+    conn = tw.Completed:Connect(function()
+        done = true
+        if conn then conn:Disconnect() end
+    end)
+
     tw:Play()
-    -- tunggu tween selesai
-    pcall(function() tw.Completed:Wait() end)
+
+    -- TIMEOUT guard: tweenDuration + 1.5s
+    local t0 = tick()
+    while not done and (tick() - t0) < (tweenDuration + 1.5) do
+        task.wait()
+        -- kalau HRP hilang (mati/respawn) saat tween → break dan lanjut
+        if (not root) or (not root.Parent) then break end
+    end
+
+    -- pastikan posisi dipaksa ke tujuan kalau tween gagal/cancel
+    if not done then
+        pcall(function()
+            if root and root.Parent then
+                root.CFrame = CFrame.new(dest)
+            end
+        end)
+    end
+
     if wasFly then setFly(true) end
 end
 
@@ -1650,6 +1678,7 @@ local function createUI()
                     if not tourRunning then break end
 
                     local loc = savedLocations[i]
+                    dprint("TP to", i, savedLocations[i].name)
                     local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
                     if v then
                         local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0, 3, 0)
@@ -1658,6 +1687,7 @@ local function createUI()
                         -- pcall supaya kalau ada error kecil (objek keburu nil), loop tidak putus
                         pcall(function()
                             safeTeleport(dest)
+                            task.wait()
                         end)
                     end
 
