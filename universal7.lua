@@ -456,6 +456,16 @@ local function teleportToPositionAndWait(dest)
     if wasFly then setFly(true) end
 end
 
+local function jumpOnce()
+    if not hum then return end
+    pcall(function()
+        hum.Jump = true
+        task.delay(0.1, function()
+            if hum then hum.Jump = false end
+        end)
+    end)
+end
+
 local function showPill()
     if ShowPillGUI then ShowPillGUI:Destroy() end
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -1678,8 +1688,8 @@ local function createUI()
     tourLbl.Parent = tourRow
 
 
-    local statusLbl
-    statusLbl = Instance.new("TextLabel")
+    -- === Interval input (BENAR) ===
+    local intervalBox = Instance.new("TextBox")
     intervalBox.Size = UDim2.new(0.4, -20, 0, 26)
     intervalBox.Position = UDim2.new(0,10,0,30)
     intervalBox.Text = "3"
@@ -1689,7 +1699,9 @@ local function createUI()
     intervalBox.BorderSizePixel = 0
     intervalBox.Parent = tourRow
     Instance.new("UICorner", intervalBox).CornerRadius = UDim.new(0,6)
-    
+    -- forward-declare untuk dipakai tombol Get All / Clear / dst.
+    local statusLbl
+
     -- Row tombol snapshot & counter
     local snapRow = createTpRow(40)
     snapRow:SetAttribute("label","Tour Snapshot")
@@ -1778,7 +1790,7 @@ local function createUI()
     stopBtn.Parent = tourRow
     Instance.new("UICorner", stopBtn).CornerRadius = UDim.new(0,6)
 
-    local statusLbl = Instance.new("TextLabel")
+    statusLbl = Instance.new("TextLabel")
     statusLbl.BackgroundTransparency = 1
     statusLbl.Size = UDim2.new(1, -20, 0, 18)
     statusLbl.Position = UDim2.new(0,10,0, 30+26+6)
