@@ -397,7 +397,6 @@ local MainGUI
 local ShowPillGUI
 
 -- ========= Shared Teleport Settings (mode, duration, easing) =========
--- dipakai oleh teleport ke Player dan teleport ke Location
 local tpMode = "Instant"
 local tweenDuration = 1.0
 local easeStyles = {
@@ -409,58 +408,89 @@ local easeStyles = {
     {"CubicOut", Enum.EasingStyle.Cubic,   Enum.EasingDirection.Out},
 }
 local easeIdx = 1
+
 local teleporting = false
+local currentTween = nil -- referensi tween aktif (kalau ada), supaya bisa di-cancel
 local function teleportToPosition(dest)
     if not root then return end
+
+    -- MODE INSTANT: hard reset dan batalkan tween lama
     if tpMode == "Instant" then
+        teleporting = false
+        if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
         root.CFrame = CFrame.new(dest)
         return
     end
-    if teleporting then return end
+
+    -- MODE TWEEN: batalkan tween sebelumnya supaya tidak nge-blok
+    if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
+
     teleporting = true
     local wasFly = fly
     if wasFly then setFly(false) end
+
     local info = TweenInfo.new(
         math.max(0.05, tweenDuration),
         easeStyles[easeIdx][2],
         easeStyles[easeIdx][3],
-        0,false,0
+        0, false, 0
     )
-    local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
-    tw:Play()
+
+    local tw = TweenService:Create(root, info, { CFrame = CFrame.new(dest) })
+    currentTween = tw
     tw.Completed:Connect(function()
         teleporting = false
+        if currentTween == tw then currentTween = nil end
         if wasFly then setFly(true) end
     end)
+    tw:Play()
 end
 
 local function teleportToPositionAndWait(dest)
     if not root then return end
+
+    -- MODE INSTANT: hard reset dan batalkan tween lama
     if tpMode == "Instant" then
+        teleporting = false
+        if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
         root.CFrame = CFrame.new(dest)
         return
     end
 
+    -- MODE TWEEN: batalkan tween sebelumnya
+    if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
+
     local wasFly = fly
     if wasFly then setFly(false) end
+
     local info = TweenInfo.new(
         math.max(0.05, tweenDuration),
         easeStyles[easeIdx][2],
         easeStyles[easeIdx][3],
-        0,false,0
+        0, false, 0
     )
-    local tw = TweenService:Create(root, info, {CFrame = CFrame.new(dest)})
+
+    local tw = TweenService:Create(root, info, { CFrame = CFrame.new(dest) })
+    currentTween = tw
     tw:Play()
-    -- tunggu tween selesai
+
+    -- tunggu tween selesai; aman-kan jika HRP/dunia berubah
     pcall(function() tw.Completed:Wait() end)
+
+    if currentTween == tw then currentTween = nil end
+    teleporting = false
     if wasFly then setFly(true) end
 end
 
+
 local function safeTeleport(dest)
+    if (not root) or (not root.Parent) or (not hum) or hum.Health <= 0 then
+        getCharacter()
+    end
     if tpMode == "Instant" then
         teleportToPosition(dest)
     else
-        teleportToPositionAndWait(dest)
+        teleportToPositionAndWait(dest) -- ⬅️ penting, jangan panggil yang non-wait
     end
 end
 
@@ -892,7 +922,7 @@ local function createUI()
     local ijmSw = makeSwitch(mainScroll, "Inf Jump (Mobile)", false, function(v) infJumpMobile = v end)
     local ijpSw = makeSwitch(mainScroll, "Inf Jump (PC)", false, function(v) infJumpPC = v end)
     local nfdSw = makeSwitch(mainScroll, "No Fall Damage", false, function(v) noFallDamage = v end)
-    recalcMain()
+    task.defer(recalcMain)
 
     -- ===== MISC =====
     local fbSw  = makeSwitch(miscScroll, "Fullbright (Terang Terus)", false, function(v) setFullBright(v) end)
@@ -1802,61 +1832,71 @@ local function createUI()
     end)
 
     -- Row: Auto Respawn toggle
-    local arSwRow = createRow(atContent, 36)
-    local arSw = makeSwitch(arSwRow, "Auto Respawn Last Location", false, function(v)
+    local arSw = makeSwitch(atContent, "Auto Respawn Last Location", false, function(v)
         autoRespawnAfterTour = v
     end)
 
+    
     -- Row: Toggle Auto Tour (On/Off) + status
     local atSwRow = createRow(atContent, 36)
-    local autoTourSw = makeSwitch(atSwRow, "Auto Tour", false, function(v)
-        if v then
-        -- kalau snapshot kosong, auto-build dari savedLocations
-        if #tourList == 0 then
-            setTour((function()
-                local list = {}
-                for _, loc in ipairs(savedLocations) do
-                    local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
-                    if v then
-                        list[#list+1] = { name = loc.name, pos = Vector3.new(v.X, v.Y, v.Z) }
-                    end
-                end
-                return list
-            end)())
-            rebuildTourCounter()
-        end
 
-        if #tourList == 0 then
-            if statusLbl then statusLbl.Text = "Status: Tour list kosong — tekan Get All dulu" end
-            autoTourSw.Set(false)
-            return
+    local function buildTourFromSaved()
+        local list = {}
+        for _, loc in ipairs(savedLocations) do
+            local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
+            if v then
+                list[#list+1] = { name = loc.name, pos = Vector3.new(v.X, v.Y, v.Z) }
+            end
         end
-            if statusLbl then statusLbl.Text = "Status: Running" end
+        return list
+    end
+
+    local autoTourSw
+    autoTourSw = makeSwitch(atSwRow, "Auto Tour", false, function(v)
+        if v then
+            -- auto-build kalau snapshot kosong
+            if #tourList == 0 then
+                setTour(buildTourFromSaved())
+                rebuildTourCounter()
+            end
+            if #tourList == 0 then
+                if statusLbl then statusLbl.Text = "Status: Tour list kosong — tekan Get All dulu" end
+                autoTourSw.Set(false)
+                return
+            end
+
             tourRunning = true
+            if statusLbl then statusLbl.Text = "Status: Running" end
+
             task.spawn(function()
                 while tourRunning do
                     for i = 1, #tourList do
                         if not tourRunning then break end
                         local item = tourList[i]
                         local dest = item.pos + Vector3.new(0,3,0)
+
                         pcall(function() safeTeleport(dest) end)
                         jumpOnce()
-                        if not useInterval then task.wait(0.05) end
+
                         if useInterval then
                             local raw = (intervalBox and intervalBox.Text) or ""
-                            local n = tonumber(raw:gsub("[^%d%.]","")) or 3
+                            local n = tonumber((raw:gsub("[^%d%.]",""))) or 3
                             if n < 0.1 then n = 0.1 end
                             local t0 = tick()
                             while tourRunning and (tick() - t0) < n do task.wait(0.05) end
+                        else
+                            task.wait(0.05)
                         end
                     end
+
                     if not tourRunning then break end
                     if autoRespawnAfterTour then
                         local delaySec = respawnDelayAfterLast or 4
                         local t0 = tick()
                         while tourRunning and (tick() - t0) < delaySec do
-                            local sisa = math.max(0, delaySec - (tick() - t0))
-                            if statusLbl then statusLbl.Text = string.format("Status: Respawning in %.1fs", sisa) end
+                            if statusLbl then
+                                statusLbl.Text = string.format("Status: Respawning in %.1fs", math.max(0, delaySec - (tick() - t0)))
+                            end
                             task.wait(0.05)
                         end
                         if not tourRunning then break end
@@ -1865,12 +1905,16 @@ local function createUI()
                         if statusLbl then statusLbl.Text = "Status: Running" end
                     end
                 end
+
                 if statusLbl then statusLbl.Text = "Status: Stopped" end
-                autoTourSw.Set(false)
+                autoTourSw.Set(false) -- balikin switch ke OFF kalau loop selesai
             end)
         else
+            -- OFF: stop loop + cancel tween aktif
             tourRunning = false
             if statusLbl then statusLbl.Text = "Status: Stopping..." end
+            if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
+            teleporting = false
         end
     end)
 
@@ -1935,20 +1979,21 @@ local function createUI()
     end)
 
     doRespawn = function()
+        -- batalkan tween aktif biar nggak tarik HRP pas respawn
+        if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
+        teleporting = false
+
         statusLbl.Text = "Status: Respawning..."
-        -- Cara paling kompatibel: matikan Humanoid (akan trigger respawn default)
         local ch = LocalPlayer.Character
         local h = ch and ch:FindFirstChildOfClass("Humanoid")
         if h then
             h.Health = 0
         else
-            -- fallback kalau humanoid nggak ada
             pcall(function() LocalPlayer:LoadCharacter() end)
         end
 
-        -- Tunggu karakter baru siap
         pcall(function() LocalPlayer.CharacterAdded:Wait() end)
-        getCharacter() -- refresh char/root/hum
+        getCharacter()
         task.wait(0.2)
         statusLbl.Text = "Status: Running"
     end
@@ -2238,6 +2283,10 @@ ensurePhysics()
 hookFallDamage()
 
 LocalPlayer.CharacterAdded:Connect(function()
+    -- batalin tween lama waktu character baru spawn
+    if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
+    teleporting = false
+
     getCharacter()
     attachFly()
     ensurePhysics()
