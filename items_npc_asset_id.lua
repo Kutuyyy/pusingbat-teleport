@@ -1,201 +1,268 @@
+-- Pusingbat Hub — Minimal UI + Assets Tab (Held/Inventory/NPC)
+-- Works in Studio (LocalScript) and executors (Delta). No Rayfield required.
+
+-- ========== Services ==========
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
-local player = Players.LocalPlayer
+local LocalPlayer = Players.LocalPlayer
 
--- ====== Forward declarations ======
-local createUI
-local createSection
-local findClosestNPC
-
--- ====== Helper: safe UI parent (executor-friendly) ======
+-- ========== Safe UI Parent (executor-friendly) ==========
 local function getUiParent()
     local ok, hui = pcall(function() return gethui and gethui() end)
     if ok and hui then return hui end
     local core = game:FindFirstChildOfClass("CoreGui")
     if core then return core end
-    return player:WaitForChild("PlayerGui")
+    return LocalPlayer:WaitForChild("PlayerGui")
 end
 
--- ====== Section builder (didefinisikan SEBELUM dipakai) ======
-function createSection(title, parent, yPosition)
-    local section = Instance.new("Frame")
-    section.Name = title .. "Section"
-    section.Size = UDim2.new(0.9, 0, 0.2, 0)
-    section.Position = UDim2.new(0.05, 0, yPosition, 0)
-    section.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-    section.BorderSizePixel = 0
-    section.Parent = parent
-
-    local label = Instance.new("TextLabel")
-    label.Name = title .. "Label"
-    label.Text = title
-    label.Size = UDim2.new(0.4, 0, 0.3, 0)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 16
-    label.TextColor3 = Color3.fromRGB(200, 200, 200)
-    label.BackgroundTransparency = 1
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = section
-
-    local value = Instance.new("TextLabel")
-    value.Name = title .. "Value"
-    value.Text = "Loading..."
-    value.Size = UDim2.new(0.6, 0, 0.3, 0)
-    value.Position = UDim2.new(0.4, 0, 0, 0)
-    value.Font = Enum.Font.Gotham
-    value.TextSize = 16
-    value.TextColor3 = Color3.fromRGB(255, 255, 255)
-    value.BackgroundTransparency = 1
-    value.TextXAlignment = Enum.TextXAlignment.Right
-    value.Parent = section
-
-    return { Frame = section, Label = label, Value = value }
+-- ========== Helpers (data) ==========
+local function getToolAssetId(tool)
+    local id = rawget(tool, "AssetId") and tool.AssetId or nil
+    return id and tostring(id) or "N/A"
 end
 
--- ====== NPC finder (didefinisikan SEBELUM updateUI memakainya) ======
-function findClosestNPC()
-    local character = player.Character
-    if not character then return nil end
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return nil end
+local function getHeldInfo()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool then return "Held Tool: None" end
+    return ("Held Tool: %s\nAsset ID: %s"):format(tool.Name, getToolAssetId(tool))
+end
 
-    local closestName, closestDist = nil, math.huge
+local function getInventoryInfo()
+    local backpack = LocalPlayer:FindFirstChildOfClass("Backpack") or LocalPlayer:WaitForChild("Backpack", 2)
+    if not backpack then return "Inventory: (Backpack not found)" end
+    local lines, n = {"Inventory Items:"}, 0
+    for _, item in ipairs(backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            n += 1
+            table.insert(lines, ("%d) %s — ID: %s"):format(n, item.Name, getToolAssetId(item)))
+        end
+    end
+    if n == 0 then table.insert(lines, "(empty)") end
+    return table.concat(lines, "\n")
+end
 
-    for _, npc in ipairs(workspace:GetChildren()) do
-        local hrp = npc:FindFirstChild("HumanoidRootPart")
-        local hasPrompt = npc:FindFirstChildWhichIsA("ProximityPrompt")
+local function getNearestNPCInfo()
+    local char = LocalPlayer.Character
+    if not char then return "Nearest NPC: None" end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return "Nearest NPC: None" end
+
+    local bestName, bestDist = nil, math.huge
+    for _, m in ipairs(workspace:GetChildren()) do
+        local hrp = m:FindFirstChild("HumanoidRootPart")
+        local hasPrompt = m:FindFirstChildWhichIsA("ProximityPrompt")
         if hrp and hasPrompt then
-            local d = (hrp.Position - rootPart.Position).Magnitude
-            if d < closestDist then
-                closestDist = d
-                closestName = npc.Name
+            local d = (hrp.Position - root.Position).Magnitude
+            if d < bestDist then
+                bestDist, bestName = d, m.Name
             end
         end
     end
-
-    return (closestDist < 20) and closestName or nil
+    return bestName and ("Nearest NPC: %s (%.1f studs)"):format(bestName, bestDist) or "Nearest NPC: None"
 end
 
--- ====== UI CREATION ======
-function createUI()
-    -- Pastikan PlayerGui siap jika tidak pakai CoreGui
-    if not player:FindFirstChild("PlayerGui") then
-        repeat task.wait() until player:FindFirstChild("PlayerGui")
+-- ========== UI Factory ==========
+local function makeCorner(parent, r)
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, r or 10)
+    c.Parent = parent
+    return c
+end
+
+local function makeButton(parent, text, sizeUDim2, posUDim2)
+    local b = Instance.new("TextButton")
+    b.Size = sizeUDim2
+    b.Position = posUDim2 or UDim2.new()
+    b.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+    b.TextColor3 = Color3.fromRGB(235, 235, 235)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 14
+    b.Text = text
+    b.AutoButtonColor = true
+    b.BorderSizePixel = 0
+    b.Parent = parent
+    makeCorner(b, 8)
+    return b
+end
+
+local function makeScroll(parent)
+    local s = Instance.new("ScrollingFrame")
+    s.Size = UDim2.new(1, -16, 1, -88)
+    s.Position = UDim2.new(0, 8, 0, 78)
+    s.BackgroundTransparency = 1
+    s.BorderSizePixel = 0
+    s.CanvasSize = UDim2.new(0,0,0,0)
+    s.ScrollBarThickness = 6
+    s.Visible = false
+    s.Parent = parent
+    local layout = Instance.new("UIListLayout")
+    layout.FillDirection = Enum.FillDirection.Vertical
+    layout.Padding = UDim.new(0, 8)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Parent = s
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        s.CanvasSize = UDim2.new(0,0,0, layout.AbsoluteContentSize.Y + 20)
+    end)
+    return s
+end
+
+local function makeRow(parent, h)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, h)
+    row.BackgroundColor3 = Color3.fromRGB(38,38,42)
+    row.BackgroundTransparency = 0.2
+    row.BorderSizePixel = 0
+    row.Parent = parent
+    makeCorner(row, 8)
+    return row
+end
+
+-- ========== Create UI ==========
+local ScreenGui, MainFrame
+local tabs = {}
+local pages = {}
+local outputLabel -- used by Assets tab
+
+local function showTab(key)
+    for k, page in pairs(pages) do
+        page.Visible = (k == key)
     end
+end
 
+local function createUI()
+    -- Clean old
     local parent = getUiParent()
-
-    -- Hapus UI lama jika ada
-    local old = parent:FindFirstChild("AssetTrackerUI")
+    local old = parent:FindFirstChild("PusingbatUI")
     if old then old:Destroy() end
 
-    -- Buat ScreenGui utama
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "AssetTrackerUI"
+    ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "PusingbatUI"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.Parent = parent
 
-    -- Frame utama
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0.8, 0, 0.6, 0)
-    MainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+    MainFrame = Instance.new("Frame")
+    MainFrame.Name = "Main"
+    MainFrame.Size = UDim2.new(0.6, 0, 0.6, 0)
+    MainFrame.Position = UDim2.new(0.2, 0, 0.2, 0)
     MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    MainFrame.BackgroundTransparency = 0.2
+    MainFrame.BackgroundTransparency = 0.05
     MainFrame.BorderSizePixel = 0
     MainFrame.Parent = ScreenGui
+    makeCorner(MainFrame, 12)
 
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 12)
-    UICorner.Parent = MainFrame
+    -- Header
+    local header = Instance.new("TextLabel")
+    header.Size = UDim2.new(1, -40, 0, 36)
+    header.Position = UDim2.new(0, 20, 0, 16)
+    header.BackgroundTransparency = 1
+    header.Text = "Pusingbat Hub"
+    header.TextColor3 = Color3.fromRGB(255, 255, 255)
+    header.TextXAlignment = Enum.TextXAlignment.Left
+    header.Font = Enum.Font.GothamBold
+    header.TextSize = 20
+    header.Parent = MainFrame
 
-    -- Judul
-    local Title = Instance.new("TextLabel")
-    Title.Name = "Title"
-    Title.Text = "ASSET TRACKER"
-    Title.Size = UDim2.new(1, 0, 0.1, 0)
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 20
-    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Title.BackgroundTransparency = 1
-    Title.Parent = MainFrame
+    -- Close
+    local closeBtn = makeButton(MainFrame, "X", UDim2.fromOffset(28, 28), UDim2.new(1, -36, 0, 18))
+    closeBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
 
-    -- Section
-    local HeldItemSection = createSection("Held Tool:", MainFrame, 0.15)
-    local HeldItemValue = HeldItemSection.Value
+    -- Tabs bar container
+    local tabsBar = Instance.new("Frame")
+    tabsBar.Size = UDim2.new(1, -16, 0, 28)
+    tabsBar.Position = UDim2.new(0, 8, 0, 56)
+    tabsBar.BackgroundTransparency = 1
+    tabsBar.Parent = MainFrame
 
-    local InventorySection = createSection("Inventory Items:", MainFrame, 0.3)
-    local InventoryScrollingFrame = Instance.new("ScrollingFrame")
-    InventoryScrollingFrame.Name = "InventoryScrollingFrame"
-    InventoryScrollingFrame.Size = UDim2.new(0.9, 0, 0.8, 0)
-    InventoryScrollingFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
-    InventoryScrollingFrame.BackgroundTransparency = 1
-    InventoryScrollingFrame.ScrollBarThickness = 5
-    InventoryScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    InventoryScrollingFrame.Parent = InventorySection.Frame
-
-    local NPCSection = createSection("Current NPC:", MainFrame, 0.85)
-    local NPCValue = NPCSection.Value
-
-    -- Tombol tutup
-    local CloseButton = Instance.new("TextButton")
-    CloseButton.Name = "CloseButton"
-    CloseButton.Text = "X"
-    CloseButton.Size = UDim2.new(0.1, 0, 0.1, 0)
-    CloseButton.Position = UDim2.new(0.9, 0, 0, 0)
-    CloseButton.Font = Enum.Font.GothamBold
-    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    CloseButton.Parent = MainFrame
-
-    -- Update UI
-    local function updateUI()
-        local character = player.Character or player.CharacterAdded:Wait()
-        local tool = character:FindFirstChildOfClass("Tool")
-        local assetId = (tool and rawget(tool, "AssetId")) and tool.AssetId or "N/A"
-        HeldItemValue.Text = tool and (tool.Name .. " (ID: " .. tostring(assetId) .. ")") or "None"
-
-        -- Inventory
-        for _, c in ipairs(InventoryScrollingFrame:GetChildren()) do
-            if c:IsA("GuiObject") then c:Destroy() end
-        end
-        local y, itemHeight = 0, 20
-        local backpack = player:FindFirstChildOfClass("Backpack") or player:WaitForChild("Backpack", 2)
-        if backpack then
-            for _, item in ipairs(backpack:GetChildren()) do
-                if item:IsA("Tool") then
-                    local id = rawget(item, "AssetId") and item.AssetId or "N/A"
-                    local itemLabel = Instance.new("TextLabel")
-                    itemLabel.Text = item.Name .. ": " .. tostring(id)
-                    itemLabel.Size = UDim2.new(1, 0, 0, itemHeight)
-                    itemLabel.Position = UDim2.new(0, 0, 0, y)
-                    itemLabel.Font = Enum.Font.Gotham
-                    itemLabel.TextSize = 14
-                    itemLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-                    itemLabel.BackgroundTransparency = 1
-                    itemLabel.TextXAlignment = Enum.TextXAlignment.Left
-                    itemLabel.Parent = InventoryScrollingFrame
-                    y += itemHeight
-                end
-            end
-        end
-        InventoryScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, y)
-
-        -- NPC
-        NPCValue.Text = findClosestNPC() or "None"
+    -- Create 5 tabs: Main, Misc, Teleport, Config, Assets
+    local tabNames = {"Main","Misc","Teleport","Config","Assets"}
+    local x = 0
+    for i, name in ipairs(tabNames) do
+        local b = makeButton(tabsBar, name, UDim2.fromOffset(110, 28), UDim2.new(0, x, 0, 0))
+        tabs[name] = b
+        x = x + 116
     end
 
-    -- Events
-    CloseButton.MouseButton1Click:Connect(function()
-        ScreenGui:Destroy()
+    -- Pages (ScrollingFrames)
+    for _, name in ipairs(tabNames) do
+        pages[name] = makeScroll(MainFrame)
+    end
+
+    -- Placeholder rows for non-assets tabs (optional)
+    for _, name in ipairs({"Main","Misc","Teleport","Config"}) do
+        local row = makeRow(pages[name], 40)
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, -20, 1, -10)
+        lbl.Position = UDim2.new(0, 10, 0, 5)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = name .. " tab (placeholder)"
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 14
+        lbl.TextColor3 = Color3.fromRGB(220,220,220)
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.Parent = row
+    end
+
+    -- ===================== ASSETS TAB =====================
+    local assetsPage = pages["Assets"]
+
+    local function makeActionButton(text, callback)
+        local r = makeRow(assetsPage, 40)
+        local b = makeButton(r, text, UDim2.new(1, -20, 1, -10), UDim2.new(0, 10, 0, 5))
+        b.BackgroundColor3 = Color3.fromRGB(0, 90, 140)
+        b.MouseButton1Click:Connect(function() task.spawn(callback) end)
+    end
+
+    -- Output box
+    do
+        local r = makeRow(assetsPage, 220)
+        local bg = Instance.new("TextLabel")
+        bg.Size = UDim2.new(1, -20, 1, -20)
+        bg.Position = UDim2.new(0, 10, 0, 10)
+        bg.BackgroundColor3 = Color3.fromRGB(28,28,32)
+        bg.TextXAlignment = Enum.TextXAlignment.Left
+        bg.TextYAlignment = Enum.TextYAlignment.Top
+        bg.TextWrapped = false
+        bg.Text = "Output will appear here."
+        bg.Font = Enum.Font.Code
+        bg.TextSize = 14
+        bg.TextColor3 = Color3.fromRGB(230,230,230)
+        bg.BorderSizePixel = 0
+        bg.Parent = r
+        makeCorner(bg, 8)
+        outputLabel = bg
+    end
+
+    local function setOutput(txt)
+        outputLabel.Text = txt
+    end
+
+    makeActionButton("View Held Item", function()
+        setOutput(getHeldInfo())
     end)
 
-    -- Drag
+    makeActionButton("View Inventory Items", function()
+        setOutput(getInventoryInfo())
+    end)
+
+    makeActionButton("View Nearest NPC", function()
+        setOutput(getNearestNPCInfo())
+    end)
+
+    -- Tab switching
+    local function bindTab(btn, key)
+        btn.MouseButton1Click:Connect(function() showTab(key) end)
+    end
+    for name, btn in pairs(tabs) do bindTab(btn, name) end
+    showTab("Assets") -- default open Assets; ganti "Main" kalau mau
+
+    -- Drag window
     local dragging, dragStart, startPos = false, nil, nil
-    Title.InputBegan:Connect(function(input)
+    local dragArea = header
+    dragArea.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
@@ -213,59 +280,31 @@ function createUI()
             dragging = false
         end
     end)
-
-    -- Heartbeat update
-    RunService.Heartbeat:Connect(function()
-        pcall(updateUI)
-    end)
-
-    return ScreenGui
 end
 
--- ====== Loading screen ======
-local function createLoadingScreen()
-    local parent = getUiParent()
-    local loadingGui = Instance.new("ScreenGui")
-    loadingGui.Name = "LoadingScreen"
-    loadingGui.ResetOnSpawn = false
-    loadingGui.Parent = parent
-
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(1, 0, 1, 0)
-    frame.BackgroundColor3 = Color3.new(0, 0, 0)
-    frame.BackgroundTransparency = 0.5
-    frame.Parent = loadingGui
-
-    local text = Instance.new("TextLabel")
-    text.Size = UDim2.new(1, 0, 0.1, 0)
-    text.Position = UDim2.new(0, 0, 0.45, 0)
-    text.Text = "Asset Tracker Loading..."
-    text.Font = Enum.Font.GothamBold
-    text.TextSize = 24
-    text.TextColor3 = Color3.new(1, 1, 1)
-    text.BackgroundTransparency = 1
-    text.Parent = frame
-
-    task.delay(1.5, function()
-        loadingGui:Destroy()
-        pcall(createUI)
-    end)
+-- ========== Boot ==========
+local function boot()
+    -- wait PlayerGui only if needed
+    if not LocalPlayer:FindFirstChild("PlayerGui") then
+        LocalPlayer.CharacterAdded:Wait()
+        LocalPlayer:WaitForChild("PlayerGui", 5)
+    end
+    createUI()
 end
 
--- ====== Start ======
-if player.PlayerGui then
-    createLoadingScreen()
-else
-    player.CharacterAdded:Connect(function()
-        createLoadingScreen()
-    end)
-end
-
--- Toggle UI (F5)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.F5 then
+-- Toggle with F5
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.F5 then
         local parent = getUiParent()
-        local ui = parent:FindFirstChild("AssetTrackerUI")
-        if ui then ui:Destroy() else pcall(createUI) end
+        local ui = parent:FindFirstChild("PusingbatUI")
+        if ui then
+            ui:Destroy()
+        else
+            boot()
+        end
     end
 end)
+
+-- Auto-start first time
+boot()
