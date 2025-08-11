@@ -505,6 +505,7 @@ end
 
 local function createUI()
     local statusLbl
+    local useInterval = true  -- dipakai lintas-seksi
     local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
     -- Loading overlay 5 detik
@@ -891,6 +892,7 @@ local function createUI()
     local ijmSw = makeSwitch(mainScroll, "Inf Jump (Mobile)", false, function(v) infJumpMobile = v end)
     local ijpSw = makeSwitch(mainScroll, "Inf Jump (PC)", false, function(v) infJumpPC = v end)
     local nfdSw = makeSwitch(mainScroll, "No Fall Damage", false, function(v) noFallDamage = v end)
+    recalcMain()
 
     -- ===== MISC =====
     local fbSw  = makeSwitch(miscScroll, "Fullbright (Terang Terus)", false, function(v) setFullBright(v) end)
@@ -1189,6 +1191,7 @@ local function createUI()
         if not hrp then return end
         safeTeleport(hrp.Position + Vector3.new(0,3,0))
         jumpOnce()
+        if not useInterval then task.wait(0.05) end
     end
 
     goBtn.MouseButton1Click:Connect(teleportToTarget)
@@ -1337,10 +1340,12 @@ local function createUI()
                 local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
                 safeTeleport(dest)   -- ✅ cukup panggil ini
                 jumpOnce()
+                if not useInterval then task.wait(0.05) end
             end
         end)
 
         entry:SetAttribute("label", string.lower(locationData.name))
+        recalcTp()          -- <— pindah ke atas return
         return entry
         end
     -----------------------------------------------------
@@ -1405,6 +1410,7 @@ local function createUI()
             table.insert(savedLocations, locationData)
             createLocationEntry(locationData)
             recalcTp()
+            rebuildTourCounter()
         end)
     end)
 
@@ -1417,6 +1423,7 @@ local function createUI()
             end
         end
         recalcTp()
+        rebuildTourCounter()
     end)
 
     
@@ -1679,6 +1686,7 @@ local function createUI()
                 end
             end
             recalcTp()
+            rebuildTourCounter()
             popup:Destroy()
         end)
 
@@ -1713,7 +1721,6 @@ local function createUI()
     local tourRunning = false
     local intervalBox
     local doRespawn
-    local useInterval = true
     local respawnDelayAfterLast = 4 -- sudah ada di atas? kalau ada, pakai yang globalmu
 
     -- Row: Interval (text) + Toggle Use Interval
@@ -1730,7 +1737,7 @@ local function createUI()
     intervalBox.Parent = intervalRow
     Instance.new("UICorner", intervalBox).CornerRadius = UDim.new(0,6)
 
-    local useIntSw = makeSwitch(intervalRow, "Use Interval", true, function(v)
+    local useIntSw = makeSwitch(atContent, "Use Interval", true, function(v)
         useInterval = v
     end)
 
@@ -1804,11 +1811,26 @@ local function createUI()
     local atSwRow = createRow(atContent, 36)
     local autoTourSw = makeSwitch(atSwRow, "Auto Tour", false, function(v)
         if v then
-            if #tourList == 0 then
-                if statusLbl then statusLbl.Text = "Status: Tour list kosong — tekan Get All dulu" end
-                autoTourSw.Set(false)
-                return
-            end
+        -- kalau snapshot kosong, auto-build dari savedLocations
+        if #tourList == 0 then
+            setTour((function()
+                local list = {}
+                for _, loc in ipairs(savedLocations) do
+                    local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
+                    if v then
+                        list[#list+1] = { name = loc.name, pos = Vector3.new(v.X, v.Y, v.Z) }
+                    end
+                end
+                return list
+            end)())
+            rebuildTourCounter()
+        end
+
+        if #tourList == 0 then
+            if statusLbl then statusLbl.Text = "Status: Tour list kosong — tekan Get All dulu" end
+            autoTourSw.Set(false)
+            return
+        end
             if statusLbl then statusLbl.Text = "Status: Running" end
             tourRunning = true
             task.spawn(function()
@@ -1819,6 +1841,7 @@ local function createUI()
                         local dest = item.pos + Vector3.new(0,3,0)
                         pcall(function() safeTeleport(dest) end)
                         jumpOnce()
+                        if not useInterval then task.wait(0.05) end
                         if useInterval then
                             local raw = (intervalBox and intervalBox.Text) or ""
                             local n = tonumber(raw:gsub("[^%d%.]","")) or 3
@@ -1887,6 +1910,8 @@ local function createUI()
     locationsContainer.AutomaticSize = Enum.AutomaticSize.Y
     locationsContainer.Parent = listContent
     local locLayout = Instance.new("UIListLayout")
+    locationsContainer.ChildAdded:Connect(function() recalcTp() end)
+    locationsContainer.ChildRemoved:Connect(function() recalcTp() end)
     locLayout.Padding = UDim.new(0,6)
     locLayout.Parent = locationsContainer
 
