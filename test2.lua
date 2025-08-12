@@ -1,72 +1,41 @@
--- LocalScript: RemoteEvent Logger + Parser Hungry/Thirsty (UI tampil argumen)
+-- LocalScript: Network Logger Window (draggable + resizable + tabs)
+-- Tempel di StarterPlayer > StarterPlayerScripts
+
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 local LP = Players.LocalPlayer
 local PlayerGui = LP:WaitForChild("PlayerGui")
 
--- ========= UI (template kamu) =========
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DebugStatsUI"
-screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = PlayerGui
+----------------------------------------------------------------
+-- Data state
+----------------------------------------------------------------
+local HB = 0
+local HookedCount = 0
+local EventsCount = 0
+local HookedSet = {}          -- [RemoteEvent] = true
+local HookedList = {}         -- array of RemoteEvent (for UI)
+local EventLog = {}           -- array of {t=timestamp, remote=Instance, summary=string, full=string}
+local MAX_EVENTS = 200
+local ActiveFilter -- Instance remote yang difilter (nil = semua)
+local ActiveTab = "Overview"
 
-local label = Instance.new("TextLabel")
-label.Name = "DebugLabel"
-label.Size = UDim2.fromScale(0.56, 0.28)
-label.Position = UDim2.fromOffset(10, 10)
-label.BackgroundTransparency = 0.2
-label.BackgroundColor3 = Color3.new(0, 0, 0)
-label.TextColor3 = Color3.new(1, 1, 1)
-label.Font = Enum.Font.SourceSansBold
-label.TextSize = 18
-label.TextWrapped = true
-label.TextXAlignment = Enum.TextXAlignment.Left
-label.TextYAlignment = Enum.TextYAlignment.Top
-label.ZIndex = 999
-label.Text = "UI OK – logger siap"
-label.Parent = screenGui
-
-screenGui.AncestryChanged:Connect(function(_, parent)
-	if not parent then
-		task.defer(function()
-			if PlayerGui then screenGui.Parent = PlayerGui end
-		end)
-	end
-end)
-
--- ========= util output =========
-local HB, Hooked, Events = 0, 0, 0
-local LastRemote = "-"
-local logs = {}     -- ring buffer last 6 baris
-local MAX_LOG = 6
-
-local HungryBase, ThirstBase = nil, nil   -- kalau nanti bisa baca angka awal
-local HungrySum,  ThirstSum  = 0, 0
-local HungryLast, ThirstLast = nil, nil
-
-local function pushLog(line)
-	table.insert(logs, 1, line)
-	if #logs > MAX_LOG then table.remove(logs) end
-end
-
-local function short(s, max)
-	max = max or 120
-	if not s then return "" end
-	s = tostring(s)
-	if #s > max then
-		return s:sub(1, max-3) .. "..."
-	end
-	return s
-end
-
+----------------------------------------------------------------
+-- Helpers
+----------------------------------------------------------------
 local function safeFullName(inst)
-	local ok, res = pcall(function()
-		return inst:GetFullName()
-	end)
+	local ok, res = pcall(function() return inst:GetFullName() end)
 	return ok and res or (inst.ClassName .. " " .. (inst.Name or "?"))
+end
+
+local function short(s, n)
+	n = n or 120
+	s = tostring(s)
+	if #s > n then return s:sub(1, n-3) .. "..." end
+	return s
 end
 
 local function dumpVal(v, depth)
@@ -74,7 +43,16 @@ local function dumpVal(v, depth)
 	if depth > 1 then return "{...}" end
 	local t = typeof(v)
 	if t == "string" then
-		return '"' .. short(v, 80) .. '"'
+		return '"' .. s tostring(v) .. '"' -- dummy to avoid gsub later (we'll just short())
+	end
+	return nil
+end
+
+local function dumpAny(v, depth)
+	depth = depth or 0
+	local t = typeof(v)
+	if t == "string" then
+		return '"' .. v .. '"'
 	elseif t == "number" or t == "boolean" then
 		return tostring(v)
 	elseif t == "Instance" then
@@ -83,9 +61,9 @@ local function dumpVal(v, depth)
 		local parts, count = {}, 0
 		for k,val in pairs(v) do
 			count += 1
-			if count > 5 then table.insert(parts, "..."); break end
+			if count > 6 then table.insert(parts, "..."); break end
 			local keyStr = (type(k)=="string") and k or ("["..tostring(k).."]")
-			table.insert(parts, keyStr .. "=" .. dumpVal(val, depth+1))
+			table.insert(parts, keyStr .. "=" .. dumpAny(val, depth+1))
 		end
 		return "{" .. table.concat(parts, ", ") .. "}"
 	else
@@ -93,162 +71,397 @@ local function dumpVal(v, depth)
 	end
 end
 
-local function getNumberFromText(text)
-	if type(text) ~= "string" then return nil end
-	local n = text:match("([%+%-]?%d+%.?%d*)")
-	return n and tonumber(n) or nil
-end
-
-local function parseNotif(text)
-	if type(text) ~= "string" then return end
-	local low = text:lower()
-	local kind
-	if low:find("hungry") or low:find("hunger") or low:find("lapar") then
-		kind = "hungry"
-	elseif low:find("thirst") or low:find("thirsty") or low:find("haus") or low:find("hydration") then
-		kind = "thirsty"
-	else
-		return
+local function summarizeArgs(args)
+	local parts = {}
+	for i,a in ipairs(args) do
+		parts[i] = "arg"..i.."="..short(dumpAny(a), 140)
 	end
-	local num = getNumberFromText(text)
-	if not num then return end
-	-- kalau kalimatnya mengandung "berkurang" atau ada tanda minus, paksa negatif
-	if low:find("berkurang") and num > 0 then num = -num end
-	return kind, num
+	return table.concat(parts, " | ")
 end
 
-local function nowValue(base, sum)
-	return base and (base + sum) or nil
-end
-
-local function refreshLabel()
-	local lines = {}
-	table.insert(lines, ("HB:%d | Hooked:%d | Events:%d"):format(HB, Hooked, Events))
-	table.insert(lines, "LastRemote: " .. LastRemote)
-	local hNow = nowValue(HungryBase, HungrySum)
-	local tNow = nowValue(ThirstBase, ThirstSum)
-	table.insert(lines, ("Hungry: %s (Δlast:%s, Σ:%s)"):format(hNow and tostring(hNow) or "?", HungryLast and tostring(HungryLast) or "?", tostring(HungrySum)))
-	table.insert(lines, ("Thirsty: %s (Δlast:%s, Σ:%s)"):format(tNow and tostring(tNow) or "?", ThirstLast and tostring(ThirstLast) or "?", tostring(ThirstSum)))
-	table.insert(lines, "---- last payloads ----")
-	for i = 1, math.min(#logs, MAX_LOG) do
-		table.insert(lines, logs[i])
+local function fullDump(args)
+	local parts = {}
+	for i,a in ipairs(args) do
+		parts[i] = "arg"..i.." = " .. dumpAny(a, 0)
 	end
-	label.Text = table.concat(lines, "\n")
+	return table.concat(parts, "\n")
 end
 
--- heartbeat (bukti script jalan)
+local function addEvent(remote, args)
+	EventsCount += 1
+	local entry = {
+		t = os.time(),
+		remote = remote,
+		summary = summarizeArgs(args),
+		full = fullDump(args)
+	}
+	table.insert(EventLog, 1, entry)
+	if #EventLog > MAX_EVENTS then table.remove(EventLog) end
+end
+
+----------------------------------------------------------------
+-- UI: Window
+----------------------------------------------------------------
+local gui = Instance.new("ScreenGui")
+gui.Name = "NetworkLoggerUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.Parent = PlayerGui
+
+local window = Instance.new("Frame")
+window.Name = "Window"
+window.Size = UDim2.fromOffset(520, 340)
+window.Position = UDim2.fromOffset(24, 24)
+window.BackgroundColor3 = Color3.fromRGB(22,22,22)
+window.BackgroundTransparency = 0.1
+window.BorderSizePixel = 0
+window.Parent = gui
+
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 1
+stroke.Color = Color3.fromRGB(70,70,70)
+stroke.Parent = window
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0,6)
+corner.Parent = window
+
+-- Title bar
+local title = Instance.new("TextLabel")
+title.Name = "Title"
+title.Size = UDim2.new(1, -90, 0, 30)
+title.Position = UDim2.fromOffset(10, 6)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.SourceSansSemibold
+title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextColor3 = Color3.fromRGB(235,235,235)
+title.Text = "Network Logger"
+title.Parent = window
+
+local btnMin = Instance.new("TextButton")
+btnMin.Name = "BtnMin"
+btnMin.Size = UDim2.fromOffset(30, 24)
+btnMin.Position = UDim2.new(1, -76, 0, 6)
+btnMin.Text = "-"
+btnMin.Font = Enum.Font.SourceSansBold
+btnMin.TextSize = 20
+btnMin.BackgroundColor3 = Color3.fromRGB(40,40,40)
+btnMin.TextColor3 = Color3.new(1,1,1)
+btnMin.Parent = window
+
+local btnClose = Instance.new("TextButton")
+btnClose.Name = "BtnClose"
+btnClose.Size = UDim2.fromOffset(30, 24)
+btnClose.Position = UDim2.new(1, -40, 0, 6)
+btnClose.Text = "×"
+btnClose.Font = Enum.Font.SourceSansBold
+btnClose.TextSize = 20
+btnClose.BackgroundColor3 = Color3.fromRGB(40,40,40)
+btnClose.TextColor3 = Color3.new(1,1,1)
+btnClose.Parent = window
+
+-- Dragging
+do
+	local dragging = false
+	local dragStart, startPos
+	title.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = true
+			dragStart = input.Position
+			startPos = window.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then dragging = false end
+			end)
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = input.Position - dragStart
+			window.Position = UDim2.fromOffset(startPos.X.Offset + delta.X, startPos.Y.Offset + delta.Y)
+		end
+	end)
+end
+
+-- Resize grip (bottom-right)
+local grip = Instance.new("Frame")
+grip.Name = "Grip"
+grip.Size = UDim2.fromOffset(16, 16)
+grip.AnchorPoint = Vector2.new(1,1)
+grip.Position = UDim2.new(1, -4, 1, -4)
+grip.BackgroundColor3 = Color3.fromRGB(70,70,70)
+grip.BorderSizePixel = 0
+grip.Parent = window
+
+local gripCorner = Instance.new("UICorner")
+gripCorner.CornerRadius = UDim.new(0,3)
+gripCorner.Parent = grip
+
+do
+	local resizing = false
+	local startSize, startPos, startMouse
+	grip.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			resizing = true
+			startSize = window.Size
+			startPos = window.Position
+			startMouse = input.Position
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then resizing = false end
+			end)
+		end
+	end)
+	UIS.InputChanged:Connect(function(input)
+		if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
+			local delta = input.Position - startMouse
+			local w = math.max(360, startSize.X.Offset + delta.X)
+			local h = math.max(220, startSize.Y.Offset + delta.Y)
+			window.Size = UDim2.fromOffset(w, h)
+		end
+	end)
+end
+
+-- Content area
+local content = Instance.new("Frame")
+content.Name = "Content"
+content.BackgroundTransparency = 1
+content.Size = UDim2.new(1, -20, 1, -50)
+content.Position = UDim2.fromOffset(10, 40)
+content.Parent = window
+
+-- Tabs
+local tabs = Instance.new("Frame")
+tabs.Name = "Tabs"
+tabs.Size = UDim2.new(1, 0, 0, 28)
+tabs.BackgroundTransparency = 1
+tabs.Parent = content
+
+local function makeTabButton(text, xIndex)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(0, 100, 1, 0)
+	b.Position = UDim2.fromOffset((xIndex-1)*106, 0)
+	b.Text = text
+	b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.Font = Enum.Font.SourceSansBold
+	b.TextSize = 16
+	b.Parent = tabs
+	return b
+end
+
+local btnTabOverview = makeTabButton("Overview", 1)
+local btnTabRemotes  = makeTabButton("Remotes",  2)
+local btnTabEvents   = makeTabButton("Events",   3)
+
+local body = Instance.new("Frame")
+body.Name = "Body"
+body.Size = UDim2.new(1, 0, 1, -34)
+body.Position = UDim2.fromOffset(0, 34)
+body.BackgroundTransparency = 1
+body.Parent = content
+
+-- Panels
+local panelOverview = Instance.new("Frame")
+panelOverview.BackgroundTransparency = 1
+panelOverview.Size = UDim2.fromScale(1,1)
+panelOverview.Parent = body
+
+local panelRemotes = Instance.new("Frame")
+panelRemotes.BackgroundTransparency = 1
+panelRemotes.Size = UDim2.fromScale(1,1)
+panelRemotes.Visible = false
+panelRemotes.Parent = body
+
+local panelEvents = Instance.new("Frame")
+panelEvents.BackgroundTransparency = 1
+panelEvents.Size = UDim2.fromScale(1,1)
+panelEvents.Visible = false
+panelEvents.Parent = body
+
+-- Overview contents
+local ovText = Instance.new("TextLabel")
+ovText.BackgroundTransparency = 1
+ovText.TextXAlignment = Enum.TextXAlignment.Left
+ovText.TextYAlignment = Enum.TextYAlignment.Top
+ovText.Font = Enum.Font.SourceSans
+ovText.TextSize = 18
+ovText.TextColor3 = Color3.new(1,1,1)
+ovText.Size = UDim2.fromScale(1,1)
+ovText.Parent = panelOverview
+
+-- Remotes list
+local remScroll = Instance.new("ScrollingFrame")
+remScroll.Size = UDim2.new(1, 0, 1, -28)
+remScroll.CanvasSize = UDim2.new()
+remScroll.ScrollBarThickness = 6
+remScroll.BackgroundTransparency = 1
+remScroll.Parent = panelRemotes
+
+local remList = Instance.new("UIListLayout")
+remList.Padding = UDim.new(0,4)
+remList.Parent = remScroll
+
+local remFilter = Instance.new("TextLabel")
+remFilter.Size = UDim2.new(1, 0, 0, 24)
+remFilter.Position = UDim2.new(0,0,1,-24)
+remFilter.BackgroundTransparency = 1
+remFilter.Font = Enum.Font.SourceSans
+remFilter.TextSize = 16
+remFilter.TextXAlignment = Enum.TextXAlignment.Left
+remFilter.TextColor3 = Color3.new(1,1,1)
+remFilter.Text = "Filter: All"
+remFilter.Parent = panelRemotes
+
+-- Events list + details
+local evTop = Instance.new("Frame")
+evTop.Size = UDim2.new(1, 0, 0.55, -2)
+evTop.BackgroundTransparency = 1
+evTop.Parent = panelEvents
+
+local evScroll = Instance.new("ScrollingFrame")
+evScroll.Size = UDim2.new(1, 0, 1, 0)
+evScroll.CanvasSize = UDim2.new()
+evScroll.ScrollBarThickness = 6
+evScroll.BackgroundTransparency = 1
+evScroll.Parent = evTop
+
+local evList = Instance.new("UIListLayout")
+evList.Padding = UDim.new(0,4)
+evList.Parent = evScroll
+
+local evDetail = Instance.new("ScrollingFrame")
+evDetail.Size = UDim2.new(1, 0, 0.45, -6)
+evDetail.Position = UDim2.new(0, 0, 0.55, 6)
+evDetail.ScrollBarThickness = 6
+evDetail.BackgroundTransparency = 0.05
+evDetail.Parent = panelEvents
+
+local evDetailText = Instance.new("TextLabel")
+evDetailText.Size = UDim2.new(1, -10, 0, 0)
+evDetailText.Position = UDim2.fromOffset(5,5)
+evDetailText.BackgroundTransparency = 1
+evDetailText.Font = Enum.Font.Code
+evDetailText.TextSize = 15
+evDetailText.TextXAlignment = Enum.TextXAlignment.Left
+evDetailText.TextYAlignment = Enum.TextYAlignment.Top
+evDetailText.TextWrapped = true
+evDetailText.AutomaticSize = Enum.AutomaticSize.Y
+evDetailText.TextColor3 = Color3.new(1,1,1)
+evDetailText.Text = "-- select an event --"
+evDetailText.Parent = evDetail
+
+----------------------------------------------------------------
+-- UI rendering
+----------------------------------------------------------------
+local function switchTab(name)
+	ActiveTab = name
+	panelOverview.Visible = (name=="Overview")
+	panelRemotes.Visible  = (name=="Remotes")
+	panelEvents.Visible   = (name=="Events")
+end
+btnTabOverview.MouseButton1Click:Connect(function() switchTab("Overview") end)
+btnTabRemotes.MouseButton1Click:Connect(function() switchTab("Remotes") end)
+btnTabEvents.MouseButton1Click:Connect(function() switchTab("Events") end)
+
+btnMin.MouseButton1Click:Connect(function()
+	body.Visible = not body.Visible
+end)
+btnClose.MouseButton1Click:Connect(function()
+	gui.Enabled = false
+end)
+
+local function renderOverview()
+	local lastRemote = (#HookedList > 0) and safeFullName(HookedList[1]) or "-"
+	ovText.Text = string.format(
+		"Heartbeat: %d\nHooked Remotes: %d\nEvents: %d\nFilter: %s\n\nTips:\n- Tab 'Remotes' untuk pilih filter\n- Tab 'Events' untuk lihat payload & klik baris untuk detail",
+		HB, HookedCount, EventsCount, ActiveFilter and safeFullName(ActiveFilter) or "All"
+	)
+end
+
+local function makeRow(text, click)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1, -8, 0, 28)
+	b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.TextXAlignment = Enum.TextXAlignment.Left
+	b.Font = Enum.Font.SourceSans
+	b.TextSize = 16
+	b.Text = text
+	b.AutoButtonColor = true
+	b.MouseButton1Click:Connect(click)
+	local bc = Instance.new("UICorner", b); bc.CornerRadius = UDim.new(0,4)
+	return b
+end
+
+local function renderRemotes()
+	for _,child in ipairs(remScroll:GetChildren()) do
+		if child:IsA("TextButton") then child:Destroy() end
+	end
+	for i, re in ipairs(HookedList) do
+		local row = makeRow(short(safeFullName(re), 90), function()
+			ActiveFilter = re
+			remFilter.Text = "Filter: "..short(safeFullName(re), 120)
+			switchTab("Events")
+		end)
+		row.Parent = remScroll
+	end
+	remScroll.CanvasSize = UDim2.new(0,0,0, remList.AbsoluteContentSize.Y + 6)
+	remFilter.Text = "Filter: ".. (ActiveFilter and short(safeFullName(ActiveFilter), 120) or "All")
+end
+
+local function renderEvents()
+	for _,child in ipairs(evScroll:GetChildren()) do
+		if child:IsA("TextButton") then child:Destroy() end
+	end
+	for i, ev in ipairs(EventLog) do
+		if not ActiveFilter or ev.remote == ActiveFilter then
+			local rowText = os.date("%H:%M:%S", ev.t) .. " | " .. short(safeFullName(ev.remote), 60) .. " | " .. short(ev.summary, 140)
+			local row = makeRow(rowText, function()
+				evDetailText.Text = ("Time: %s\nRemote: %s\n\n%s"):format(
+					os.date("%c", ev.t), safeFullName(ev.remote), ev.full
+				)
+				evDetail.CanvasSize = UDim2.new(0,0,0, evDetailText.AbsoluteSize.Y + 10)
+			end)
+			row.Parent = evScroll
+		end
+	end
+	evScroll.CanvasSize = UDim2.new(0,0,0, evList.AbsoluteContentSize.Y + 6)
+end
+
+local function renderAll()
+	renderOverview()
+	renderRemotes()
+	renderEvents()
+end
+
+-- periodic UI update (HB)
 task.spawn(function()
-	while true do
+	while gui.Parent do
 		HB += 1
-		refreshLabel()
+		if ActiveTab=="Overview" then renderOverview() end
 		task.wait(1)
 	end
 end)
 
--- (opsional) seed nilai awal dari GUI (format "00.0/100")
-task.spawn(function()
-	task.wait(1)
-	local hungryLbl, thirstyLbl
-	for _, obj in ipairs(PlayerGui:GetDescendants()) do
-		if (obj:IsA("TextLabel") or obj:IsA("TextButton")) and type(obj.Text)=="string" then
-			local t = obj.Text:lower()
-			if not hungryLbl and t:find("hungry") then hungryLbl = obj end
-			if not thirstyLbl and t:find("thirst") then thirstyLbl = obj end
-		end
-	end
-	local function baseFromLabel(o)
-		if not o then return nil end
-		local n = o.Text:match("(%d+%.?%d*)")
-		return n and tonumber(n) or nil
-	end
-	HungryBase = baseFromLabel(hungryLbl)
-	ThirstBase = baseFromLabel(thirstyLbl)
-	if hungryLbl then
-		hungryLbl:GetPropertyChangedSignal("Text"):Connect(function()
-			HungryBase = baseFromLabel(hungryLbl); refreshLabel()
-		end)
-	end
-	if thirstyLbl then
-		thirstyLbl:GetPropertyChangedSignal("Text"):Connect(function()
-			ThirstBase = baseFromLabel(thirstyLbl); refreshLabel()
-		end)
-	end
-	refreshLabel()
-end)
-
--- ========= hook RemoteEvent =========
+----------------------------------------------------------------
+-- Hooking remotes (ReplicatedStorage)
+----------------------------------------------------------------
 local function hookRemote(re)
-	if not re or not re:IsA("RemoteEvent") then return end
-	Hooked += 1
-	refreshLabel()
+	if not re:IsA("RemoteEvent") then return end
+	if HookedSet[re] then return end
+	HookedSet[re] = true
+	table.insert(HookedList, 1, re)
+	HookedCount += 1
+	if ActiveTab=="Remotes" then renderRemotes() end
+
 	re.OnClientEvent:Connect(function(...)
-		Events += 1
-		LastRemote = safeFullName(re)
-
-		-- bangun summary argumen
-		local parts = {}
-		local args = {...}
-		for i, a in ipairs(args) do
-			parts[i] = "arg"..i.."="..short(dumpVal(a), 140)
-		end
-		pushLog(short(table.concat(parts, " | "), 220))
-
-		-- parsing notif (cari string di args & juga di table nested level 1)
-		for _, a in ipairs(args) do
-			if type(a) == "string" then
-				local kind, delta = parseNotif(a)
-				if kind == "hungry" then HungryLast = delta; HungrySum += delta end
-				if kind == "thirsty" then ThirstLast = delta; ThirstSum += delta end
-			elseif typeof(a) == "table" then
-				for k,v in pairs(a) do
-					if type(v) == "string" then
-						local kind, delta = parseNotif(v)
-						if kind == "hungry" then HungryLast = delta; HungrySum += delta end
-						if kind == "thirsty" then ThirstLast = delta; ThirstSum += delta end
-					end
-					-- kalau key-nya informatif (mis. {Hungry=10})
-					if type(k) == "string" and (k:lower():find("hung") or k:lower():find("thirst")) and tonumber(v) then
-						if k:lower():find("hung") then HungryLast = tonumber(v); HungrySum += tonumber(v) end
-						if k:lower():find("thirst") then ThirstLast = tonumber(v); ThirstSum += tonumber(v) end
-					end
-				end
-			end
-		end
-
-		refreshLabel()
+		addEvent(re, {...})
+		if ActiveTab=="Events" then renderEvents() end
+		if ActiveTab=="Overview" then renderOverview() end
 	end)
 end
 
--- 1) coba hook path networker yg kamu sebut (versi spesifik & wildcard)
-local function findAndHookNetworker()
-	local ok, fixed = pcall(function()
-		return RS:WaitForChild("Packages", 1)
-			:WaitForChild("_Index", 1)
-			:WaitForChild("leifstout_networker@0.2.1", 1)
-			:WaitForChild("networker", 1)
-			:WaitForChild("_remotes", 1)
-			:WaitForChild("Network", 1)
-			:WaitForChild("RemoteEvent", 1)
-	end)
-	if ok and fixed then hookRemote(fixed) end
-
-	local packages = RS:FindFirstChild("Packages")
-	if not packages then return end
-	local index = packages:FindFirstChild("_Index")
-	if not index then return end
-	for _, child in ipairs(index:GetChildren()) do
-		if child.Name:match("^leifstout_networker@") then
-			local nw = child:FindFirstChild("networker")
-			if nw and nw:FindFirstChild("_remotes") then
-				for _, sub in ipairs(nw._remotes:GetDescendants()) do
-					if sub:IsA("RemoteEvent") then hookRemote(sub) end
-				end
-			end
-		end
-	end
-end
-
--- 2) hook semua RemoteEvent lain di ReplicatedStorage (cadangan)
 for _, obj in ipairs(RS:GetDescendants()) do
 	if obj:IsA("RemoteEvent") then hookRemote(obj) end
 end
@@ -256,8 +469,4 @@ RS.DescendantAdded:Connect(function(obj)
 	if obj:IsA("RemoteEvent") then hookRemote(obj) end
 end)
 
-findAndHookNetworker()
-refreshLabel()
-
--- heartbeat naik → bukti script jalan.
--- lihat bagian "---- last payloads ----" buat isi argumen event terakhir.
+renderAll()
