@@ -1,6 +1,4 @@
--- LocalScript: Hook "Notif" Remote + UI debug (gunakan template UI-mu)
--- Taruh di StarterPlayer > StarterPlayerScripts
-
+-- LocalScript: RemoteEvent Logger + Parser Hungry/Thirsty (UI tampil argumen)
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 local Players = game:GetService("Players")
@@ -8,7 +6,7 @@ local RS = game:GetService("ReplicatedStorage")
 local LP = Players.LocalPlayer
 local PlayerGui = LP:WaitForChild("PlayerGui")
 
--- ==== UI (template kamu) ====
+-- ========= UI (template kamu) =========
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "DebugStatsUI"
 screenGui.ResetOnSpawn = false
@@ -17,7 +15,7 @@ screenGui.Parent = PlayerGui
 
 local label = Instance.new("TextLabel")
 label.Name = "DebugLabel"
-label.Size = UDim2.fromScale(0.45, 0.135)
+label.Size = UDim2.fromScale(0.56, 0.28)
 label.Position = UDim2.fromOffset(10, 10)
 label.BackgroundTransparency = 0.2
 label.BackgroundColor3 = Color3.new(0, 0, 0)
@@ -28,10 +26,9 @@ label.TextWrapped = true
 label.TextXAlignment = Enum.TextXAlignment.Left
 label.TextYAlignment = Enum.TextYAlignment.Top
 label.ZIndex = 999
-label.Text = "UI OK – hooking Remote..."
+label.Text = "UI OK – logger siap"
 label.Parent = screenGui
 
--- kalau ada script lain yg destroy GUI, re-attach lagi
 screenGui.AncestryChanged:Connect(function(_, parent)
 	if not parent then
 		task.defer(function()
@@ -40,40 +37,72 @@ screenGui.AncestryChanged:Connect(function(_, parent)
 	end
 end)
 
--- ==== state ====
-local events = 0
-local lastRemote = "-"
-local hungryDeltaLast, thirstyDeltaLast = nil, nil
-local hungryDeltaSum, thirstyDeltaSum = 0, 0
-local hungryBase, thirstyBase = nil, nil -- kalau nanti bisa dibaca nilai awalnya
-local hungryNow, thirstyNow = nil, nil
+-- ========= util output =========
+local HB, Hooked, Events = 0, 0, 0
+local LastRemote = "-"
+local logs = {}     -- ring buffer last 6 baris
+local MAX_LOG = 6
 
-local function fmt(x) return x and tostring(x) or "?" end
+local HungryBase, ThirstBase = nil, nil   -- kalau nanti bisa baca angka awal
+local HungrySum,  ThirstSum  = 0, 0
+local HungryLast, ThirstLast = nil, nil
 
-local function refreshNow()
-	if hungryBase then hungryNow = hungryBase + hungryDeltaSum end
-	if thirstyBase then thirstyNow = thirstyBase + thirstyDeltaSum end
+local function pushLog(line)
+	table.insert(logs, 1, line)
+	if #logs > MAX_LOG then table.remove(logs) end
 end
 
-local function setText()
-	refreshNow()
-	label.Text = string.format(
-		"Remote: %s | Events: %d\n" ..
-		"Hungry: %s  (Δlast: %s, Δsum: %s)\n" ..
-		"Thirsty: %s (Δlast: %s, Δsum: %s)",
-		lastRemote, events,
-		fmt(hungryNow or hungryBase), fmt(hungryDeltaLast), fmt(hungryDeltaSum),
-		fmt(thirstyNow or thirstyBase), fmt(thirstyDeltaLast), fmt(thirstyDeltaSum)
-	)
+local function short(s, max)
+	max = max or 120
+	if not s then return "" end
+	s = tostring(s)
+	if #s > max then
+		return s:sub(1, max-3) .. "..."
+	end
+	return s
 end
-setText()
 
--- ==== helper parse notif ====
--- Contoh payload: "Notif", "Hungry bertambah +10"
+local function safeFullName(inst)
+	local ok, res = pcall(function()
+		return inst:GetFullName()
+	end)
+	return ok and res or (inst.ClassName .. " " .. (inst.Name or "?"))
+end
+
+local function dumpVal(v, depth)
+	depth = depth or 0
+	if depth > 1 then return "{...}" end
+	local t = typeof(v)
+	if t == "string" then
+		return '"' .. short(v, 80) .. '"'
+	elseif t == "number" or t == "boolean" then
+		return tostring(v)
+	elseif t == "Instance" then
+		return "<" .. safeFullName(v) .. ">"
+	elseif t == "table" then
+		local parts, count = {}, 0
+		for k,val in pairs(v) do
+			count += 1
+			if count > 5 then table.insert(parts, "..."); break end
+			local keyStr = (type(k)=="string") and k or ("["..tostring(k).."]")
+			table.insert(parts, keyStr .. "=" .. dumpVal(val, depth+1))
+		end
+		return "{" .. table.concat(parts, ", ") .. "}"
+	else
+		return "<"..t..">"
+	end
+end
+
+local function getNumberFromText(text)
+	if type(text) ~= "string" then return nil end
+	local n = text:match("([%+%-]?%d+%.?%d*)")
+	return n and tonumber(n) or nil
+end
+
 local function parseNotif(text)
 	if type(text) ~= "string" then return end
 	local low = text:lower()
-	local kind -- "hungry" / "thirsty"
+	local kind
 	if low:find("hungry") or low:find("hunger") or low:find("lapar") then
 		kind = "hungry"
 	elseif low:find("thirst") or low:find("thirsty") or low:find("haus") or low:find("hydration") then
@@ -81,21 +110,44 @@ local function parseNotif(text)
 	else
 		return
 	end
-
-	-- cari angka +/- (boleh desimal)
-	local sign = 1
-	if low:find("berkurang") or low:find("-") then sign = -1 end
-	local num = text:match("([%+%-]?%d+%.?%d*)")
-	num = tonumber(num)
+	local num = getNumberFromText(text)
 	if not num then return end
-
-	local delta = sign * math.abs(num)
-	return kind, delta
+	-- kalau kalimatnya mengandung "berkurang" atau ada tanda minus, paksa negatif
+	if low:find("berkurang") and num > 0 then num = -num end
+	return kind, num
 end
 
--- ==== (opsional) seed nilai awal dari GUI kalau kebaca (00.0/100) ====
+local function nowValue(base, sum)
+	return base and (base + sum) or nil
+end
+
+local function refreshLabel()
+	local lines = {}
+	table.insert(lines, ("HB:%d | Hooked:%d | Events:%d"):format(HB, Hooked, Events))
+	table.insert(lines, "LastRemote: " .. LastRemote)
+	local hNow = nowValue(HungryBase, HungrySum)
+	local tNow = nowValue(ThirstBase, ThirstSum)
+	table.insert(lines, ("Hungry: %s (Δlast:%s, Σ:%s)"):format(hNow and tostring(hNow) or "?", HungryLast and tostring(HungryLast) or "?", tostring(HungrySum)))
+	table.insert(lines, ("Thirsty: %s (Δlast:%s, Σ:%s)"):format(tNow and tostring(tNow) or "?", ThirstLast and tostring(ThirstLast) or "?", tostring(ThirstSum)))
+	table.insert(lines, "---- last payloads ----")
+	for i = 1, math.min(#logs, MAX_LOG) do
+		table.insert(lines, logs[i])
+	end
+	label.Text = table.concat(lines, "\n")
+end
+
+-- heartbeat (bukti script jalan)
 task.spawn(function()
-	task.wait(1) -- kasih waktu UI asli muncul
+	while true do
+		HB += 1
+		refreshLabel()
+		task.wait(1)
+	end
+end)
+
+-- (opsional) seed nilai awal dari GUI (format "00.0/100")
+task.spawn(function()
+	task.wait(1)
 	local hungryLbl, thirstyLbl
 	for _, obj in ipairs(PlayerGui:GetDescendants()) do
 		if (obj:IsA("TextLabel") or obj:IsA("TextButton")) and type(obj.Text)=="string" then
@@ -104,106 +156,108 @@ task.spawn(function()
 			if not thirstyLbl and t:find("thirst") then thirstyLbl = obj end
 		end
 	end
-	local function numFromText(s)
-		if type(s) ~= "string" then return nil end
-		local n = s:match("(%d+%.?%d*)") -- ambil angka pertama dari "00.0/100"
+	local function baseFromLabel(o)
+		if not o then return nil end
+		local n = o.Text:match("(%d+%.?%d*)")
 		return n and tonumber(n) or nil
 	end
-	if hungryLbl then hungryBase = numFromText(hungryLbl.Text) end
-	if thirstyLbl then thirstyBase = numFromText(thirstyLbl.Text) end
-	setText()
-	-- update jika label GUI berubah
-	if hungryLbl then hungryLbl:GetPropertyChangedSignal("Text"):Connect(function()
-		hungryBase = numFromText(hungryLbl.Text); setText()
-	end) end
-	if thirstyLbl then thirstyLbl:GetPropertyChangedSignal("Text"):Connect(function()
-		thirstyBase = numFromText(thirstyLbl.Text); setText()
-	end) end
+	HungryBase = baseFromLabel(hungryLbl)
+	ThirstBase = baseFromLabel(thirstyLbl)
+	if hungryLbl then
+		hungryLbl:GetPropertyChangedSignal("Text"):Connect(function()
+			HungryBase = baseFromLabel(hungryLbl); refreshLabel()
+		end)
+	end
+	if thirstyLbl then
+		thirstyLbl:GetPropertyChangedSignal("Text"):Connect(function()
+			ThirstBase = baseFromLabel(thirstyLbl); refreshLabel()
+		end)
+	end
+	refreshLabel()
 end)
 
--- ==== cari & hook RemoteEvent "Network/RemoteEvent" (leifstout_networker@...) ====
-local function findNetworkRemote()
-	-- coba path yang kamu share (versi fixed)
-	local ok, remote = pcall(function()
-		return RS:WaitForChild("Packages", 3)
-			:WaitForChild("_Index", 3)
-			:WaitForChild("leifstout_networker@0.2.1", 3)
-			:WaitForChild("networker", 3)
-			:WaitForChild("_remotes", 3)
-			:WaitForChild("Network", 3)
-			:WaitForChild("RemoteEvent", 3)
-	end)
-	if ok and remote then return remote end
-
-	-- kalau versi paket beda, cari folder yg namanya mulai "leifstout_networker@"
-	local packages = RS:FindFirstChild("Packages")
-	if not packages then return nil end
-	local index = packages:FindFirstChild("_Index")
-	if not index then return nil end
-	for _, child in ipairs(index:GetChildren()) do
-		if child.Name:match("^leifstout_networker@") then
-			local nw = child:FindFirstChild("networker")
-			if nw and nw:FindFirstChild("_remotes") then
-				local net = nw._remotes:FindFirstChild("Network")
-				if net and net:FindFirstChild("RemoteEvent") then
-					return net.RemoteEvent
-				end
-			end
-		end
-	end
-	return nil
-end
-
+-- ========= hook RemoteEvent =========
 local function hookRemote(re)
-	if not re or not re:IsA("RemoteEvent") then return false end
-	lastRemote = re:GetFullName()
-	setText()
-
+	if not re or not re:IsA("RemoteEvent") then return end
+	Hooked += 1
+	refreshLabel()
 	re.OnClientEvent:Connect(function(...)
-		events += 1
-		lastRemote = re:GetFullName()
+		Events += 1
+		LastRemote = safeFullName(re)
 
+		-- bangun summary argumen
+		local parts = {}
 		local args = {...}
-		-- format yang kamu kirim dari Sigma Spy: "Notif", "Hungry bertambah +10"
-		if #args >= 2 and args[1] == "Notif" and type(args[2]) == "string" then
-			local kind, delta = parseNotif(args[2])
-			if kind == "hungry" and delta then
-				hungryDeltaLast = delta
-				hungryDeltaSum += delta
-			elseif kind == "thirsty" and delta then
-				thirstyDeltaLast = delta
-				thirstyDeltaSum += delta
-			end
-		else
-			-- kalau format beda, coba cek semua argumen string (fallback)
-			for _,v in ipairs(args) do
-				if type(v) == "string" then
-					local kind, delta = parseNotif(v)
-					if kind == "hungry" and delta then
-						hungryDeltaLast = delta
-						hungryDeltaSum += delta
-					elseif kind == "thirsty" and delta then
-						thirstyDeltaLast = delta
-						thirstyDeltaSum += delta
+		for i, a in ipairs(args) do
+			parts[i] = "arg"..i.."="..short(dumpVal(a), 140)
+		end
+		pushLog(short(table.concat(parts, " | "), 220))
+
+		-- parsing notif (cari string di args & juga di table nested level 1)
+		for _, a in ipairs(args) do
+			if type(a) == "string" then
+				local kind, delta = parseNotif(a)
+				if kind == "hungry" then HungryLast = delta; HungrySum += delta end
+				if kind == "thirsty" then ThirstLast = delta; ThirstSum += delta end
+			elseif typeof(a) == "table" then
+				for k,v in pairs(a) do
+					if type(v) == "string" then
+						local kind, delta = parseNotif(v)
+						if kind == "hungry" then HungryLast = delta; HungrySum += delta end
+						if kind == "thirsty" then ThirstLast = delta; ThirstSum += delta end
+					end
+					-- kalau key-nya informatif (mis. {Hungry=10})
+					if type(k) == "string" and (k:lower():find("hung") or k:lower():find("thirst")) and tonumber(v) then
+						if k:lower():find("hung") then HungryLast = tonumber(v); HungrySum += tonumber(v) end
+						if k:lower():find("thirst") then ThirstLast = tonumber(v); ThirstSum += tonumber(v) end
 					end
 				end
 			end
 		end
-		setText()
+
+		refreshLabel()
 	end)
-	return true
 end
 
--- pasang hook
-local remote = findNetworkRemote()
-if not hookRemote(remote) then
-	label.Text = label.Text .. "\nRemote belum ketemu, nunggu 5s..."
-	task.delay(5, function()
-		local again = findNetworkRemote()
-		if hookRemote(again) then
-			label.Text = "Remote ketemu ulang: " .. again:GetFullName()
-		else
-			label.Text = label.Text .. "\nGagal hook. Coba makan/minum dulu lalu rejoin, atau kasih aku path Remote terbaru."
-		end
+-- 1) coba hook path networker yg kamu sebut (versi spesifik & wildcard)
+local function findAndHookNetworker()
+	local ok, fixed = pcall(function()
+		return RS:WaitForChild("Packages", 1)
+			:WaitForChild("_Index", 1)
+			:WaitForChild("leifstout_networker@0.2.1", 1)
+			:WaitForChild("networker", 1)
+			:WaitForChild("_remotes", 1)
+			:WaitForChild("Network", 1)
+			:WaitForChild("RemoteEvent", 1)
 	end)
+	if ok and fixed then hookRemote(fixed) end
+
+	local packages = RS:FindFirstChild("Packages")
+	if not packages then return end
+	local index = packages:FindFirstChild("_Index")
+	if not index then return end
+	for _, child in ipairs(index:GetChildren()) do
+		if child.Name:match("^leifstout_networker@") then
+			local nw = child:FindFirstChild("networker")
+			if nw and nw:FindFirstChild("_remotes") then
+				for _, sub in ipairs(nw._remotes:GetDescendants()) do
+					if sub:IsA("RemoteEvent") then hookRemote(sub) end
+				end
+			end
+		end
+	end
 end
+
+-- 2) hook semua RemoteEvent lain di ReplicatedStorage (cadangan)
+for _, obj in ipairs(RS:GetDescendants()) do
+	if obj:IsA("RemoteEvent") then hookRemote(obj) end
+end
+RS.DescendantAdded:Connect(function(obj)
+	if obj:IsA("RemoteEvent") then hookRemote(obj) end
+end)
+
+findAndHookNetworker()
+refreshLabel()
+
+-- heartbeat naik → bukti script jalan.
+-- lihat bagian "---- last payloads ----" buat isi argumen event terakhir.
