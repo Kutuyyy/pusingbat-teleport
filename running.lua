@@ -993,79 +993,93 @@ local function createUI()
 
     local selectedPlayerName = nil
     local function openPlayerPopup()
-        -- (pakai fungsi popup yang lama persis; copy dari versi kamu)
-        -- HANYA ganti assignment label target-nya ke playerNameLbl.Text
-        local pg = LocalPlayer:WaitForChild("PlayerGui")
-        local pop = Instance.new("ScreenGui")
-        pop.Name = "PB_PlayerPicker"
-        pop.ResetOnSpawn = false
-        pop.Parent = pg
+    local pg = LocalPlayer:WaitForChild("PlayerGui")
+    local pop = Instance.new("ScreenGui")
+    pop.Name = "PB_PlayerPicker"
+    pop.ResetOnSpawn = false
+    pop.Parent = pg
 
-        local f = Instance.new("Frame")
-        f.Size = UDim2.fromOffset(300, 320)
-        f.Position = UDim2.new(0.5, -150, 0.5, -160)
-        f.BackgroundColor3 = Color3.fromRGB(45,45,50)
-        f.BorderSizePixel = 0
-        f.Parent = pop
-        f.ClipsDescendants = true
-        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+    local f = Instance.new("Frame")
+    f.Size = UDim2.fromOffset(300, 320)
+    f.Position = UDim2.new(0.5, -150, 0.5, -160)
+    f.BackgroundColor3 = Color3.fromRGB(45,45,50)
+    f.BorderSizePixel = 0
+    f.Parent = pop
+    f.ClipsDescendants = true
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
 
-        local title = Instance.new("TextLabel")
-        title.Size = UDim2.new(1, -12, 0, 30)
-        title.Position = UDim2.new(0,6,0,6)
-        title.BackgroundColor3 = Color3.fromRGB(70,70,70)
-        title.Text = "Pilih Player"
-        title.TextColor3 = Color3.new(1,1,1)
-        title.Font = Enum.Font.GothamBold
-        title.TextSize = 14
-        title.Parent = f
-        Instance.new("UICorner", title).CornerRadius = UDim.new(0,6)
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -12, 0, 30)
+    title.Position = UDim2.new(0,6,0,6)
+    title.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    title.Text = "Pilih Player"
+    title.TextColor3 = Color3.new(1,1,1)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 14
+    title.Parent = f
+    Instance.new("UICorner", title).CornerRadius = UDim.new(0,6)
 
-        local list = Instance.new("ScrollingFrame")
-        list.Size = UDim2.new(1, -12, 1, -80)
-        list.Position = UDim2.new(0,6,0,42)
-        list.BackgroundTransparency = 1
-        list.ScrollBarThickness = 6
-        list.ClipsDescendants = true
+    -- LIST + layout + fallback CanvasSize
+    local list = Instance.new("ScrollingFrame")
+    list.Size = UDim2.new(1, -12, 1, -80)
+    list.Position = UDim2.new(0,6,0,42)
+    list.BackgroundTransparency = 1
+    list.ScrollBarThickness = 6
+    list.ClipsDescendants = true
+    list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    list.ScrollingDirection = Enum.ScrollingDirection.Y
+    list.Parent = f
 
-        -- Pakai salah satu: A) Automatic (tetap dipakai) + fallback manual
-        list.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        list.ScrollingDirection = Enum.ScrollingDirection.Y
+    local lay = Instance.new("UIListLayout")
+    lay.Padding = UDim.new(0,6)
+    lay.SortOrder = Enum.SortOrder.LayoutOrder
+    lay.Parent = list
 
-        -- Layout + fallback manual CanvasSize
-        local lay = Instance.new("UIListLayout")
-        lay.Padding = UDim.new(0,6)
-        lay.SortOrder = Enum.SortOrder.LayoutOrder
-        lay.Parent = list
+    -- fallback CanvasSize kalau AutomaticCanvasSize belum update
+    lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        list.CanvasSize = UDim2.new(0,0,0, lay.AbsoluteContentSize.Y + 6)
+    end)
+    task.defer(function()
+        list.CanvasSize = UDim2.new(0,0,0, lay.AbsoluteContentSize.Y + 6)
+    end)
 
-        -- Fallback manual kalau AutomaticCanvasSize belum update di frame pertama
-        lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            list.CanvasSize = UDim2.new(0,0,0, lay.AbsoluteContentSize.Y + 6)
-        end)
-        task.defer(function()
-            list.CanvasSize = UDim2.new(0,0,0, lay.AbsoluteContentSize.Y + 6)
-        end)
+    -- tombol bar: Refresh + Tutup
+    local btnBar = Instance.new("Frame")
+    btnBar.Size = UDim2.new(1, -12, 0, 30)
+    btnBar.Position = UDim2.new(0,6,1,-36)
+    btnBar.BackgroundTransparency = 1
+    btnBar.Parent = f
 
-        list.Parent = f
+    local refresh = Instance.new("TextButton")
+    refresh.Size = UDim2.new(0.5, -4, 1, 0)
+    refresh.Position = UDim2.new(0,0,0,0)
+    refresh.Text = "Refresh"
+    refresh.BackgroundColor3 = Color3.fromRGB(60,90,120)
+    refresh.TextColor3 = Color3.new(1,1,1)
+    refresh.BorderSizePixel = 0
+    refresh.Parent = btnBar
+    Instance.new("UICorner", refresh).CornerRadius = UDim.new(0,6)
 
-        local lay = Instance.new("UIListLayout")
-        lay.Padding = UDim.new(0,6)
-        lay.Parent = list
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0.5, -4, 1, 0)
+    close.Position = UDim2.new(0.5, 8, 0, 0)
+    close.Text = "Tutup"
+    close.BackgroundColor3 = Color3.fromRGB(90,60,60)
+    close.TextColor3 = Color3.new(1,1,1)
+    close.BorderSizePixel = 0
+    close.Parent = btnBar
+    Instance.new("UICorner", close).CornerRadius = UDim.new(0,6)
 
-        local close = Instance.new("TextButton")
-        close.Size = UDim2.new(1, -12, 0, 30)
-        close.Position = UDim2.new(0,6,1,-36)
-        close.Text = "Tutup"
-        close.BackgroundColor3 = Color3.fromRGB(90,60,60)
-        close.TextColor3 = Color3.new(1,1,1)
-        close.Parent = f
-        Instance.new("UICorner", close).CornerRadius = UDim.new(0,6)
+    -- builder item + placeholder
+    local function populate()
+        -- bersihin isi list
+        for _,ch in ipairs(list:GetChildren()) do
+            if ch:IsA("TextButton") or ch:IsA("TextLabel") then ch:Destroy() end
+        end
 
         local others = {}
         for _,plr in ipairs(Players:GetPlayers()) do
-            if plr ~= LocalPlayer then
-                table.insert(others, plr)
-            end
+            if plr ~= LocalPlayer then table.insert(others, plr) end
         end
 
         if #others == 0 then
@@ -1091,8 +1105,18 @@ local function createUI()
                 end)
             end
         end
-        close.MouseButton1Click:Connect(function() pop:Destroy() end)
+
+        -- paksa refresh CanvasSize sekali lagi
+        task.defer(function()
+            list.CanvasSize = UDim2.new(0,0,0, lay.AbsoluteContentSize.Y + 6)
+        end)
     end
+
+    populate()
+    refresh.MouseButton1Click:Connect(populate)
+    close.MouseButton1Click:Connect(function() pop:Destroy() end)
+end
+
 
     pickBtn.MouseButton1Click:Connect(openPlayerPopup)
     refreshBtn.MouseButton1Click:Connect(function()
