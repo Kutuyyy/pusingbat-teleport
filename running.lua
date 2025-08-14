@@ -717,7 +717,7 @@ local function createUI()
         scroll.ScrollBarThickness = 6
         scroll.Visible = false
         scroll.ClipsDescendants = true
-        scroll.AutomaticCanvasSize = Enum.AutomaticSize.None
+        scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
         scroll.Parent = frame
 
         local layout = Instance.new("UIListLayout")
@@ -1836,7 +1836,7 @@ local function createUI()
         autoRespawnAfterTour = v
     end)
 
-    
+
     -- Row: Toggle Auto Tour (On/Off) + status
     local atSwRow = createRow(atContent, 36)
 
