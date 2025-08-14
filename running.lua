@@ -1027,7 +1027,9 @@ local function createUI()
         list.BackgroundTransparency = 1
         list.ScrollBarThickness = 6
         list.ClipsDescendants = true
-        list.Parent = f
+        -- ⬇️ tambahin ini:
+        list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        list.ScrollingDirection = Enum.ScrollingDirection.Y
         local lay = Instance.new("UIListLayout")
         lay.Padding = UDim.new(0,6)
         lay.Parent = list
