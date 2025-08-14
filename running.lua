@@ -1027,11 +1027,27 @@ local function createUI()
         list.BackgroundTransparency = 1
         list.ScrollBarThickness = 6
         list.ClipsDescendants = true
-        -- ⬇️ tambahin ini:
+
+        -- Pakai salah satu: A) Automatic (tetap dipakai) + fallback manual
         list.AutomaticCanvasSize = Enum.AutomaticSize.Y
         list.ScrollingDirection = Enum.ScrollingDirection.Y
-        -- (CanvasSize manual gak perlu lagi)
+
+        -- Layout + fallback manual CanvasSize
+        local lay = Instance.new("UIListLayout")
+        lay.Padding = UDim.new(0,6)
+        lay.SortOrder = Enum.SortOrder.LayoutOrder
+        lay.Parent = list
+
+        -- Fallback manual kalau AutomaticCanvasSize belum update di frame pertama
+        lay:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            list.CanvasSize = UDim2.new(0,0,0, lay.AbsoluteContentSize.Y + 6)
+        end)
+        task.defer(function()
+            list.CanvasSize = UDim2.new(0,0,0, lay.AbsoluteContentSize.Y + 6)
+        end)
+
         list.Parent = f
+
         local lay = Instance.new("UIListLayout")
         lay.Padding = UDim.new(0,6)
         lay.Parent = list
@@ -1045,8 +1061,22 @@ local function createUI()
         close.Parent = f
         Instance.new("UICorner", close).CornerRadius = UDim.new(0,6)
 
+        local others = {}
         for _,plr in ipairs(Players:GetPlayers()) do
             if plr ~= LocalPlayer then
+                table.insert(others, plr)
+            end
+        end
+
+        if #others == 0 then
+            local empty = Instance.new("TextLabel")
+            empty.Size = UDim2.new(1, -4, 0, 28)
+            empty.BackgroundTransparency = 1
+            empty.TextColor3 = Color3.fromRGB(200,200,200)
+            empty.Text = "Tidak ada player lain."
+            empty.Parent = list
+        else
+            for _,plr in ipairs(others) do
                 local b = Instance.new("TextButton")
                 b.Size = UDim2.new(1, -4, 0, 28)
                 b.Text = plr.Name
