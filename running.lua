@@ -1030,6 +1030,8 @@ local function createUI()
         -- ⬇️ tambahin ini:
         list.AutomaticCanvasSize = Enum.AutomaticSize.Y
         list.ScrollingDirection = Enum.ScrollingDirection.Y
+        -- (CanvasSize manual gak perlu lagi)
+        list.Parent = f
         local lay = Instance.new("UIListLayout")
         lay.Padding = UDim.new(0,6)
         lay.Parent = list
