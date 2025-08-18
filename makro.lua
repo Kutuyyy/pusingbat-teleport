@@ -143,6 +143,7 @@ local autoRespawnAfterTour = false
 -- Configs via server
 local configs = {}
 local autoloadName = nil
+local autoloadEnabled = true -- ⬅️ baru
 local serverOnline = false
 
 -- ========== HWID ==========
@@ -204,11 +205,22 @@ local function tryLoadFromServer()
     local data = dataOrRes
     serverOnline = true
     autoloadName = data.autoload
+    autoloadEnabled = (data.autoload_enabled ~= false) -- default true jika field belum ada
     configs = data.configs or {}
     exportedSets = data.exports or {}
     apiPostUsage(USERNAME, HWID)
 end
 
+-- taruh dekat API helpers
+local function buildServerBody()
+    return {
+        autoload = autoloadName,
+        autoload_enabled = autoloadEnabled,
+        configs  = configs,
+        exports  = normalizeExportsForSend(exportedSets),
+        meta     = { username = USERNAME }
+    }
+end
 
 -- ========== Character helpers ==========
 local function getCharacter()
@@ -2287,7 +2299,7 @@ end
                 exports  = normalizeExportsForSend(exportedSets),
                 meta     = { username = USERNAME }
             }
-            apiPutUser(HWID, body)
+            apiPutUser(HWID, buildServerBody())
         end)
     end)
 
@@ -2462,21 +2474,10 @@ end
             if not serverOnline then dprint("delete export: server offline"); return end
 
             exportedSets[selectedName] = nil
-
-            local body = {
-                autoload = autoloadName,
-                configs  = configs,
-                exports  = normalizeExportsForSend(exportedSets),
-                meta     = { username = USERNAME }
-            }
-            local ok,_ = apiPutUser(HWID, body)
-            if not ok then
-                dprint("delete export PUT failed")
-                return
-            end
-
+            apiPutUser(HWID, buildServerBody())
             rebuildList()
         end)
+
 
         closeB.MouseButton1Click:Connect(function() popup:Destroy() end)
     end)
@@ -2576,19 +2577,6 @@ end
 
     -- Row: Toggle Auto Tour (On/Off) + status
     local atSwRow = createRow(atContent, 36)
-
-    local function buildTourFromSaved()
-        local list = {}
-        for _, loc in ipairs(savedLocations) do
-            local v = (typeof(loc.position)=="Vector3") and loc.position or unpackVec3(loc.position)
-            if v then
-                list[#list+1] = { name = loc.name, pos = Vector3.new(v.X,v.Y,v.Z), ref = loc }
-            end
-        end
-        return list
-    end
-
-
 
     local autoTourSw
     autoTourSw = makeSwitch(atSwRow, "Auto Tour", false, function(v)
@@ -2838,6 +2826,7 @@ end
             fly=fly, noclip=noclip, infJumpMobile=infJumpMobile, infJumpPC=infJumpPC, noFallDamage=noFallDamage,
             walkSpeed=walkSpeed, jumpPower=jumpPower,
             fullBright=fullBright, removeFog=removeFog, fov=defaultFOV,
+            antiAFK = antiAFK,  -- ⬅️ baru
         }
     end
     local function applySettings(s)
@@ -2914,6 +2903,21 @@ end
     cfgLay.Parent = cfgScrollInner
     cfgLay.Padding = UDim.new(0,6)
 
+    local autoloadSw = makeSwitch(cfgScroll, "Autoload at startup", autoloadEnabled, function(v)
+        autoloadEnabled = v
+        if serverOnline then
+            local body = {
+                autoload = autoloadName,
+                autoload_enabled = autoloadEnabled, -- ⬅️ simpan ke server
+                configs  = configs,
+                exports  = normalizeExportsForSend(exportedSets),
+                meta     = { username = USERNAME }
+            }
+            apiPutUser(HWID, buildServerBody())
+        end
+        rebuildCfgList() -- refresh warna/disable tombol Auto di list
+    end)
+
     local function rebuildCfgList()
         for _,ch in ipairs(cfgScrollInner:GetChildren()) do
             if ch:IsA("TextButton") or ch:IsA("Frame") then ch:Destroy() end
@@ -2929,7 +2933,11 @@ end
             nLbl.BackgroundTransparency = 1
             nLbl.Size = UDim2.new(0.5, -10, 1, 0)
             nLbl.Position = UDim2.new(0,10,0,0)
-            nLbl.Text = name .. (autoloadName==name and "  (Auto)" or "")
+            if autoloadName == name then
+                nLbl.Text = autoloadEnabled and (name.."  (Auto)") or (name.."  (Auto • Disabled)")
+            else
+                nLbl.Text = name
+            end
             nLbl.TextXAlignment = Enum.TextXAlignment.Left
             nLbl.TextColor3 = Color3.new(1,1,1)
             nLbl.Parent = row
@@ -2946,11 +2954,37 @@ end
             local autoB = Instance.new("TextButton")
             autoB.Size = UDim2.new(0.2, -6, 0, 26)
             autoB.Position = UDim2.new(0.7, 0, 0.5, -13)
-            autoB.Text = "Auto"
-            autoB.BackgroundColor3 = autoloadName==name and Color3.fromRGB(0,150,0) or Color3.fromRGB(70,70,70)
             autoB.TextColor3 = Color3.new(1,1,1)
             autoB.Parent = row
             Instance.new("UICorner", autoB).CornerRadius = UDim.new(0,6)
+
+            local function refreshAutoBtn()
+                local isActive = (autoloadName == name)
+                autoB.Text = (not autoloadEnabled) and "Auto (Disabled)"
+                        or (isActive and "Auto (On)" or "Auto")
+                autoB.BackgroundColor3 = (autoloadEnabled and isActive)
+                    and Color3.fromRGB(0,150,0) or Color3.fromRGB(70,70,70)
+                autoB.Active = autoloadEnabled
+                autoB.AutoButtonColor = autoloadEnabled
+                autoB.TextTransparency = autoloadEnabled and 0 or 0.35
+            end
+            refreshAutoBtn()
+
+            autoB.MouseButton1Click:Connect(function()
+                if not autoloadEnabled then return end
+                if not serverOnline then dprint("auto set: server offline"); return end
+                autoloadName = (autoloadName == name) and nil or name
+                local body = {
+                    autoload = autoloadName,
+                    autoload_enabled = autoloadEnabled, -- ⬅️ tetap kirim
+                    configs  = configs,
+                    exports  = normalizeExportsForSend(exportedSets),
+                    meta     = { username = USERNAME }
+                }
+                apiPutUser(HWID, buildServerBody())
+                rebuildCfgList()
+            end)
+
 
             local delB = Instance.new("TextButton")
             delB.Size = UDim2.new(0.1, -6, 0, 26)
@@ -2962,18 +2996,6 @@ end
             Instance.new("UICorner", delB).CornerRadius = UDim.new(0,6)
 
             loadB.MouseButton1Click:Connect(function() applySettings(s) end)
-            autoB.MouseButton1Click:Connect(function()
-                if not serverOnline then dprint("auto set: server offline"); return end
-                autoloadName = (autoloadName==name) and nil or name
-                local body = {
-                    autoload = autoloadName,
-                    configs  = configs,
-                    exports  = normalizeExportsForSend(exportedSets),
-                    meta     = { username = USERNAME }
-                }
-                apiPutUser(HWID, body)
-                rebuildCfgList()
-            end)
             delB.MouseButton1Click:Connect(function()
                 if not serverOnline then dprint("delete config: server offline"); return end
                 configs[name] = nil
@@ -2984,7 +3006,7 @@ end
                     exports  = normalizeExportsForSend(exportedSets),
                     meta     = { username = USERNAME }
                 }
-                apiPutUser(HWID, body)
+                apiPutUser(HWID, buildServerBody())
                 rebuildCfgList()
             end)
         end
@@ -3000,7 +3022,7 @@ end
             exports  = normalizeExportsForSend(exportedSets),
             meta     = { username = USERNAME }
         }
-        apiPutUser(HWID, body)
+        apiPutUser(HWID, buildServerBody())
         rebuildCfgList()
     end)
 
@@ -3063,7 +3085,7 @@ end
         overlay:Destroy()
         MainGUI.Enabled = true
 
-        if autoloadName and configs[autoloadName] then
+        if autoloadEnabled and autoloadName and configs[autoloadName] then
             task.defer(function() applySettings(configs[autoloadName]) end)
         end
 
