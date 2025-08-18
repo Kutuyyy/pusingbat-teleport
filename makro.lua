@@ -1951,6 +1951,7 @@ end
 
     -- Modal Edit: buka UI yang sama untuk lokasi yang sudah ada
 function openEditLocationPrompt(target)
+    local playBtn, delBtn
     if not target then return end
     local capturedPos = (typeof(target.position)=="Vector3") and target.position or unpackVec3(target.position)
     capturedPos = capturedPos or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position) or Vector3.new()
@@ -2975,19 +2976,15 @@ end
             refreshAutoBtn()
 
             autoB.MouseButton1Click:Connect(function()
-                autoB.Active = autoloadEnabled
-                autoB.AutoButtonColor = autoloadEnabled
-                if not autoloadEnabled then return end  -- di handler
-                if not serverOnline then dprint("auto set: server offline"); return end
+                -- Toggle lokal SELALU boleh
                 autoloadName = (autoloadName == name) and nil or name
-                local body = {
-                    autoload = autoloadName,
-                    autoload_enabled = autoloadEnabled, -- ⬅️ tetap kirim
-                    configs  = configs,
-                    exports  = normalizeExportsForSend(exportedSets),
-                    meta     = { username = USERNAME }
-                }
-                apiPutUser(HWID, buildServerBody())
+
+                -- Simpan ke server kalau online; kalau offline ya nanti nyusul di PUT berikutnya
+                if serverOnline then
+                    apiPutUser(HWID, buildServerBody())
+                end
+
+                -- Refresh UI
                 rebuildCfgList()
             end)
 
@@ -3102,12 +3099,13 @@ end
 
 -- ========== Init ==========
 tryLoadFromServer()
-autoloadName = (data.autoload ~= "" and data.autoload) or nil
-autoloadEnabled = (data.autoload_enabled ~= false)
 getCharacter()
 attachFly()
 ensurePhysics()
 hookFallDamage()
+
+autoloadName   = (data.autoload ~= "" and data.autoload) or nil
+autoloadEnabled = (data.autoload_enabled ~= false)
 
 LocalPlayer.CharacterAdded:Connect(function()
     -- batalin tween lama waktu character baru spawn
