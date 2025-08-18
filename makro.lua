@@ -1540,7 +1540,7 @@ end
     local function createLocationEntry(locationData)
     local entry = createRow(locationsContainer, 60)
 
-    -- Checkbox select (tetap)
+    -- Checkbox select
     local checkbox = Instance.new("TextButton")
     checkbox.Size = UDim2.fromOffset(26, 26)
     checkbox.Position = UDim2.new(0, 10, 0, 8)
@@ -1555,7 +1555,7 @@ end
         checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
     end)
 
-    -- Tombol nama lokasi (klik = TP, dan kalau ada macro => auto play)
+    -- Tombol nama lokasi (klik = TP; kalau ada macro -> auto play)
     local tpBtn = Instance.new("TextButton")
     tpBtn.Size = UDim2.new(1, -220, 0, 28)
     tpBtn.Position = UDim2.new(0, 46, 0, 6)
@@ -1567,8 +1567,21 @@ end
     tpBtn.BorderSizePixel = 0
     tpBtn.Parent = entry
     Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
+    locationData._nameBtn = tpBtn
 
-    -- Indikator "ada macro?" (auto checkbox, non-interaktif)
+    -- Tombol ✎ Edit (untuk edit macro & rename)
+    local editBtn = Instance.new("TextButton")
+    editBtn.Size = UDim2.fromOffset(26, 26)
+    editBtn.Position = UDim2.new(1, -72, 0, 8)  -- di kiri indikator macro
+    editBtn.Text = "✎"
+    editBtn.TextSize = 16
+    editBtn.TextColor3 = Color3.new(1,1,1)
+    editBtn.BackgroundColor3 = Color3.fromRGB(70,70,90)
+    editBtn.BorderSizePixel = 0
+    editBtn.Parent = entry
+    Instance.new("UICorner", editBtn).CornerRadius = UDim.new(0,6)
+
+    -- Indikator “ada macro?”
     local macroBox = Instance.new("TextButton")
     macroBox.Size = UDim2.fromOffset(26, 26)
     macroBox.Position = UDim2.new(1, -36, 0, 8)
@@ -1594,7 +1607,7 @@ end
         checkLbl.Text = has and "✓" or ""
     end
     setMacroIndicator()
-    locationData._refreshMacroIndicator = setMacroIndicator -- (opsional kalau mau dipanggil dari luar)
+    locationData._refreshMacroIndicator = setMacroIndicator
 
     -- Info posisi + status macro
     local info = Instance.new("TextLabel")
@@ -1620,22 +1633,26 @@ end
         end
     end
     setInfoFromPos(locationData.position)
+    locationData._refreshInfo = function() setInfoFromPos(locationData.position) end
 
-    -- Klik nama = TP, lalu kalau ada macro => auto play
+    -- Klik nama = TP + (jika ada macro) auto play
     tpBtn.MouseButton1Click:Connect(function()
         local v = (typeof(locationData.position)=="Vector3") and locationData.position or unpackVec3(locationData.position)
         if not v then return end
         task.spawn(function()
             local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
-            safeTeleport(dest)
-            jumpOnce()
-            task.wait(0.05)
+            safeTeleport(dest); jumpOnce(); task.wait(0.05)
             if locationData.macro and type(locationData.macro.events)=="table" and #locationData.macro.events>0 then
                 if macroRecording then stopMacroRecord() end
                 if macroPlaying then stopMacro() end
                 playMacro(locationData)
             end
         end)
+    end)
+
+    -- Edit macro / rename
+    editBtn.MouseButton1Click:Connect(function()
+        openEditLocationPrompt(locationData)
     end)
 
     entry:SetAttribute("label", string.lower(locationData.name))
@@ -1897,6 +1914,220 @@ end
         end)
         cancel.MouseButton1Click:Connect(close)
     end
+
+    -- Modal Edit: buka UI yang sama untuk lokasi yang sudah ada
+function openEditLocationPrompt(target)
+    if not target then return end
+    local capturedPos = (typeof(target.position)=="Vector3") and target.position or unpackVec3(target.position)
+    capturedPos = capturedPos or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position) or Vector3.new()
+
+    local tempLoc = {
+        name     = target.name or "Location",
+        position = capturedPos,
+        selected = target.selected or false,
+        macro    = (target.macro and type(target.macro.events)=="table")
+                   and { version = target.macro.version or 1,
+                         duration = target.macro.duration or 0,
+                         events   = table.clone and table.clone(target.macro.events) or (function()
+                            local t = {}
+                            for i,e in ipairs(target.macro.events) do
+                                t[i] = {type=e.type, action=e.action, key=e.key, dx=e.dx, dz=e.dz, t=e.t}
+                            end
+                            return t
+                         end)()
+                       }
+                   or nil
+    }
+
+    local pg = LocalPlayer:WaitForChild("PlayerGui")
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "PB_EditLocation"
+    gui.ResetOnSpawn = false
+    gui.Parent = pg
+
+    local f = Instance.new("Frame")
+    f.Size = UDim2.fromOffset(360, 260)
+    f.Position = UDim2.new(0.5, -180, 0.5, -130)
+    f.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    f.BorderSizePixel = 0
+    f.Parent = gui
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -12, 0, 30)
+    title.Position = UDim2.new(0, 6, 0, 6)
+    title.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    title.Text = "Edit this location:"
+    title.TextColor3 = Color3.new(1,1,1)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 14
+    title.Parent = f
+    Instance.new("UICorner", title).CornerRadius = UDim.new(0,6)
+
+    local nameBox = Instance.new("TextBox")
+    nameBox.Size = UDim2.new(1, -12, 0, 30)
+    nameBox.Position = UDim2.new(0, 6, 0, 44)
+    nameBox.Text = tempLoc.name
+    nameBox.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    nameBox.TextColor3 = Color3.new(1,1,1)
+    nameBox.ClearTextOnFocus = false
+    nameBox.Parent = f
+    Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0, 6)
+
+    local coord = Instance.new("TextLabel")
+    coord.BackgroundTransparency = 1
+    coord.Size = UDim2.new(1, -12, 0, 20)
+    coord.Position = UDim2.new(0, 6, 0, 78)
+    coord.TextXAlignment = Enum.TextXAlignment.Left
+    coord.TextColor3 = Color3.fromRGB(220,220,220)
+    coord.Font = Enum.Font.Gotham
+    coord.TextSize = 12
+    coord.Text = string.format("X: %.1f   Y: %.1f   Z: %.1f", capturedPos.X, capturedPos.Y, capturedPos.Z)
+    coord.Parent = f
+
+    local macroLbl = Instance.new("TextLabel")
+    macroLbl.BackgroundTransparency = 1
+    macroLbl.Size = UDim2.new(1, -12, 0, 18)
+    macroLbl.Position = UDim2.new(0, 6, 0, 98)
+    macroLbl.Font = Enum.Font.Gotham
+    macroLbl.TextSize = 12
+    macroLbl.TextXAlignment = Enum.TextXAlignment.Left
+    macroLbl.TextColor3 = Color3.fromRGB(200,200,200)
+    macroLbl.Parent = f
+
+    local function setEnabled(btn, en, onCol, offCol)
+        btn.Active = en
+        btn.AutoButtonColor = en
+        btn.BackgroundColor3 = en and onCol or offCol
+        btn.TextTransparency = en and 0 or 0.35
+    end
+    local function refreshMacroUI()
+        local has = tempLoc.macro and type(tempLoc.macro.events)=="table" and #tempLoc.macro.events>0
+        macroLbl.Text = has and string.format("Macro: %d ev, %.1fs", #tempLoc.macro.events, math.floor((tempLoc.macro.duration or 0)*10+0.5)/10) or "Macro: (none)"
+        setEnabled(playBtn, has, Color3.fromRGB(0,120,180), Color3.fromRGB(70,70,70))
+        setEnabled(delBtn,  has, Color3.fromRGB(120,0,0),   Color3.fromRGB(70,70,70))
+    end
+
+    -- Row 1
+    local row1 = Instance.new("Frame")
+    row1.Size = UDim2.new(1, -12, 0, 34)
+    row1.Position = UDim2.new(0, 6, 0, 120)
+    row1.BackgroundTransparency = 1
+    row1.Parent = f
+    local recBtn  = Instance.new("TextButton")
+    recBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    recBtn.Text = "Record Macro"
+    recBtn.TextColor3 = Color3.new(1,1,1)
+    recBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+    recBtn.BorderSizePixel = 0
+    recBtn.Parent = row1
+    Instance.new("UICorner", recBtn).CornerRadius = UDim.new(0,6)
+    local stopBtn = Instance.new("TextButton")
+    stopBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    stopBtn.Position = UDim2.new(0.5, 12, 0, 0)
+    stopBtn.Text = "Stop (Rec)"
+    stopBtn.TextColor3 = Color3.new(1,1,1)
+    stopBtn.BackgroundColor3 = Color3.fromRGB(150,0,0)
+    stopBtn.BorderSizePixel = 0
+    stopBtn.Parent = row1
+    Instance.new("UICorner", stopBtn).CornerRadius = UDim.new(0,6)
+    setEnabled(stopBtn, false, Color3.fromRGB(150,0,0), Color3.fromRGB(70,70,70))
+
+    -- Row 2
+    local row2 = Instance.new("Frame")
+    row2.Size = UDim2.new(1, -12, 0, 34)
+    row2.Position = UDim2.new(0, 6, 0, 158)
+    row2.BackgroundTransparency = 1
+    row2.Parent = f
+    playBtn = Instance.new("TextButton")
+    playBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    playBtn.Text = "Play Macro"
+    playBtn.TextColor3 = Color3.new(1,1,1)
+    playBtn.BackgroundColor3 = Color3.fromRGB(0,120,180)
+    playBtn.BorderSizePixel = 0
+    playBtn.Parent = row2
+    Instance.new("UICorner", playBtn).CornerRadius = UDim.new(0,6)
+    delBtn = Instance.new("TextButton")
+    delBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    delBtn.Position = UDim2.new(0.5, 12, 0, 0)
+    delBtn.Text = "Delete Macro"
+    delBtn.TextColor3 = Color3.new(1,1,1)
+    delBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
+    delBtn.BorderSizePixel = 0
+    delBtn.Parent = row2
+    Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0,6)
+
+    refreshMacroUI()
+
+    recBtn.MouseButton1Click:Connect(function()
+        if macroRecording then return end
+        if macroPlaying then stopMacro() end
+        startMacroRecord(tempLoc)
+        setEnabled(recBtn,  false, Color3.fromRGB(0,120,0),  Color3.fromRGB(70,70,70))
+        setEnabled(stopBtn, true,  Color3.fromRGB(150,0,0),  Color3.fromRGB(70,70,70))
+        setEnabled(playBtn, false, Color3.fromRGB(0,120,180), Color3.fromRGB(70,70,70))
+        setEnabled(delBtn,  false, Color3.fromRGB(120,0,0),   Color3.fromRGB(70,70,70))
+    end)
+    stopBtn.MouseButton1Click:Connect(function()
+        if not macroRecording then return end
+        stopMacroRecord()
+        setEnabled(recBtn,  true,  Color3.fromRGB(0,120,0),  Color3.fromRGB(70,70,70))
+        setEnabled(stopBtn, false, Color3.fromRGB(150,0,0),  Color3.fromRGB(70,70,70))
+        refreshMacroUI()
+    end)
+    playBtn.MouseButton1Click:Connect(function()
+        if tempLoc.macro and not macroRecording then
+            task.spawn(function() playMacro(tempLoc) end)
+        end
+    end)
+    delBtn.MouseButton1Click:Connect(function()
+        if macroRecording then return end
+        tempLoc.macro = nil
+        refreshMacroUI()
+    end)
+
+    -- Save / Cancel
+    local row3 = Instance.new("Frame")
+    row3.Size = UDim2.new(1, -12, 0, 36)
+    row3.Position = UDim2.new(0, 6, 1, -42)
+    row3.BackgroundTransparency = 1
+    row3.Parent = f
+    local save = Instance.new("TextButton")
+    save.Size = UDim2.new(0.5, -6, 1, 0)
+    save.Text = "Save"
+    save.BackgroundColor3 = Color3.fromRGB(0,140,0)
+    save.TextColor3 = Color3.new(1,1,1)
+    save.BorderSizePixel = 0
+    save.Parent = row3
+    Instance.new("UICorner", save).CornerRadius = UDim.new(0,6)
+    local cancel = Instance.new("TextButton")
+    cancel.Size = UDim2.new(0.5, -6, 1, 0)
+    cancel.Position = UDim2.new(0.5, 12, 0, 0)
+    cancel.Text = "Cancel"
+    cancel.BackgroundColor3 = Color3.fromRGB(140,0,0)
+    cancel.TextColor3 = Color3.new(1,1,1)
+    cancel.BorderSizePixel = 0
+    cancel.Parent = row3
+    Instance.new("UICorner", cancel).CornerRadius = UDim.new(0,6)
+
+    local function close() if macroRecording then stopMacroRecord() end gui:Destroy() end
+
+    save.MouseButton1Click:Connect(function()
+        -- apply ke target
+        target.name = (nameBox.Text ~= "" and nameBox.Text) or target.name
+        target.macro = (tempLoc.macro and type(tempLoc.macro.events)=="table")
+                       and { version = tempLoc.macro.version or 1,
+                             duration = tempLoc.macro.duration or 0,
+                             events   = table.clone and table.clone(tempLoc.macro.events) or tempLoc.macro.events }
+                       or nil
+        if target._nameBtn then target._nameBtn.Text = target.name end
+        if target._refreshMacroIndicator then target._refreshMacroIndicator() end
+        if target._refreshInfo then target._refreshInfo() end
+        close()
+    end)
+    cancel.MouseButton1Click:Connect(close)
+end
+
 
     -----------------------------------------------------
     -- Add/Delete handlers
@@ -2430,6 +2661,46 @@ end
     selectAllBtn.BorderSizePixel = 0
     selectAllBtn.Parent = selAllRow
     Instance.new("UICorner", selectAllBtn).CornerRadius = UDim.new(0,8)
+
+    -- Header kolom
+    local headerRow = createRow(listContent, 22)
+    headerRow.BackgroundTransparency = 1
+    headerRow:SetAttribute("label","locations header")
+
+    local function makeHdr(txt, size, pos, center)
+        local l = Instance.new("TextLabel")
+        l.BackgroundTransparency = 1
+        l.Size = size
+        l.Position = pos
+        if center then l.AnchorPoint = Vector2.new(0.5,0) end
+        l.Text = txt
+        l.TextColor3 = Color3.fromRGB(200,200,210)
+        l.Font = Enum.Font.GothamBold
+        l.TextSize = 12
+        l.TextXAlignment = Enum.TextXAlignment.Center
+        l.Parent = headerRow
+        return l
+    end
+
+    -- Center di atas checkbox kiri (checkbox 26px di X=10 -> center di 23)
+    makeHdr("Select", UDim2.fromOffset(60,20), UDim2.new(0, 23, 0, 2), true)
+
+    -- Center di area tombol nama lokasi (mulai X=46, width = (1,-220))
+    do
+        local hList = Instance.new("TextLabel")
+        hList.BackgroundTransparency = 1
+        hList.Size = UDim2.new(1, -220, 0, 20)
+        hList.Position = UDim2.new(0, 46, 0, 2)
+        hList.Text = "List Location"
+        hList.TextColor3 = Color3.fromRGB(200,200,210)
+        hList.Font = Enum.Font.GothamBold
+        hList.TextSize = 12
+        hList.TextXAlignment = Enum.TextXAlignment.Center
+        hList.Parent = headerRow
+    end
+
+    -- Center di atas indikator macro kanan (checkbox 26px di X=1,-36 -> center offset -23)
+    makeHdr("Macro", UDim2.fromOffset(60,20), UDim2.new(1, -23, 0, 2), true)
 
     -- Container tempat entry lokasi ditempel
     locationsContainer = Instance.new("Frame")  -- tanpa 'local'
