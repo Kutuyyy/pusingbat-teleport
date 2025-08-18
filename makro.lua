@@ -2531,18 +2531,13 @@ end
     local function buildTourFromSaved()
         local list = {}
         for _, loc in ipairs(savedLocations) do
-            local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
+            local v = (typeof(loc.position)=="Vector3") and loc.position or unpackVec3(loc.position)
             if v then
-                list[#list+1] = {
-                    name = loc.name,
-                    pos  = Vector3.new(v.X, v.Y, v.Z),
-                    ref  = loc,                         -- <== REFERENSI ke data lokasi asli (supaya macro selalu up-to-date)
-                }
+                list[#list+1] = { name = loc.name, pos = Vector3.new(v.X,v.Y,v.Z), ref = loc }
             end
         end
         return list
     end
-
 
     getAllBtn.MouseButton1Click:Connect(function()
         setTour(buildTourFromSaved())
@@ -2567,23 +2562,19 @@ end
     local function buildTourFromSaved()
         local list = {}
         for _, loc in ipairs(savedLocations) do
-            local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
+            local v = (typeof(loc.position)=="Vector3") and loc.position or unpackVec3(loc.position)
             if v then
-                list[#list+1] = {
-                    name = loc.name,
-                    pos  = Vector3.new(v.X, v.Y, v.Z),
-                    ref  = loc,                         -- <== REFERENSI ke data lokasi asli (supaya macro selalu up-to-date)
-                }
+                list[#list+1] = { name = loc.name, pos = Vector3.new(v.X,v.Y,v.Z), ref = loc }
             end
         end
         return list
     end
 
 
+
     local autoTourSw
     autoTourSw = makeSwitch(atSwRow, "Auto Tour", false, function(v)
         if v then
-            -- auto-build kalau snapshot kosong
             if #tourList == 0 then
                 setTour(buildTourFromSaved())
                 rebuildTourCounter()
@@ -2604,18 +2595,16 @@ end
                         local item = tourList[i]
                         local dest = item.pos + Vector3.new(0,3,0)
 
-                        -- Teleport (Instant/Tween sudah di-handle safeTeleport)
                         pcall(function() safeTeleport(dest) end)
                         jumpOnce()
 
-                        -- Kalau lokasi punya macro: jalankan dan tunggu selesai. Kalau tidak, barulah pakai interval.
                         local played = false
-                        local loc = item.ref
+                        local loc = item.ref or item  -- fallback untuk snapshot lama
                         if hasMacroOn(loc) then
                             if macroRecording then stopMacroRecord() end
                             if macroPlaying then stopMacro() end
                             if statusLbl then
-                                local ev = #loc.macro.events
+                                local ev  = #loc.macro.events
                                 local dur = math.floor((loc.macro.duration or 0)*10+0.5)/10
                                 statusLbl.Text = string.format("Status: Playing macro — %s (%d ev, %.1fs)", item.name or "loc", ev, dur)
                             end
@@ -2627,32 +2616,40 @@ end
 
                         if not tourRunning then break end
 
-                        -- Kalau tadi TIDAK ada macro, tunggu interval (jika 'Use Interval' ON). 
-                        -- Kalau ada macro, kita langsung lanjut ke lokasi berikutnya.
                         if not played then
                             if useInterval then
                                 local raw = (intervalBox and intervalBox.Text) or ""
                                 local n = tonumber((raw:gsub("[^%d%.]",""))) or 3
-                                if n > 0 then task.wait(n) end
-                            end
+                                if n < 0.1 then n = 0.1 end
+                                local t0 = tick()
+                                while tourRunning and (tick() - t0) < n do task.wait(0.05) end
                             else
                                 task.wait(0.05)
                             end
                         end
                     end
 
+                    if not tourRunning then break end
+                    if autoRespawnAfterTour then
+                        local delaySec = respawnDelayAfterLast or 4
+                        local t0 = tick()
+                        while tourRunning and (tick() - t0) < delaySec do
+                            if statusLbl then
+                                statusLbl.Text = string.format("Status: Respawning in %.1fs", math.max(0, delaySec - (tick() - t0)))
+                            end
+                            task.wait(0.05)
+                        end
                         if not tourRunning then break end
                         if statusLbl then statusLbl.Text = "Status: Respawning..." end
                         doRespawn()
                         if statusLbl then statusLbl.Text = "Status: Running" end
                     end
-                end
+                end -- <== tutup while
 
                 if statusLbl then statusLbl.Text = "Status: Stopped" end
-                autoTourSw.Set(false) -- balikin switch ke OFF kalau loop selesai
+                autoTourSw.Set(false)
             end)
         else
-            -- OFF: stop loop + cancel tween aktif
             tourRunning = false
             if statusLbl then statusLbl.Text = "Status: Stopping..." end
             if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
