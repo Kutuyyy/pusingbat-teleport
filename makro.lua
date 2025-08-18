@@ -101,6 +101,7 @@ local macroBuffer    = {}
 local macroConnections = {}
 local macroThread    = nil
 local macroTargetLoc = nil  -- lokasi yang sedang direkam
+local macroPlaybackConn = nil
 
 local function clearConnections(tbl)
     for _,c in ipairs(tbl) do pcall(function() c:Disconnect() end) end
@@ -618,47 +619,68 @@ local function playMacro(locData)
     macroPlaying = true
     local wasFly = fly
     if wasFly then setFly(false) end
+
     hum.PlatformStand = false
     hum.AutoRotate = true
 
-    macroThread = task.spawn(function()
-        local start = tick()
-        local evs = locData.macro.events or {}
-        local keyState = {}
+    local start = tick()
+    local evs = locData.macro.events or {}
+    local i = 1
 
-        for i = 1, #evs do
-            if not macroPlaying then break end
-            local e = evs[i]
-            local nowt = tick() - start
-            local waitT = math.max(0, (e.t or 0) - nowt)
-            if waitT > 0 then task.wait(waitT) end
-            if not macroPlaying then break end
+    -- arah aktif yang dipertahankan setiap frame
+    local curDX, curDZ = 0, 0
+    local keyState = {}
 
+    -- FEED hum:Move SETIAP FRAME (relativeToCamera = true)
+    if macroPlaybackConn then pcall(function() macroPlaybackConn:Disconnect() end) end
+    macroPlaybackConn = RunService.RenderStepped:Connect(function()
+        if macroPlaying and hum then
+            hum:Move(Vector3.new(curDX, 0, curDZ), true)
+        end
+    end)
+
+    -- loop event berdasarkan timestamp
+    while macroPlaying and i <= #evs do
+        local e = evs[i]
+        local t_e = e.t or 0
+        local nowt = tick() - start
+
+        if nowt < t_e then
+            -- tunggu dikit-dikit supaya gerak tetap lancar
+            task.wait(math.min(0.03, t_e - nowt))
+        else
             if e.type == "move" then
-                hum:Move(Vector3.new(e.dx or 0, 0, e.dz or 0), true)
+                curDX, curDZ = e.dx or 0, e.dz or 0
             elseif e.type == "jump" then
                 hum.Jump = true
+                task.delay(0.1, function()
+                    if hum then hum.Jump = false end
+                end)
             elseif e.type == "key" then
-                -- Redundansi: bila ingin derivasi arah dari key
+                -- fallback: derive arah dari tombol (kalau ada)
                 keyState[e.key] = (e.action == "begin")
-                local f = (keyState.W and 1 or 0) + (keyState.Up and 1 or 0)
-                        - (keyState.S and 1 or 0) - (keyState.Down and 1 or 0)
-                local r = (keyState.D and 1 or 0) + (keyState.Right and 1 or 0)
-                        - (keyState.A and 1 or 0) - (keyState.Left and 1 or 0)
-                if f ~= 0 or r ~= 0 then
-                    hum:Move(Vector3.new(r,0,f), true)
-                end
+                local f = (keyState.W or keyState.Up)   and 1 or 0
+                local b = (keyState.S or keyState.Down) and 1 or 0
+                local r = (keyState.D or keyState.Right) and 1 or 0
+                local l = (keyState.A or keyState.Left)  and 1 or 0
+                curDZ = f - b
+                curDX = r - l
             end
+            i += 1
         end
+    end
 
-        hum:Move(Vector3.zero, true)
-        macroPlaying = false
-        if wasFly then setFly(true) end
-    end)
+    -- beresin
+    if hum then hum:Move(Vector3.zero, true) end
+    if macroPlaybackConn then pcall(function() macroPlaybackConn:Disconnect() end); macroPlaybackConn = nil end
+    macroPlaying = false
+    if wasFly then setFly(true) end
 end
 
 local function stopMacro()
     macroPlaying = false
+    if hum then hum:Move(Vector3.zero, true) end
+    if macroPlaybackConn then pcall(function() macroPlaybackConn:Disconnect() end); macroPlaybackConn = nil end
 end
 
 local function showPill()
