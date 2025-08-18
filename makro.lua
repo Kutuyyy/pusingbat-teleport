@@ -621,45 +621,36 @@ local function playMacro(locData)
     if wasFly then setFly(false) end
 
     hum.PlatformStand = false
-    hum.AutoRotate = true
+    hum.AutoRotate    = true
 
     local start = tick()
     local evs = locData.macro.events or {}
     local i = 1
-
-    -- arah aktif yang dipertahankan setiap frame
     local curDX, curDZ = 0, 0
     local keyState = {}
 
-    -- FEED hum:Move SETIAP FRAME (relativeToCamera = true)
     if macroPlaybackConn then pcall(function() macroPlaybackConn:Disconnect() end) end
     macroPlaybackConn = RunService.RenderStepped:Connect(function()
         if macroPlaying and hum then
-            hum:Move(Vector3.new(curDX, 0, curDZ), true)
+            hum:Move(Vector3.new(curDX, 0, curDZ), true) -- feed tiap frame
         end
     end)
 
-    -- loop event berdasarkan timestamp
     while macroPlaying and i <= #evs do
         local e = evs[i]
-        local t_e = e.t or 0
-        local nowt = tick() - start
-
-        if nowt < t_e then
-            -- tunggu dikit-dikit supaya gerak tetap lancar
-            task.wait(math.min(0.03, t_e - nowt))
+        local targetT = e.t or 0
+        local nowT = tick() - start
+        if nowT < targetT then
+            task.wait(math.min(0.03, targetT - nowT))
         else
             if e.type == "move" then
                 curDX, curDZ = e.dx or 0, e.dz or 0
             elseif e.type == "jump" then
                 hum.Jump = true
-                task.delay(0.1, function()
-                    if hum then hum.Jump = false end
-                end)
+                task.delay(0.1, function() if hum then hum.Jump = false end end)
             elseif e.type == "key" then
-                -- fallback: derive arah dari tombol (kalau ada)
                 keyState[e.key] = (e.action == "begin")
-                local f = (keyState.W or keyState.Up)   and 1 or 0
+                local f = (keyState.W or keyState.Up) and 1 or 0
                 local b = (keyState.S or keyState.Down) and 1 or 0
                 local r = (keyState.D or keyState.Right) and 1 or 0
                 local l = (keyState.A or keyState.Left)  and 1 or 0
@@ -670,7 +661,6 @@ local function playMacro(locData)
         end
     end
 
-    -- beresin
     if hum then hum:Move(Vector3.zero, true) end
     if macroPlaybackConn then pcall(function() macroPlaybackConn:Disconnect() end); macroPlaybackConn = nil end
     macroPlaying = false
@@ -1548,22 +1538,26 @@ end
     -- List Entry Builder (tiap lokasi)
     -----------------------------------------------------
     local function createLocationEntry(locationData)
-    local entry = createRow(locationsContainer, 60)  -- tinggi diperbesar sedikit
+    local entry = createRow(locationsContainer, 60)
 
-    -- Checkbox select
+    -- Checkbox select (tetap)
     local checkbox = Instance.new("TextButton")
     checkbox.Size = UDim2.fromOffset(26, 26)
     checkbox.Position = UDim2.new(0, 10, 0, 8)
     checkbox.Text = ""
-    checkbox.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
     checkbox.BorderSizePixel = 0
     checkbox.Parent = entry
     Instance.new("UICorner", checkbox).CornerRadius = UDim.new(0, 6)
     locationData.checkbox = checkbox
+    checkbox.MouseButton1Click:Connect(function()
+        locationData.selected = not locationData.selected
+        checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+    end)
 
-    -- Tombol Teleport (dipersempit untuk beri ruang action bar)
+    -- Tombol nama lokasi (klik = TP, dan kalau ada macro => auto play)
     local tpBtn = Instance.new("TextButton")
-    tpBtn.Size = UDim2.new(1, -260, 0, 28)
+    tpBtn.Size = UDim2.new(1, -220, 0, 28)
     tpBtn.Position = UDim2.new(0, 46, 0, 6)
     tpBtn.Text = locationData.name
     tpBtn.Font = Enum.Font.GothamBold
@@ -1574,45 +1568,36 @@ end
     tpBtn.Parent = entry
     Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
 
-    -- Action bar kanan (Play / TP+Play / Record)
-    local actions = Instance.new("Frame")
-    actions.Size = UDim2.new(0, 300, 0, 28)
-    actions.Position = UDim2.new(1, -320, 0, 6)   -- 300px + 20px gutter
-    actions.BackgroundTransparency = 1
-    actions.ZIndex = 2                              -- pastikan di atas label info
-    actions.Parent = entry
+    -- Indikator "ada macro?" (auto checkbox, non-interaktif)
+    local macroBox = Instance.new("TextButton")
+    macroBox.Size = UDim2.fromOffset(26, 26)
+    macroBox.Position = UDim2.new(1, -36, 0, 8)
+    macroBox.Text = ""
+    macroBox.AutoButtonColor = false
+    macroBox.Active = false
+    macroBox.BorderSizePixel = 0
+    macroBox.Parent = entry
+    Instance.new("UICorner", macroBox).CornerRadius = UDim.new(0,6)
 
-    -- 3 tombol: Play, TP+Play, Record
-    local playBtn   = Instance.new("TextButton")
-    local tpPlayBtn = Instance.new("TextButton")
-    local recBtn    = Instance.new("TextButton")
+    local checkLbl = Instance.new("TextLabel")
+    checkLbl.Size = UDim2.fromScale(1,1)
+    checkLbl.BackgroundTransparency = 1
+    checkLbl.Text = ""
+    checkLbl.TextColor3 = Color3.new(1,1,1)
+    checkLbl.Font = Enum.Font.GothamBold
+    checkLbl.TextSize = 18
+    checkLbl.Parent = macroBox
 
-    local buttons = {playBtn, tpPlayBtn, recBtn}
-    for i, b in ipairs(buttons) do
-        b.Size = UDim2.new(1/3, -8, 1, 0)
-        b.Position = UDim2.new((i-1)/3, (i-1)*4, 0, 0)
-        b.TextColor3 = Color3.new(1,1,1)
-        b.BorderSizePixel = 0
-        b.ZIndex = 3
-        Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
-        b.Parent = actions
+    local function setMacroIndicator()
+        local has = locationData.macro and type(locationData.macro.events)=="table" and #locationData.macro.events>0
+        macroBox.BackgroundColor3 = has and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+        checkLbl.Text = has and "✓" or ""
     end
-    playBtn.Text, tpPlayBtn.Text, recBtn.Text = "Play", "TP + Play", "Record Macro"
-    playBtn.BackgroundColor3   = Color3.fromRGB(70,70,70)
-    tpPlayBtn.BackgroundColor3 = Color3.fromRGB(0,120,180)
-    recBtn.BackgroundColor3    = Color3.fromRGB(0,120,0)
-    tpBtn.Size = UDim2.new(1, -320, 0, 28)
-
-    for _,b in ipairs({playBtn,tpPlayBtn,recBtn}) do
-        b.TextColor3 = Color3.new(1,1,1)
-        b.BorderSizePixel = 0
-        Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
-        b.Parent = actions
-    end
+    setMacroIndicator()
+    locationData._refreshMacroIndicator = setMacroIndicator -- (opsional kalau mau dipanggil dari luar)
 
     -- Info posisi + status macro
     local info = Instance.new("TextLabel")
-    info.ZIndex = 1    -- tombol di atasnya (ZIndex 3)
     info.Size = UDim2.new(1, -56, 0, 20)
     info.Position = UDim2.new(0, 46, 0, 38)
     info.BackgroundTransparency = 1
@@ -1626,7 +1611,7 @@ end
     local function setInfoFromPos(pos)
         local v = (typeof(pos)=="Vector3") and pos or unpackVec3(pos)
         local base = v and string.format("X: %.1f  Y: %.1f  Z: %.1f", v.X, v.Y, v.Z) or "Invalid position"
-        if locationData.macro and locationData.macro.events then
+        if locationData.macro and type(locationData.macro.events)=="table" then
             local evn = #locationData.macro.events
             local dur = math.floor((locationData.macro.duration or 0)*10+0.5)/10
             info.Text = string.format("%s   |   Macro: %d ev, %.1fs", base, evn, dur)
@@ -1635,111 +1620,22 @@ end
         end
     end
     setInfoFromPos(locationData.position)
-    
-    -- Checkbox handler
-    locationData.selected = locationData.selected or false
-    checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
-    checkbox.MouseButton1Click:Connect(function()
-        locationData.selected = not locationData.selected
-        checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
-    end)
 
-    -- Teleport handler
+    -- Klik nama = TP, lalu kalau ada macro => auto play
     tpBtn.MouseButton1Click:Connect(function()
-        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hrp = character:WaitForChild("HumanoidRootPart")
         local v = (typeof(locationData.position)=="Vector3") and locationData.position or unpackVec3(locationData.position)
-        if v then
-            local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
-            safeTeleport(dest)
-            jumpOnce()
-            if not useInterval then task.wait(0.05) end
-        end
-    end)
-
-    -- Record/Stop handler
-    recBtn.MouseButton1Click:Connect(function()
-        -- Toggle: jika sedang rekam, maka Stop. Kalau tidak, mulai rekam untuk lokasi ini.
-        if macroRecording then
-            stopMacroRecord()
-            recBtn.Text = "Record Macro"
-            recBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
-            setInfoFromPos(locationData.position)
-        else
-            -- Pastikan tidak sedang playback
-            if macroPlaying then stopMacro() end
-            startMacroRecord(locationData)
-            recBtn.Text = "Stop (Rec)"
-            recBtn.BackgroundColor3 = Color3.fromRGB(150,0,0)
-        end
-    end)
-
-    -- Handler TP + Play
-    tpPlayBtn.MouseButton1Click:Connect(function()
-        if not locationData.macro or not locationData.macro.events then
-            tpPlayBtn.Text = "No Macro"
-            task.delay(0.8, function() if tpPlayBtn then tpPlayBtn.Text = "TP + Play" end end)
-            return
-        end
-
-        -- pastikan rekaman berhenti dan fly off
-        if macroRecording then stopMacroRecord() end
-        if fly then setFly(false) end
-
-        -- Teleport ke lokasi
-        local v = (typeof(locationData.position)=="Vector3") and locationData.position or unpackVec3(locationData.position)
-        if v then
+        if not v then return end
+        task.spawn(function()
             local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
             safeTeleport(dest)
             jumpOnce()
             task.wait(0.05)
-        end
-
-        -- Putar macro
-        tpPlayBtn.Text = "Stop"
-        task.spawn(function()
-            playMacro(locationData)
-            while macroPlaying do task.wait(0.05) end
-            if tpPlayBtn then tpPlayBtn.Text = "TP + Play" end
-        end)
-    end)
-
-    -- Play/Stop handler
-    playBtn.MouseButton1Click:Connect(function()
-        if macroPlaying then
-            stopMacro()
-            playBtn.Text = "Play Macro"
-            playBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-        else
-            if not locationData.macro or not locationData.macro.events then
-                -- Tidak ada macro
-                playBtn.Text = "No Macro"
-                task.delay(0.8, function()
-                    if playBtn then playBtn.Text = "Play Macro" end
-                end)
-                return
-            end
-            -- Pastikan tidak rekam
-            if macroRecording then
-                stopMacroRecord()
-                if recBtn then
-                    recBtn.Text = "Record Macro"
-                    recBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
-                end
-                setInfoFromPos(locationData.position)
-            end
-            playBtn.Text = "Stop (Play)"
-            playBtn.BackgroundColor3 = Color3.fromRGB(0,120,180)
-            task.spawn(function()
+            if locationData.macro and type(locationData.macro.events)=="table" and #locationData.macro.events>0 then
+                if macroRecording then stopMacroRecord() end
+                if macroPlaying then stopMacro() end
                 playMacro(locationData)
-                -- Pulihkan tombol saat playback selesai
-                while macroPlaying do task.wait(0.05) end
-                if playBtn then
-                    playBtn.Text = "Play Macro"
-                    playBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-                end
-            end)
-        end
+            end
+        end)
     end)
 
     entry:SetAttribute("label", string.lower(locationData.name))
@@ -1797,21 +1693,221 @@ end
         cancel.MouseButton1Click:Connect(function() prompt:Destroy() end)
     end
 
+    -- Modal Add Location (nama + koordinat + kontrol macro)
+    local function openAddLocationPrompt(capturedPos)
+        local defaultName = "Location " .. tostring(#savedLocations + 1)
+        local tempLoc = { name = defaultName, position = capturedPos, selected=false, macro=nil }
+
+        local pg = LocalPlayer:WaitForChild("PlayerGui")
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "PB_AddLocation"
+        gui.ResetOnSpawn = false
+        gui.Parent = pg
+
+        local f = Instance.new("Frame")
+        f.Size = UDim2.fromOffset(360, 260)
+        f.Position = UDim2.new(0.5, -180, 0.5, -130)
+        f.BackgroundColor3 = Color3.fromRGB(50,50,50)
+        f.BorderSizePixel = 0
+        f.Parent = gui
+        Instance.new("UICorner", f).CornerRadius = UDim.new(0, 10)
+
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1, -12, 0, 30)
+        title.Position = UDim2.new(0, 6, 0, 6)
+        title.BackgroundColor3 = Color3.fromRGB(70,70,70)
+        title.Text = "Name this location:"
+        title.TextColor3 = Color3.new(1,1,1)
+        title.Font = Enum.Font.GothamBold
+        title.TextSize = 14
+        title.Parent = f
+        Instance.new("UICorner", title).CornerRadius = UDim.new(0,6)
+
+        local nameBox = Instance.new("TextBox")
+        nameBox.Size = UDim2.new(1, -12, 0, 30)
+        nameBox.Position = UDim2.new(0, 6, 0, 44)
+        nameBox.Text = defaultName
+        nameBox.BackgroundColor3 = Color3.fromRGB(30,30,30)
+        nameBox.TextColor3 = Color3.new(1,1,1)
+        nameBox.ClearTextOnFocus = false
+        nameBox.Parent = f
+        Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0, 6)
+
+        local coord = Instance.new("TextLabel")
+        coord.BackgroundTransparency = 1
+        coord.Size = UDim2.new(1, -12, 0, 20)
+        coord.Position = UDim2.new(0, 6, 0, 78)
+        coord.TextXAlignment = Enum.TextXAlignment.Left
+        coord.TextColor3 = Color3.fromRGB(220,220,220)
+        coord.Font = Enum.Font.Gotham
+        coord.TextSize = 12
+        coord.Text = string.format("X: %.1f   Y: %.1f   Z: %.1f", capturedPos.X, capturedPos.Y, capturedPos.Z)
+        coord.Parent = f
+
+        local macroLbl = Instance.new("TextLabel")
+        macroLbl.BackgroundTransparency = 1
+        macroLbl.Size = UDim2.new(1, -12, 0, 18)
+        macroLbl.Position = UDim2.new(0, 6, 0, 98)
+        macroLbl.Font = Enum.Font.Gotham
+        macroLbl.TextSize = 12
+        macroLbl.TextXAlignment = Enum.TextXAlignment.Left
+        macroLbl.TextColor3 = Color3.fromRGB(200,200,200)
+        macroLbl.Text = "Macro: (none)"
+        macroLbl.Parent = f
+
+        local function setEnabled(btn, en, onCol, offCol)
+            btn.Active = en
+            btn.AutoButtonColor = en
+            btn.BackgroundColor3 = en and onCol or offCol
+            btn.TextTransparency = en and 0 or 0.35
+        end
+
+        -- Row 1: Record / Stop(Rec)
+        local row1 = Instance.new("Frame")
+        row1.Size = UDim2.new(1, -12, 0, 34)
+        row1.Position = UDim2.new(0, 6, 0, 120)
+        row1.BackgroundTransparency = 1
+        row1.Parent = f
+
+        local recBtn  = Instance.new("TextButton")
+        recBtn.Size = UDim2.new(0.5, -6, 1, 0)
+        recBtn.Position = UDim2.new(0, 0, 0, 0)
+        recBtn.Text = "Record Macro"
+        recBtn.TextColor3 = Color3.new(1,1,1)
+        recBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+        recBtn.BorderSizePixel = 0
+        recBtn.Parent = row1
+        Instance.new("UICorner", recBtn).CornerRadius = UDim.new(0,6)
+
+        local stopBtn = Instance.new("TextButton")
+        stopBtn.Size = UDim2.new(0.5, -6, 1, 0)
+        stopBtn.Position = UDim2.new(0.5, 12, 0, 0)
+        stopBtn.Text = "Stop (Rec)"
+        stopBtn.TextColor3 = Color3.new(1,1,1)
+        stopBtn.BackgroundColor3 = Color3.fromRGB(150,0,0)
+        stopBtn.BorderSizePixel = 0
+        stopBtn.Parent = row1
+        Instance.new("UICorner", stopBtn).CornerRadius = UDim.new(0,6)
+        setEnabled(stopBtn, false, Color3.fromRGB(150,0,0), Color3.fromRGB(70,70,70))
+
+        -- Row 2: Play / Delete
+        local row2 = Instance.new("Frame")
+        row2.Size = UDim2.new(1, -12, 0, 34)
+        row2.Position = UDim2.new(0, 6, 0, 158)
+        row2.BackgroundTransparency = 1
+        row2.Parent = f
+
+        local playBtn = Instance.new("TextButton")
+        playBtn.Size = UDim2.new(0.5, -6, 1, 0)
+        playBtn.Position = UDim2.new(0, 0, 0, 0)
+        playBtn.Text = "Play Macro"
+        playBtn.TextColor3 = Color3.new(1,1,1)
+        playBtn.BackgroundColor3 = Color3.fromRGB(0,120,180)
+        playBtn.BorderSizePixel = 0
+        playBtn.Parent = row2
+        Instance.new("UICorner", playBtn).CornerRadius = UDim.new(0,6)
+
+        local delBtn = Instance.new("TextButton")
+        delBtn.Size = UDim2.new(0.5, -6, 1, 0)
+        delBtn.Position = UDim2.new(0.5, 12, 0, 0)
+        delBtn.Text = "Delete Macro"
+        delBtn.TextColor3 = Color3.new(1,1,1)
+        delBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
+        delBtn.BorderSizePixel = 0
+        delBtn.Parent = row2
+        Instance.new("UICorner", delBtn).CornerRadius = UDim.new(0,6)
+
+        local function refreshMacroUI()
+            local has = tempLoc.macro and type(tempLoc.macro.events)=="table" and #tempLoc.macro.events>0
+            macroLbl.Text = has and string.format("Macro: %d ev, %.1fs", #tempLoc.macro.events, math.floor((tempLoc.macro.duration or 0)*10+0.5)/10) or "Macro: (none)"
+            setEnabled(playBtn, has, Color3.fromRGB(0,120,180), Color3.fromRGB(70,70,70))
+            setEnabled(delBtn,  has, Color3.fromRGB(120,0,0),   Color3.fromRGB(70,70,70))
+        end
+        refreshMacroUI()
+
+        recBtn.MouseButton1Click:Connect(function()
+            if macroRecording then return end
+            if macroPlaying then stopMacro() end
+            startMacroRecord(tempLoc)
+            setEnabled(recBtn,  false, Color3.fromRGB(0,120,0),  Color3.fromRGB(70,70,70))
+            setEnabled(stopBtn, true,  Color3.fromRGB(150,0,0),  Color3.fromRGB(70,70,70))
+            setEnabled(playBtn, false, Color3.fromRGB(0,120,180), Color3.fromRGB(70,70,70))
+            setEnabled(delBtn,  false, Color3.fromRGB(120,0,0),   Color3.fromRGB(70,70,70))
+        end)
+
+        stopBtn.MouseButton1Click:Connect(function()
+            if not macroRecording then return end
+            stopMacroRecord()
+            setEnabled(recBtn,  true,  Color3.fromRGB(0,120,0),  Color3.fromRGB(70,70,70))
+            setEnabled(stopBtn, false, Color3.fromRGB(150,0,0),  Color3.fromRGB(70,70,70))
+            refreshMacroUI()
+        end)
+
+        playBtn.MouseButton1Click:Connect(function()
+            if tempLoc.macro and not macroRecording then
+                task.spawn(function() playMacro(tempLoc) end)
+            end
+        end)
+
+        delBtn.MouseButton1Click:Connect(function()
+            if macroRecording then return end
+            tempLoc.macro = nil
+            refreshMacroUI()
+        end)
+
+        -- Row 3: Save / Cancel (seperti gambar)
+        local row3 = Instance.new("Frame")
+        row3.Size = UDim2.new(1, -12, 0, 36)
+        row3.Position = UDim2.new(0, 6, 1, -42)
+        row3.BackgroundTransparency = 1
+        row3.Parent = f
+
+        local save = Instance.new("TextButton")
+        save.Size = UDim2.new(0.5, -6, 1, 0)
+        save.Position = UDim2.new(0, 0, 0, 0)
+        save.Text = "Save"
+        save.BackgroundColor3 = Color3.fromRGB(0,140,0)
+        save.TextColor3 = Color3.new(1,1,1)
+        save.BorderSizePixel = 0
+        save.Parent = row3
+        Instance.new("UICorner", save).CornerRadius = UDim.new(0,6)
+
+        local cancel = Instance.new("TextButton")
+        cancel.Size = UDim2.new(0.5, -6, 1, 0)
+        cancel.Position = UDim2.new(0.5, 12, 0, 0)
+        cancel.Text = "Cancel"
+        cancel.BackgroundColor3 = Color3.fromRGB(140,0,0)
+        cancel.TextColor3 = Color3.new(1,1,1)
+        cancel.BorderSizePixel = 0
+        cancel.Parent = row3
+        Instance.new("UICorner", cancel).CornerRadius = UDim.new(0,6)
+
+        local function close()
+            if macroRecording then stopMacroRecord() end
+            gui:Destroy()
+        end
+
+        save.MouseButton1Click:Connect(function()
+            tempLoc.name = (nameBox.Text ~= "" and nameBox.Text) or defaultName
+            table.insert(savedLocations, tempLoc)
+            createLocationEntry(tempLoc)
+            recalcTp()
+            rebuildTourCounter()
+            close()
+        end)
+        cancel.MouseButton1Click:Connect(close)
+    end
+
     -----------------------------------------------------
     -- Add/Delete handlers
     -----------------------------------------------------
     addBtn.MouseButton1Click:Connect(function()
         local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
         local hrp = character:WaitForChild("HumanoidRootPart")
-        local defaultName = "Location "..tostring(#savedLocations + 1)
-        promptName(defaultName, "Name this location:", function(name)
-            local locationData = {name=name, position=hrp.Position, selected=false}
-            table.insert(savedLocations, locationData)
-            createLocationEntry(locationData)
-            recalcTp()
-            rebuildTourCounter()
-        end)
+        local capturedPos = hrp.Position -- snapshot sekarang, walau lagi gerak
+        openAddLocationPrompt(capturedPos)
     end)
+
 
     delBtn.MouseButton1Click:Connect(function()
         for i = #savedLocations, 1, -1 do
