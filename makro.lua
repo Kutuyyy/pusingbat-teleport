@@ -1557,10 +1557,10 @@ end
     tpBtn.Parent = entry
     Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
 
-    -- Action bar (3 tombol)
+    -- Action bar kanan (Play/Record/Stop)
     local actions = Instance.new("Frame")
     actions.Size = UDim2.new(0, 300, 0, 28)       -- dilebarkan sedikit
-    actions.Position = UDim2.new(1, -310, 0, 6)
+    actions.Position = UDim2.new(1, -210, 0, 6)
     actions.BackgroundTransparency = 1
     actions.Parent = entry
 
@@ -1591,6 +1591,89 @@ end
         b.Parent = actions
     end
 
+    local playBtn = Instance.new("TextButton")
+    playBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    playBtn.Position = UDim2.new(0, 0, 0, 0)
+    playBtn.Text = "Play Macro"
+    playBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    playBtn.TextColor3 = Color3.new(1,1,1)
+    playBtn.BorderSizePixel = 0
+    playBtn.Parent = actions
+    Instance.new("UICorner", playBtn).CornerRadius = UDim.new(0,6)
+
+    local recBtn = Instance.new("TextButton")
+    recBtn.Size = UDim2.new(0.5, -6, 1, 0)
+    recBtn.Position = UDim2.new(0.5, 6, 0, 0)
+    recBtn.Text = "Record Macro"
+    recBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+    recBtn.TextColor3 = Color3.new(1,1,1)
+    recBtn.BorderSizePixel = 0
+    recBtn.Parent = actions
+    Instance.new("UICorner", recBtn).CornerRadius = UDim.new(0,6)
+
+    -- Info posisi + status macro
+    local info = Instance.new("TextLabel")
+    info.Size = UDim2.new(1, -56, 0, 20)
+    info.Position = UDim2.new(0, 46, 0, 38)
+    info.BackgroundTransparency = 1
+    info.TextColor3 = Color3.fromRGB(200,200,200)
+    info.TextXAlignment = Enum.TextXAlignment.Left
+    info.Font = Enum.Font.Gotham
+    info.TextSize = 12
+    info.Parent = entry
+    locationData.infoLabel = info
+
+    local function setInfoFromPos(pos)
+        local v = (typeof(pos)=="Vector3") and pos or unpackVec3(pos)
+        local base = v and string.format("X: %.1f  Y: %.1f  Z: %.1f", v.X, v.Y, v.Z) or "Invalid position"
+        if locationData.macro and locationData.macro.events then
+            local evn = #locationData.macro.events
+            local dur = math.floor((locationData.macro.duration or 0)*10+0.5)/10
+            info.Text = string.format("%s   |   Macro: %d ev, %.1fs", base, evn, dur)
+        else
+            info.Text = base .. "   |   Macro: (none)"
+        end
+    end
+    setInfoFromPos(locationData.position)
+    
+    -- Checkbox handler
+    locationData.selected = locationData.selected or false
+    checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+    checkbox.MouseButton1Click:Connect(function()
+        locationData.selected = not locationData.selected
+        checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
+    end)
+
+    -- Teleport handler
+    tpBtn.MouseButton1Click:Connect(function()
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = character:WaitForChild("HumanoidRootPart")
+        local v = (typeof(locationData.position)=="Vector3") and locationData.position or unpackVec3(locationData.position)
+        if v then
+            local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
+            safeTeleport(dest)
+            jumpOnce()
+            if not useInterval then task.wait(0.05) end
+        end
+    end)
+
+    -- Record/Stop handler
+    recBtn.MouseButton1Click:Connect(function()
+        -- Toggle: jika sedang rekam, maka Stop. Kalau tidak, mulai rekam untuk lokasi ini.
+        if macroRecording then
+            stopMacroRecord()
+            recBtn.Text = "Record Macro"
+            recBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+            setInfoFromPos(locationData.position)
+        else
+            -- Pastikan tidak sedang playback
+            if macroPlaying then stopMacro() end
+            startMacroRecord(locationData)
+            recBtn.Text = "Stop (Rec)"
+            recBtn.BackgroundColor3 = Color3.fromRGB(150,0,0)
+        end
+    end)
+
     -- Handler TP + Play
     tpPlayBtn.MouseButton1Click:Connect(function()
         if not locationData.macro or not locationData.macro.events then
@@ -1619,6 +1702,44 @@ end
             while macroPlaying do task.wait(0.05) end
             if tpPlayBtn then tpPlayBtn.Text = "TP + Play" end
         end)
+    end)
+
+    -- Play/Stop handler
+    playBtn.MouseButton1Click:Connect(function()
+        if macroPlaying then
+            stopMacro()
+            playBtn.Text = "Play Macro"
+            playBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+        else
+            if not locationData.macro or not locationData.macro.events then
+                -- Tidak ada macro
+                playBtn.Text = "No Macro"
+                task.delay(0.8, function()
+                    if playBtn then playBtn.Text = "Play Macro" end
+                end)
+                return
+            end
+            -- Pastikan tidak rekam
+            if macroRecording then
+                stopMacroRecord()
+                if recBtn then
+                    recBtn.Text = "Record Macro"
+                    recBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
+                end
+                setInfoFromPos(locationData.position)
+            end
+            playBtn.Text = "Stop (Play)"
+            playBtn.BackgroundColor3 = Color3.fromRGB(0,120,180)
+            task.spawn(function()
+                playMacro(locationData)
+                -- Pulihkan tombol saat playback selesai
+                while macroPlaying do task.wait(0.05) end
+                if playBtn then
+                    playBtn.Text = "Play Macro"
+                    playBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+                end
+            end)
+        end
     end)
 
     entry:SetAttribute("label", string.lower(locationData.name))
