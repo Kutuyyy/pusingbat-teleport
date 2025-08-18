@@ -440,7 +440,6 @@ local currentTween = nil -- referensi tween aktif (kalau ada), supaya bisa di-ca
 local function teleportToPosition(dest)
     if not root then return end
 
-    -- MODE INSTANT: hard reset dan batalkan tween lama
     if tpMode == "Instant" then
         teleporting = false
         if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
@@ -448,15 +447,11 @@ local function teleportToPosition(dest)
         return
     end
 
-    -- MODE TWEEN: batalkan tween sebelumnya supaya tidak nge-blok
     if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
 
     teleporting = true
     local wasFly = fly
     if wasFly then setFly(false) end
-    
-    macroPlaying = false
-    if wasFly then setFly(true) end
 
     local info = TweenInfo.new(
         math.max(0.05, tweenDuration),
@@ -1557,33 +1552,35 @@ end
     tpBtn.Parent = entry
     Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
 
-    -- Action bar kanan (Play/Record/Stop)
+    -- Action bar kanan (Play / TP+Play / Record)
     local actions = Instance.new("Frame")
-    actions.Size = UDim2.new(0, 300, 0, 28)       -- dilebarkan sedikit
-    actions.Position = UDim2.new(1, -210, 0, 6)
+    actions.Size = UDim2.new(0, 300, 0, 28)
+    actions.Position = UDim2.new(1, -320, 0, 6)   -- 300px + 20px gutter
     actions.BackgroundTransparency = 1
+    actions.ZIndex = 2                              -- pastikan di atas label info
     actions.Parent = entry
 
-    local playBtn  = Instance.new("TextButton")
-    local tpPlayBtn= Instance.new("TextButton")
-    local recBtn   = Instance.new("TextButton")
+    -- 3 tombol: Play, TP+Play, Record
+    local playBtn   = Instance.new("TextButton")
+    local tpPlayBtn = Instance.new("TextButton")
+    local recBtn    = Instance.new("TextButton")
 
-    playBtn.Size   = UDim2.new(1/3, -8, 1, 0)
-    tpPlayBtn.Size = UDim2.new(1/3, -8, 1, 0)
-    recBtn.Size    = UDim2.new(1/3, -8, 1, 0)
-
-    playBtn.Position   = UDim2.new(0/3, 0,   0, 0)
-    tpPlayBtn.Position = UDim2.new(1/3, 4,   0, 0)
-    recBtn.Position    = UDim2.new(2/3, 8,   0, 0)
-
-    playBtn.Text   = "Play"
-    tpPlayBtn.Text = "TP + Play"
-    recBtn.Text    = "Record Macro"
-
-    -- warna awal
+    local buttons = {playBtn, tpPlayBtn, recBtn}
+    for i, b in ipairs(buttons) do
+        b.Size = UDim2.new(1/3, -8, 1, 0)
+        b.Position = UDim2.new((i-1)/3, (i-1)*4, 0, 0)
+        b.TextColor3 = Color3.new(1,1,1)
+        b.BorderSizePixel = 0
+        b.ZIndex = 3
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+        b.Parent = actions
+    end
+    playBtn.Text, tpPlayBtn.Text, recBtn.Text = "Play", "TP + Play", "Record Macro"
     playBtn.BackgroundColor3   = Color3.fromRGB(70,70,70)
     tpPlayBtn.BackgroundColor3 = Color3.fromRGB(0,120,180)
     recBtn.BackgroundColor3    = Color3.fromRGB(0,120,0)
+    tpBtn.Size = UDim2.new(1, -320, 0, 28)
+
     for _,b in ipairs({playBtn,tpPlayBtn,recBtn}) do
         b.TextColor3 = Color3.new(1,1,1)
         b.BorderSizePixel = 0
@@ -1591,28 +1588,9 @@ end
         b.Parent = actions
     end
 
-    local playBtn = Instance.new("TextButton")
-    playBtn.Size = UDim2.new(0.5, -6, 1, 0)
-    playBtn.Position = UDim2.new(0, 0, 0, 0)
-    playBtn.Text = "Play Macro"
-    playBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    playBtn.TextColor3 = Color3.new(1,1,1)
-    playBtn.BorderSizePixel = 0
-    playBtn.Parent = actions
-    Instance.new("UICorner", playBtn).CornerRadius = UDim.new(0,6)
-
-    local recBtn = Instance.new("TextButton")
-    recBtn.Size = UDim2.new(0.5, -6, 1, 0)
-    recBtn.Position = UDim2.new(0.5, 6, 0, 0)
-    recBtn.Text = "Record Macro"
-    recBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
-    recBtn.TextColor3 = Color3.new(1,1,1)
-    recBtn.BorderSizePixel = 0
-    recBtn.Parent = actions
-    Instance.new("UICorner", recBtn).CornerRadius = UDim.new(0,6)
-
     -- Info posisi + status macro
     local info = Instance.new("TextLabel")
+    info.ZIndex = 1    -- tombol di atasnya (ZIndex 3)
     info.Size = UDim2.new(1, -56, 0, 20)
     info.Position = UDim2.new(0, 46, 0, 38)
     info.BackgroundTransparency = 1
