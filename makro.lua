@@ -18,6 +18,7 @@ local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
 local RbxAnalyticsService = game:GetService("RbxAnalyticsService")
 local TweenService = game:GetService("TweenService")
+local VirtualUser = game:GetService("VirtualUser") -- ⬅️ baru
 
 local LocalPlayer = Players.LocalPlayer
 local USERNAME = LocalPlayer and LocalPlayer.Name or "unknown"
@@ -118,6 +119,8 @@ local noclip = false
 local infJumpMobile = false
 local infJumpPC = false
 local noFallDamage = false
+local antiAFK = false            -- ⬅️ baru
+local antiAFKConn = nil          -- ⬅️ baru
 
 -- Misc
 local fullBright = false
@@ -350,6 +353,20 @@ local function hookFallDamage()
             lastFreefallHealth = h
         end
     end)
+end
+
+-- ========== Anti AFK ==========
+local function setAntiAFK(state)
+    antiAFK = state and true or false
+    if antiAFKConn then pcall(function() antiAFKConn:Disconnect() end); antiAFKConn = nil end
+    if antiAFK then
+        antiAFKConn = Players.LocalPlayer.Idled:Connect(function()
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new(0,0)) -- “sentil” kecil biar tidak AFK
+            end)
+        end)
+    end
 end
 
 -- ========== MISC ==========
@@ -1091,6 +1108,7 @@ local function createUI()
     local ijmSw = makeSwitch(mainScroll, "Inf Jump (Mobile)", false, function(v) infJumpMobile = v end)
     local ijpSw = makeSwitch(mainScroll, "Inf Jump (PC)", false, function(v) infJumpPC = v end)
     local nfdSw = makeSwitch(mainScroll, "No Fall Damage", false, function(v) noFallDamage = v end)
+    local aafkSw = makeSwitch(mainScroll, "Anti AFK",       false, function(v) setAntiAFK(v) end) -- ⬅️ baru
     task.defer(recalcMain)
 
     -- ===== MISC =====
@@ -2834,6 +2852,7 @@ end
         ijmSw.Set(s.infJumpMobile or false)
         ijpSw.Set(s.infJumpPC or false)
         nfdSw.Set(s.noFallDamage or false)
+        aafkSw.Set(s.antiAFK or false)   -- ⬅️ baru
     end
 
     local nameRow = createRow(cfgScroll, 58)
