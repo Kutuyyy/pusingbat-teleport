@@ -2934,7 +2934,7 @@ end
             nLbl.Size = UDim2.new(0.5, -10, 1, 0)
             nLbl.Position = UDim2.new(0,10,0,0)
             if autoloadName == name then
-                nLbl.Text = autoloadEnabled and (name.."  (Auto)") or (name.."  (Auto • Disabled)")
+                nLbl.Text = autoloadEnabled and (name.."  (Auto)") or (name.."  (Auto — Master OFF)")
             else
                 nLbl.Text = name
             end
@@ -2960,18 +2960,24 @@ end
 
             local function refreshAutoBtn()
                 local isActive = (autoloadName == name)
-                autoB.Text = (not autoloadEnabled) and "Auto (Disabled)"
-                        or (isActive and "Auto (On)" or "Auto")
-                autoB.BackgroundColor3 = (autoloadEnabled and isActive)
-                    and Color3.fromRGB(0,150,0) or Color3.fromRGB(70,70,70)
-                autoB.Active = autoloadEnabled
-                autoB.AutoButtonColor = autoloadEnabled
-                autoB.TextTransparency = autoloadEnabled and 0 or 0.35
+                if isActive then
+                    autoB.Text = autoloadEnabled and "Auto (On)" or "Auto (On — Master OFF)"
+                else
+                    autoB.Text = "Auto"
+                end
+                autoB.BackgroundColor3 = isActive and Color3.fromRGB(0,150,0) or Color3.fromRGB(70,70,70)
+
+                -- Selalu bisa diklik, walau master OFF
+                autoB.Active = true
+                autoB.AutoButtonColor = true
+                autoB.TextTransparency = 0
             end
             refreshAutoBtn()
 
             autoB.MouseButton1Click:Connect(function()
-                if not autoloadEnabled then return end
+                autoB.Active = autoloadEnabled
+                autoB.AutoButtonColor = autoloadEnabled
+                if not autoloadEnabled then return end  -- di handler
                 if not serverOnline then dprint("auto set: server offline"); return end
                 autoloadName = (autoloadName == name) and nil or name
                 local body = {
@@ -3096,7 +3102,8 @@ end
 
 -- ========== Init ==========
 tryLoadFromServer()
-
+autoloadName = (data.autoload ~= "" and data.autoload) or nil
+autoloadEnabled = (data.autoload_enabled ~= false)
 getCharacter()
 attachFly()
 ensurePhysics()
