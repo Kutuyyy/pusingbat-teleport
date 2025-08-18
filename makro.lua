@@ -67,18 +67,31 @@ local function unpackVec3(t)
     end
     return nil
 end
+-- ========== Vector3 <-> JSON ==========
 local function normalizeExportsForSend(exports)
     local out = {}
     for setName, arr in pairs(exports or {}) do
         local packedArr = {}
         for _, loc in ipairs(arr) do
             local p = packVec3(loc.position)
-            if p then table.insert(packedArr, { name = loc.name, position = p }) end
+            if p then
+                local rec = { name = loc.name, position = p }
+                -- sertakan macro bila ada
+                if type(loc.macro) == "table" and type(loc.macro.events) == "table" then
+                    rec.macro = {
+                        version  = loc.macro.version or 1,
+                        duration = loc.macro.duration or 0,
+                        events   = loc.macro.events
+                    }
+                end
+                table.insert(packedArr, rec)
+            end
         end
         out[setName] = packedArr
     end
     return out
 end
+
 
 -- ========== State ==========
 local macroRecording = false
@@ -441,6 +454,9 @@ local function teleportToPosition(dest)
     teleporting = true
     local wasFly = fly
     if wasFly then setFly(false) end
+    
+    macroPlaying = false
+    if wasFly then setFly(true) end
 
     local info = TweenInfo.new(
         math.max(0.05, tweenDuration),
@@ -1541,132 +1557,68 @@ end
     tpBtn.Parent = entry
     Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 6)
 
-    -- Action bar kanan (Play/Record/Stop)
+    -- Action bar (3 tombol)
     local actions = Instance.new("Frame")
-    actions.Size = UDim2.new(0, 200, 0, 28)
-    actions.Position = UDim2.new(1, -210, 0, 6)
+    actions.Size = UDim2.new(0, 300, 0, 28)       -- dilebarkan sedikit
+    actions.Position = UDim2.new(1, -310, 0, 6)
     actions.BackgroundTransparency = 1
     actions.Parent = entry
 
-    local playBtn = Instance.new("TextButton")
-    playBtn.Size = UDim2.new(0.5, -6, 1, 0)
-    playBtn.Position = UDim2.new(0, 0, 0, 0)
-    playBtn.Text = "Play Macro"
-    playBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-    playBtn.TextColor3 = Color3.new(1,1,1)
-    playBtn.BorderSizePixel = 0
-    playBtn.Parent = actions
-    Instance.new("UICorner", playBtn).CornerRadius = UDim.new(0,6)
+    local playBtn  = Instance.new("TextButton")
+    local tpPlayBtn= Instance.new("TextButton")
+    local recBtn   = Instance.new("TextButton")
 
-    local recBtn = Instance.new("TextButton")
-    recBtn.Size = UDim2.new(0.5, -6, 1, 0)
-    recBtn.Position = UDim2.new(0.5, 6, 0, 0)
-    recBtn.Text = "Record Macro"
-    recBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
-    recBtn.TextColor3 = Color3.new(1,1,1)
-    recBtn.BorderSizePixel = 0
-    recBtn.Parent = actions
-    Instance.new("UICorner", recBtn).CornerRadius = UDim.new(0,6)
+    playBtn.Size   = UDim2.new(1/3, -8, 1, 0)
+    tpPlayBtn.Size = UDim2.new(1/3, -8, 1, 0)
+    recBtn.Size    = UDim2.new(1/3, -8, 1, 0)
 
-    -- Info posisi + status macro
-    local info = Instance.new("TextLabel")
-    info.Size = UDim2.new(1, -56, 0, 20)
-    info.Position = UDim2.new(0, 46, 0, 38)
-    info.BackgroundTransparency = 1
-    info.TextColor3 = Color3.fromRGB(200,200,200)
-    info.TextXAlignment = Enum.TextXAlignment.Left
-    info.Font = Enum.Font.Gotham
-    info.TextSize = 12
-    info.Parent = entry
-    locationData.infoLabel = info
+    playBtn.Position   = UDim2.new(0/3, 0,   0, 0)
+    tpPlayBtn.Position = UDim2.new(1/3, 4,   0, 0)
+    recBtn.Position    = UDim2.new(2/3, 8,   0, 0)
 
-    local function setInfoFromPos(pos)
-        local v = (typeof(pos)=="Vector3") and pos or unpackVec3(pos)
-        local base = v and string.format("X: %.1f  Y: %.1f  Z: %.1f", v.X, v.Y, v.Z) or "Invalid position"
-        if locationData.macro and locationData.macro.events then
-            local evn = #locationData.macro.events
-            local dur = math.floor((locationData.macro.duration or 0)*10+0.5)/10
-            info.Text = string.format("%s   |   Macro: %d ev, %.1fs", base, evn, dur)
-        else
-            info.Text = base .. "   |   Macro: (none)"
-        end
+    playBtn.Text   = "Play"
+    tpPlayBtn.Text = "TP + Play"
+    recBtn.Text    = "Record Macro"
+
+    -- warna awal
+    playBtn.BackgroundColor3   = Color3.fromRGB(70,70,70)
+    tpPlayBtn.BackgroundColor3 = Color3.fromRGB(0,120,180)
+    recBtn.BackgroundColor3    = Color3.fromRGB(0,120,0)
+    for _,b in ipairs({playBtn,tpPlayBtn,recBtn}) do
+        b.TextColor3 = Color3.new(1,1,1)
+        b.BorderSizePixel = 0
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+        b.Parent = actions
     end
-    setInfoFromPos(locationData.position)
 
-    -- Checkbox handler
-    locationData.selected = locationData.selected or false
-    checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
-    checkbox.MouseButton1Click:Connect(function()
-        locationData.selected = not locationData.selected
-        checkbox.BackgroundColor3 = locationData.selected and Color3.fromRGB(0,150,0) or Color3.fromRGB(80,80,80)
-    end)
+    -- Handler TP + Play
+    tpPlayBtn.MouseButton1Click:Connect(function()
+        if not locationData.macro or not locationData.macro.events then
+            tpPlayBtn.Text = "No Macro"
+            task.delay(0.8, function() if tpPlayBtn then tpPlayBtn.Text = "TP + Play" end end)
+            return
+        end
 
-    -- Teleport handler
-    tpBtn.MouseButton1Click:Connect(function()
-        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hrp = character:WaitForChild("HumanoidRootPart")
+        -- pastikan rekaman berhenti dan fly off
+        if macroRecording then stopMacroRecord() end
+        if fly then setFly(false) end
+
+        -- Teleport ke lokasi
         local v = (typeof(locationData.position)=="Vector3") and locationData.position or unpackVec3(locationData.position)
         if v then
             local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
             safeTeleport(dest)
             jumpOnce()
-            if not useInterval then task.wait(0.05) end
+            task.wait(0.05)
         end
-    end)
 
-    -- Record/Stop handler
-    recBtn.MouseButton1Click:Connect(function()
-        -- Toggle: jika sedang rekam, maka Stop. Kalau tidak, mulai rekam untuk lokasi ini.
-        if macroRecording then
-            stopMacroRecord()
-            recBtn.Text = "Record Macro"
-            recBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
-            setInfoFromPos(locationData.position)
-        else
-            -- Pastikan tidak sedang playback
-            if macroPlaying then stopMacro() end
-            startMacroRecord(locationData)
-            recBtn.Text = "Stop (Rec)"
-            recBtn.BackgroundColor3 = Color3.fromRGB(150,0,0)
-        end
-    end)
-
-    -- Play/Stop handler
-    playBtn.MouseButton1Click:Connect(function()
-        if macroPlaying then
-            stopMacro()
-            playBtn.Text = "Play Macro"
-            playBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-        else
-            if not locationData.macro or not locationData.macro.events then
-                -- Tidak ada macro
-                playBtn.Text = "No Macro"
-                task.delay(0.8, function()
-                    if playBtn then playBtn.Text = "Play Macro" end
-                end)
-                return
-            end
-            -- Pastikan tidak rekam
-            if macroRecording then
-                stopMacroRecord()
-                if recBtn then
-                    recBtn.Text = "Record Macro"
-                    recBtn.BackgroundColor3 = Color3.fromRGB(0,120,0)
-                end
-                setInfoFromPos(locationData.position)
-            end
-            playBtn.Text = "Stop (Play)"
-            playBtn.BackgroundColor3 = Color3.fromRGB(0,120,180)
-            task.spawn(function()
-                playMacro(locationData)
-                -- Pulihkan tombol saat playback selesai
-                while macroPlaying do task.wait(0.05) end
-                if playBtn then
-                    playBtn.Text = "Play Macro"
-                    playBtn.BackgroundColor3 = Color3.fromRGB(70,70,70)
-                end
-            end)
-        end
+        -- Putar macro
+        tpPlayBtn.Text = "Stop"
+        task.spawn(function()
+            playMacro(locationData)
+            while macroPlaying do task.wait(0.05) end
+            if tpPlayBtn then tpPlayBtn.Text = "TP + Play" end
+        end)
     end)
 
     entry:SetAttribute("label", string.lower(locationData.name))
@@ -1844,7 +1796,15 @@ end
             for _, loc in ipairs(savedLocations) do
                 local p = packVec3(loc.position)
                 if p then
-                    copy[#copy+1] = { name = loc.name, position = p }
+                    local item = { name = loc.name, position = p }
+                    if type(loc.macro) == "table" and type(loc.macro.events) == "table" then
+                        item.macro = {
+                            version  = loc.macro.version or 1,
+                            duration = loc.macro.duration or 0,
+                            events   = loc.macro.events
+                        }
+                    end
+                    copy[#copy+1] = item
                 else
                     dprint("skip export; invalid position on", loc.name)
                 end
@@ -1860,6 +1820,7 @@ end
             apiPutUser(HWID, body)
         end)
     end)
+
 
     -----------------------------------------------------
     -- Import popup (Load/Delete)
@@ -2004,9 +1965,18 @@ end
             for _,loc in ipairs(set) do
                 local v = unpackVec3(loc.position)
                 if v then
-                    local nd = { name=loc.name, position=v, selected=false }
+                    local nd = {
+                        name     = loc.name,
+                        position = v,
+                        selected = false,
+                        macro    = (type(loc.macro)=="table" and type(loc.macro.events)=="table")
+                                and { version = loc.macro.version or 1,
+                                        duration = loc.macro.duration or 0,
+                                        events   = loc.macro.events }
+                                or nil
+                    }
                     table.insert(savedLocations, nd)
-                    createLocationEntry(nd)
+                    createLocationEntry(nd) -- info label nanti tampilkan status macro
                 else
                     dprint("skip import; invalid packed position on", tostring(loc.name))
                 end
@@ -2015,6 +1985,7 @@ end
             rebuildTourCounter()
             popup:Destroy()
         end)
+
 
         deleteBtn.MouseButton1Click:Connect(function()
             if not selectedName then return end
