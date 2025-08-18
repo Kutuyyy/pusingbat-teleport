@@ -102,6 +102,7 @@ local macroConnections = {}
 local macroThread    = nil
 local macroTargetLoc = nil  -- lokasi yang sedang direkam
 local macroPlaybackConn = nil
+local rebuildTourCounter -- forward declaration
 
 local function clearConnections(tbl)
     for _,c in ipairs(tbl) do pcall(function() c:Disconnect() end) end
@@ -1110,6 +1111,10 @@ local function createUI()
         tourList = list or {}
     end
 
+    local function hasMacroOn(loc)
+        return loc and loc.macro and type(loc.macro.events) == "table" and #loc.macro.events > 0
+    end
+
     -- === Group: Teleport To Player ===
     local ttpContent = makeGroupBox(tpScroll, "Teleport To Player")
 
@@ -1573,7 +1578,7 @@ end
     local editBtn = Instance.new("TextButton")
     editBtn.Size = UDim2.fromOffset(26, 26)
     editBtn.Position = UDim2.new(1, -72, 0, 8)  -- di kiri indikator macro
-    editBtn.Text = "✎"
+    editBtn.Text = "edit"
     editBtn.TextSize = 16
     editBtn.TextColor3 = Color3.new(1,1,1)
     editBtn.BackgroundColor3 = Color3.fromRGB(70,70,90)
@@ -2039,7 +2044,7 @@ function openEditLocationPrompt(target)
     row2.Position = UDim2.new(0, 6, 0, 158)
     row2.BackgroundTransparency = 1
     row2.Parent = f
-    playBtn = Instance.new("TextButton")
+    local playBtn = Instance.new("TextButton")
     playBtn.Size = UDim2.new(0.5, -6, 1, 0)
     playBtn.Text = "Play Macro"
     playBtn.TextColor3 = Color3.new(1,1,1)
@@ -2047,7 +2052,7 @@ function openEditLocationPrompt(target)
     playBtn.BorderSizePixel = 0
     playBtn.Parent = row2
     Instance.new("UICorner", playBtn).CornerRadius = UDim.new(0,6)
-    delBtn = Instance.new("TextButton")
+    local delBtn = Instance.new("TextButton")
     delBtn.Size = UDim2.new(0.5, -6, 1, 0)
     delBtn.Position = UDim2.new(0.5, 12, 0, 0)
     delBtn.Text = "Delete Macro"
@@ -2509,7 +2514,7 @@ end
     clearBtn.Parent = snapRow
     Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0,8)
 
-    local tourCountLbl = Instance.new("TextLabel")
+    tourCountLbl = Instance.new("TextLabel")
     tourCountLbl.BackgroundTransparency = 1
     tourCountLbl.Size = UDim2.new(0.35, -10, 1, 0)
     tourCountLbl.Position = UDim2.new(0.64, 0, 0, 0)
@@ -2522,17 +2527,6 @@ end
 
     local function rebuildTourCounter()
         tourCountLbl.Text = ("Tour count: %d"):format(#tourList)
-    end
-
-    local function buildTourFromSaved()
-        local list = {}
-        for _, loc in ipairs(savedLocations) do
-            local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
-            if v then
-                list[#list+1] = { name = loc.name, pos = Vector3.new(v.X, v.Y, v.Z) }
-            end
-        end
-        return list
     end
 
     getAllBtn.MouseButton1Click:Connect(function()
@@ -2560,11 +2554,16 @@ end
         for _, loc in ipairs(savedLocations) do
             local v = (typeof(loc.position) == "Vector3") and loc.position or unpackVec3(loc.position)
             if v then
-                list[#list+1] = { name = loc.name, pos = Vector3.new(v.X, v.Y, v.Z) }
+                list[#list+1] = {
+                    name = loc.name,
+                    pos  = Vector3.new(v.X, v.Y, v.Z),
+                    ref  = loc,                         -- <== REFERENSI ke data lokasi asli (supaya macro selalu up-to-date)
+                }
             end
         end
         return list
     end
+
 
     local autoTourSw
     autoTourSw = makeSwitch(atSwRow, "Auto Tour", false, function(v)
@@ -2584,15 +2583,37 @@ end
             if statusLbl then statusLbl.Text = "Status: Running" end
 
             task.spawn(function()
-                while tourRunning do
-                    for i = 1, #tourList do
-                        if not tourRunning then break end
-                        local item = tourList[i]
-                        local dest = item.pos + Vector3.new(0,3,0)
+            while tourRunning do
+                for i = 1, #tourList do
+                    if not tourRunning then break end
+                    local item = tourList[i]
+                    local dest = item.pos + Vector3.new(0,3,0)
 
-                        pcall(function() safeTeleport(dest) end)
-                        jumpOnce()
+                    -- Teleport
+                    pcall(function() safeTeleport(dest) end)
+                    jumpOnce()
 
+                    -- Main: kalau lokasinya punya macro → mainkan & tunggu selesai
+                    local played = false
+                    local loc = item.ref
+                    if hasMacroOn(loc) then
+                        if macroRecording then stopMacroRecord() end
+                        if macroPlaying then stopMacro() end
+                        if statusLbl then
+                            local ev  = #loc.macro.events
+                            local dur = math.floor((loc.macro.duration or 0)*10+0.5)/10
+                            statusLbl.Text = string.format("Status: Playing macro — %s (%d ev, %.1fs)", item.name or "loc", ev, dur)
+                        end
+                        playMacro(loc)
+                        while tourRunning and macroPlaying do task.wait(0.05) end
+                        if statusLbl then statusLbl.Text = "Status: Running" end
+                        played = true
+                    end
+
+                    if not tourRunning then break end
+
+                    -- Kalau TIDAK ada macro, baru pakai interval (atau delay singkat)
+                    if not played then
                         if useInterval then
                             local raw = (intervalBox and intervalBox.Text) or ""
                             local n = tonumber((raw:gsub("[^%d%.]",""))) or 3
@@ -2603,35 +2624,21 @@ end
                             task.wait(0.05)
                         end
                     end
-
-                    if not tourRunning then break end
-                    if autoRespawnAfterTour then
-                        local delaySec = respawnDelayAfterLast or 4
-                        local t0 = tick()
-                        while tourRunning and (tick() - t0) < delaySec do
-                            if statusLbl then
-                                statusLbl.Text = string.format("Status: Respawning in %.1fs", math.max(0, delaySec - (tick() - t0)))
-                            end
-                            task.wait(0.05)
-                        end
-                        if not tourRunning then break end
-                        if statusLbl then statusLbl.Text = "Status: Respawning..." end
-                        doRespawn()
-                        if statusLbl then statusLbl.Text = "Status: Running" end
-                    end
                 end
 
-                if statusLbl then statusLbl.Text = "Status: Stopped" end
-                autoTourSw.Set(false) -- balikin switch ke OFF kalau loop selesai
-            end)
-        else
-            -- OFF: stop loop + cancel tween aktif
-            tourRunning = false
-            if statusLbl then statusLbl.Text = "Status: Stopping..." end
-            if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
-            teleporting = false
-        end
-    end)
+                if not tourRunning then break end
+
+                -- Respawn hanya kalau toggle-nya ON
+                if autoRespawnAfterTour then
+                    if statusLbl then statusLbl.Text = "Status: Respawning..." end
+                    doRespawn()
+                    if statusLbl then statusLbl.Text = "Status: Running" end
+                end
+            end
+
+            if statusLbl then statusLbl.Text = "Status: Stopped" end
+            autoTourSw.Set(false)
+        end)
 
     -- Row: status
     local statusRow = createRow(atContent, 24)
