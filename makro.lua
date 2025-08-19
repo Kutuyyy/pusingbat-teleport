@@ -1908,6 +1908,47 @@ end
         coord.Text = string.format("X: %.1f   Y: %.1f   Z: %.1f", capturedPos.X, capturedPos.Y, capturedPos.Z)
         coord.Parent = f
 
+        -- setelah 'coord' dibuat:
+        local facingLbl = Instance.new("TextLabel")
+        facingLbl.BackgroundTransparency = 1
+        facingLbl.Size = UDim2.new(1, -12, 0, 20)
+        facingLbl.Position = UDim2.new(0, 6, 0, 98)  -- geser 98 / atur agar muat dengan layout-mu
+        facingLbl.TextXAlignment = Enum.TextXAlignment.Left
+        facingLbl.TextColor3 = Color3.fromRGB(220,220,220)
+        facingLbl.Font = Enum.Font.Gotham
+        facingLbl.TextSize = 12
+        facingLbl.Text = "Facing now: (capturing...)"
+        facingLbl.Parent = f
+
+        -- geser posisi macroLbl turun sedikit (dari 98 -> 120, misal)
+        macroLbl.Position = UDim2.new(0, 6, 0, 120)
+
+        -- updater live sederhana (disconnect saat close)
+        local facingConn
+        local function updateFacingNow()
+            local y  = getCharYaw()
+            local cy, cp = getCamYawPitch()
+            local cam = workspace.CurrentCamera
+            local dist = (cam and root) and (cam.CFrame.Position - root.Position).Magnitude or 0
+            facingLbl.Text = string.format(
+                "Facing now → char %d°, cam %d°/%d°, dist %.1f",
+                y and math.floor(math.deg(y)+0.5) or 0,
+                cy and math.floor(math.deg(cy)+0.5) or 0,
+                cp and math.floor(math.deg(cp)+0.5) or 0,
+                dist
+            )
+        end
+        facingConn = game:GetService("RunService").Heartbeat:Connect(function()
+            updateFacingNow()
+        end)
+
+        -- pastikan di fungsi 'close()' popup ini kamu putuskan:
+        local function close()
+            if macroRecording then stopMacroRecord() end
+            if facingConn then pcall(function() facingConn:Disconnect() end) facingConn = nil end
+            gui:Destroy()
+        end
+
         local macroLbl = Instance.new("TextLabel")
         macroLbl.BackgroundTransparency = 1
         macroLbl.Size = UDim2.new(1, -12, 0, 18)
