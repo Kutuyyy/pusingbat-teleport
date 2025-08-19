@@ -1908,6 +1908,9 @@ end
         coord.Text = string.format("X: %.1f   Y: %.1f   Z: %.1f", capturedPos.X, capturedPos.Y, capturedPos.Z)
         coord.Parent = f
 
+        -- geser posisi macroLbl turun sedikit (dari 98 -> 120, misal)
+        macroLbl.Position = UDim2.new(0, 6, 0, 120)
+
         -- setelah 'coord' dibuat:
         local facingLbl = Instance.new("TextLabel")
         facingLbl.BackgroundTransparency = 1
@@ -1919,9 +1922,6 @@ end
         facingLbl.TextSize = 12
         facingLbl.Text = "Facing now: (capturing...)"
         facingLbl.Parent = f
-
-        -- geser posisi macroLbl turun sedikit (dari 98 -> 120, misal)
-        macroLbl.Position = UDim2.new(0, 6, 0, 120)
 
         -- updater live sederhana (disconnect saat close)
         local facingConn
@@ -1945,7 +1945,7 @@ end
         -- pastikan di fungsi 'close()' popup ini kamu putuskan:
         local function close()
             if macroRecording then stopMacroRecord() end
-            if facingConn then pcall(function() facingConn:Disconnect() end) facingConn = nil end
+            if facingConn then pcall(function() facingConn:Disconnect() end); facingConn = nil end
             gui:Destroy()
         end
 
@@ -2089,6 +2089,7 @@ end
 
         local function close()
             if macroRecording then stopMacroRecord() end
+            if facingConn then pcall(function() facingConn:Disconnect() end); facingConn = nil end
             gui:Destroy()
         end
 
@@ -2325,8 +2326,12 @@ function openEditLocationPrompt(target)
     cancel.Parent = row3
     Instance.new("UICorner", cancel).CornerRadius = UDim.new(0,6)
 
-    local function close() if macroRecording then stopMacroRecord() end gui:Destroy() end
-
+    local function close()
+        if macroRecording then stopMacroRecord() end
+        if facingConn then pcall(function() facingConn:Disconnect() end); facingConn = nil end
+        gui:Destroy()
+    end
+    
     save.MouseButton1Click:Connect(function()
         -- apply ke target
         target.name = (nameBox.Text ~= "" and nameBox.Text) or target.name
@@ -2409,9 +2414,7 @@ local rebuildTourCounter
         list.ScrollBarThickness = 6
         list.ClipsDescendants = true
         list.Parent = f
-        local lay = Instance.new("UIListLayout")
-        lay.Padding = UDim.new(0,6)
-        lay.Parent = list
+        local lay = Instance.new("UIListLayout"); lay.Padding = UDim.new(0,6); lay.Parent = list
 
         local close = Instance.new("TextButton")
         close.Size = UDim2.new(1, -12, 0, 30)
@@ -2440,34 +2443,19 @@ local rebuildTourCounter
                 loc.position = hrp.Position
 
                 -- snapshot facing saat replace
-                do
-                    local facing = {}
-                    local y = getCharYaw()
-                    if y then facing.charYaw = y end
-
-                    local cy, cp = getCamYawPitch()
-                    if cy then
-                        facing.camYaw   = cy
-                        facing.camPitch = cp
-                        local cam = workspace.CurrentCamera
-                        if cam and root then
-                            facing.camDist = (cam.CFrame.Position - root.Position).Magnitude
-                        end
-                    end
-
-                    if next(facing) ~= nil then
-                        loc.facing = facing
-                    else
-                        loc.facing = nil
+                local facing = {}
+                local y = getCharYaw()
+                if y then facing.charYaw = y end
+                local cy, cp = getCamYawPitch()
+                if cy then
+                    facing.camYaw   = cy
+                    facing.camPitch = cp
+                    local cam = workspace.CurrentCamera
+                    if cam and root then
+                        facing.camDist = (cam.CFrame.Position - root.Position).Magnitude
                     end
                 end
-
-                    if next(facing) ~= nil then
-                        loc.facing = facing
-                    else
-                        loc.facing = nil
-                    end
-                end
+                loc.facing = (next(facing) ~= nil) and facing or nil
 
                 -- refresh tampilan info
                 if loc._refreshInfo then
@@ -2476,12 +2464,13 @@ local rebuildTourCounter
                     loc.infoLabel.Text = string.format("X: %.1f  Y: %.1f  Z: %.1f", hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
                 end
 
-                if statusLbl then statusLbl.Text = 'Status: Replaced "' .. (loc.name or "loc") .. '"' end
+                if statusLbl then statusLbl.Text = ('Status: Replaced "%s"'):format(loc.name or "loc") end
                 if rebuildTourCounter then rebuildTourCounter() end
                 pop:Destroy()
             end)
         end
     end
+
 
     replaceBtn.MouseButton1Click:Connect(openReplacePopup)
 
