@@ -28,6 +28,26 @@ local function dprint(...) -- aktifkan jika perlu
     -- print("[PB]", ...)
 end
 
+-- ========== Facing Helpers (yaw/pitch) ==========
+local function yawFromLook(lv)
+    if not lv then return nil end
+    return math.atan2(-lv.X, -lv.Z) -- rotasi sumbu Y (radian)
+end
+
+local function getCharYaw()
+    if not root or not root.Parent then return nil end
+    return yawFromLook(root.CFrame.LookVector)
+end
+
+local function getCamYawPitch()
+    local cam = workspace.CurrentCamera
+    if not cam then return nil, nil end
+    local lv = cam.CFrame.LookVector
+    local yaw = yawFromLook(lv)
+    local pitch = math.asin(math.clamp(lv.Y, -1, 1))
+    return yaw, pitch  -- radian
+end
+
 -- HTTP helper untuk executor (synapse/krnl/etc)
 local function rawRequest(opts)
     local req = (syn and syn.request) or (http and http.request) or http_request or request
@@ -83,6 +103,14 @@ local function normalizeExportsForSend(exports)
                         version  = loc.macro.version or 1,
                         duration = loc.macro.duration or 0,
                         events   = loc.macro.events
+                    }
+                end
+                -- sertakan facing
+                if type(loc.facing) == "table" then
+                    rec.facing = {
+                        charYaw  = loc.facing.charYaw,
+                        camYaw   = loc.facing.camYaw,
+                        camPitch = loc.facing.camPitch
                     }
                 end
                 table.insert(packedArr, rec)
@@ -467,13 +495,15 @@ local easeIdx = 1
 
 local teleporting = false
 local currentTween = nil -- referensi tween aktif (kalau ada), supaya bisa di-cancel
-local function teleportToPosition(dest)
+-- GANTI versi lama:
+local function teleportToPosition(dest, yaw)
     if not root then return end
+    local goal = yaw and (CFrame.new(dest) * CFrame.Angles(0, yaw, 0)) or CFrame.new(dest)
 
     if tpMode == "Instant" then
         teleporting = false
         if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
-        root.CFrame = CFrame.new(dest)
+        root.CFrame = goal
         return
     end
 
@@ -490,7 +520,7 @@ local function teleportToPosition(dest)
         0, false, 0
     )
 
-    local tw = TweenService:Create(root, info, { CFrame = CFrame.new(dest) })
+    local tw = TweenService:Create(root, info, { CFrame = goal })
     currentTween = tw
     tw.Completed:Connect(function()
         teleporting = false
@@ -500,18 +530,18 @@ local function teleportToPosition(dest)
     tw:Play()
 end
 
-local function teleportToPositionAndWait(dest)
+-- GANTI versi lama:
+local function teleportToPositionAndWait(dest, yaw)
     if not root then return end
+    local goal = yaw and (CFrame.new(dest) * CFrame.Angles(0, yaw, 0)) or CFrame.new(dest)
 
-    -- MODE INSTANT: hard reset dan batalkan tween lama
     if tpMode == "Instant" then
         teleporting = false
         if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
-        root.CFrame = CFrame.new(dest)
+        root.CFrame = goal
         return
     end
 
-    -- MODE TWEEN: batalkan tween sebelumnya
     if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
 
     local wasFly = fly
@@ -524,11 +554,9 @@ local function teleportToPositionAndWait(dest)
         0, false, 0
     )
 
-    local tw = TweenService:Create(root, info, { CFrame = CFrame.new(dest) })
+    local tw = TweenService:Create(root, info, { CFrame = goal })
     currentTween = tw
     tw:Play()
-
-    -- tunggu tween selesai; aman-kan jika HRP/dunia berubah
     pcall(function() tw.Completed:Wait() end)
 
     if currentTween == tw then currentTween = nil end
@@ -536,15 +564,15 @@ local function teleportToPositionAndWait(dest)
     if wasFly then setFly(true) end
 end
 
-
-local function safeTeleport(dest)
+-- GANTI versi lama:
+local function safeTeleport(dest, yaw)
     if (not root) or (not root.Parent) or (not hum) or hum.Health <= 0 then
         getCharacter()
     end
     if tpMode == "Instant" then
-        teleportToPosition(dest)
+        teleportToPosition(dest, yaw)
     else
-        teleportToPositionAndWait(dest) -- ⬅️ penting, jangan panggil yang non-wait
+        teleportToPositionAndWait(dest, yaw)
     end
 end
 
@@ -1658,14 +1686,32 @@ end
     local function setInfoFromPos(pos)
         local v = (typeof(pos)=="Vector3") and pos or unpackVec3(pos)
         local base = v and string.format("X: %.1f  Y: %.1f  Z: %.1f", v.X, v.Y, v.Z) or "Invalid position"
+        local macroTxt
         if locationData.macro and type(locationData.macro.events)=="table" then
             local evn = #locationData.macro.events
             local dur = math.floor((locationData.macro.duration or 0)*10+0.5)/10
-            info.Text = string.format("%s   |   Macro: %d ev, %.1fs", base, evn, dur)
+            macroTxt = string.format("Macro: %d ev, %.1fs", evn, dur)
         else
-            info.Text = base .. "   |   Macro: (none)"
+            macroTxt = "Macro: (none)"
         end
+
+        local faceTxt = ""
+        if locationData.facing and (locationData.facing.charYaw or locationData.facing.camYaw) then
+            local parts = {}
+            if locationData.facing.charYaw then
+                table.insert(parts, ("char %.0f°"):format(math.deg(locationData.facing.charYaw)))
+            end
+            if locationData.facing.camYaw then
+                table.insert(parts, ("cam %.0f°/%.0f°"):format(
+                    math.deg(locationData.facing.camYaw),
+                    math.deg(locationData.facing.camPitch or 0)
+                ))
+            end
+            faceTxt = "   |   Facing: "..table.concat(parts, ", ")
+        end
+        info.Text = string.format("%s   |   %s%s", base, macroTxt, faceTxt)
     end
+
     setInfoFromPos(locationData.position)
     locationData._refreshInfo = function() setInfoFromPos(locationData.position) end
 
@@ -1675,7 +1721,35 @@ end
         if not v then return end
         task.spawn(function()
             local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
-            safeTeleport(dest); jumpOnce(); task.wait(0.05)
+            local yaw = locationData.facing and locationData.facing.charYaw or nil
+
+            safeTeleport(dest, yaw)
+            jumpOnce()
+
+            -- (opsional) arahkan kamera sesuai snapshot
+            if locationData.facing and locationData.facing.camYaw and root then
+                task.delay(0.05, function()
+                    local cam = workspace.CurrentCamera
+                    if not cam then return end
+                    local prevType = cam.CameraType
+                    cam.CameraType = Enum.CameraType.Scriptable
+
+                    local cy = locationData.facing.camYaw
+                    local cp = locationData.facing.camPitch or 0
+                    local dist = (cam.CFrame.Position - root.Position).Magnitude
+                    if dist < 6 then dist = 12 end
+
+                    local dir = (CFrame.Angles(cp, cy, 0)).LookVector
+                    local pos = root.Position - dir * dist
+                    cam.CFrame = CFrame.new(pos, root.Position)
+
+                    task.delay(0.05, function()
+                        cam.CameraType = prevType -- balikin kontrol kamera
+                    end)
+                end)
+            end
+
+            -- auto mainkan macro bila ada (seperti semula)
             if locationData.macro and type(locationData.macro.events)=="table" and #locationData.macro.events>0 then
                 if macroRecording then stopMacroRecord() end
                 if macroPlaying then stopMacro() end
@@ -1940,6 +2014,22 @@ end
 
         save.MouseButton1Click:Connect(function()
             tempLoc.name = (nameBox.Text ~= "" and nameBox.Text) or defaultName
+            -- simpan arah hadap saat menekan Save
+            -- simpan facing saat Replace
+            do
+                local facing = {}
+                local y = getCharYaw()
+                if y then facing.charYaw = y end
+                local cy, cp = getCamYawPitch()
+                if cy then
+                    facing.camYaw = cy
+                    facing.camPitch = cp
+                end
+                if next(facing) ~= nil then
+                    loc.facing = facing
+                end
+            end
+            if loc._refreshInfo then loc._refreshInfo() end
             table.insert(savedLocations, tempLoc)
             createLocationEntry(tempLoc)
             recalcTp()
@@ -2448,16 +2538,24 @@ end
             for _,loc in ipairs(set) do
                 local v = unpackVec3(loc.position)
                 if v then
-                    local nd = {
-                        name     = loc.name,
-                        position = v,
-                        selected = false,
-                        macro    = (type(loc.macro)=="table" and type(loc.macro.events)=="table")
-                                and { version = loc.macro.version or 1,
-                                        duration = loc.macro.duration or 0,
-                                        events   = loc.macro.events }
-                                or nil
-                    }
+                    local facing = (type(loc.facing)=="table") and {
+                    charYaw  = tonumber(loc.facing.charYaw),
+                    camYaw   = tonumber(loc.facing.camYaw),
+                    camPitch = tonumber(loc.facing.camPitch)
+                } or nil
+
+                local nd = {
+                    name     = loc.name,
+                    position = v,
+                    selected = false,
+                    macro    = (type(loc.macro)=="table" and type(loc.macro.events)=="table") and {
+                                version  = loc.macro.version or 1,
+                                duration = loc.macro.duration or 0,
+                                events   = loc.macro.events
+                            } or nil,
+                    facing   = facing, -- ⬅️ baru
+                }
+
                     table.insert(savedLocations, nd)
                     createLocationEntry(nd) -- info label nanti tampilkan status macro
                 else
@@ -2601,8 +2699,10 @@ end
                         if not tourRunning then break end
                         local item = tourList[i]
                         local dest = item.pos + Vector3.new(0,3,0)
+                        local yaw = (item.ref and item.ref.facing and item.ref.facing.charYaw)
+                                    or (item.facing and item.facing.charYaw)
+                        pcall(function() safeTeleport(dest, yaw) end)
 
-                        pcall(function() safeTeleport(dest) end)
                         jumpOnce()
 
                         local played = false
