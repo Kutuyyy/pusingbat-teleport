@@ -2014,8 +2014,8 @@ end
 
         save.MouseButton1Click:Connect(function()
             tempLoc.name = (nameBox.Text ~= "" and nameBox.Text) or defaultName
-            -- simpan arah hadap saat menekan Save
-            -- simpan facing saat Replace
+
+            -- simpan arah hadap saat Save
             do
                 local facing = {}
                 local y = getCharYaw()
@@ -2026,14 +2026,16 @@ end
                     facing.camPitch = cp
                 end
                 if next(facing) ~= nil then
-                    loc.facing = facing
+                    tempLoc.facing = facing
                 end
             end
-            if loc._refreshInfo then loc._refreshInfo() end
+
+            -- tambahkan ke list & render UI
             table.insert(savedLocations, tempLoc)
-            createLocationEntry(tempLoc)
+            createLocationEntry(tempLoc)                 -- di sini _refreshInfo baru ada
+            if tempLoc._refreshInfo then tempLoc._refreshInfo() end
             recalcTp()
-            rebuildTourCounter()
+            if rebuildTourCounter then rebuildTourCounter() end  -- aman kalau belum terisi
             close()
         end)
         cancel.MouseButton1Click:Connect(close)
@@ -2253,6 +2255,8 @@ function openEditLocationPrompt(target)
     cancel.MouseButton1Click:Connect(close)
 end
 
+-- forward declare supaya bisa dipakai di handler yang didefinisikan sebelum fungsinya
+local rebuildTourCounter
 
     -----------------------------------------------------
     -- Add/Delete handlers
@@ -2642,7 +2646,7 @@ end
     tourCountLbl.TextSize = 12
     tourCountLbl.Parent = snapRow
 
-    local function rebuildTourCounter()
+    rebuildTourCounter = function()
         tourCountLbl.Text = ("Tour count: %d"):format(#tourList)
     end
 
