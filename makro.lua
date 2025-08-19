@@ -29,9 +29,11 @@ local function dprint(...) -- aktifkan jika perlu
 end
 
 -- ========== Facing Helpers (yaw/pitch) ==========
+-- ganti yang lama: return math.atan2(-lv.X, -lv.Z)
 local function yawFromLook(lv)
     if not lv then return nil end
-    return math.atan2(-lv.X, -lv.Z) -- rotasi sumbu Y (radian)
+    -- yaw benar: sinθ = lv.X, cosθ = -lv.Z  ⇒ θ = atan2(lv.X, -lv.Z)
+    return math.atan2(lv.X, -lv.Z)
 end
 
 local function getCharYaw()
@@ -110,7 +112,8 @@ local function normalizeExportsForSend(exports)
                     rec.facing = {
                         charYaw  = loc.facing.charYaw,
                         camYaw   = loc.facing.camYaw,
-                        camPitch = loc.facing.camPitch
+                        camPitch = loc.facing.camPitch,
+                        camDist  = loc.facing.camDist,   -- ⬅️ tambah ini
                     }
                 end
                 table.insert(packedArr, rec)
@@ -1755,9 +1758,22 @@ end
                     local dist = (cam.CFrame.Position - root.Position).Magnitude
                     if dist < 6 then dist = 12 end
 
-                    local dir = (CFrame.Angles(cp, cy, 0)).LookVector
+                    local cy = locationData.facing.camYaw
+                    local cp = locationData.facing.camPitch or 0
+                    local savedDist = tonumber(locationData.facing.camDist)
+                    local dist = savedDist
+                    if not dist then
+                        dist = (cam.CFrame.Position - root.Position).Magnitude
+                    end
+                    if dist < 6 then dist = 12 end
+
+                    -- rotasi yang benar: yaw (Y) lalu pitch (X)
+                    local rot = CFrame.Angles(0, cy, 0) * CFrame.Angles(cp, 0, 0)
+                    local dir = rot.LookVector
                     local pos = root.Position - dir * dist
                     cam.CFrame = CFrame.new(pos, root.Position)
+
+
 
                     task.delay(0.05, function()
                         cam.CameraType = prevType -- balikin kontrol kamera
@@ -2030,25 +2046,29 @@ end
 
         save.MouseButton1Click:Connect(function()
             tempLoc.name = (nameBox.Text ~= "" and nameBox.Text) or defaultName
-
-            -- simpan arah hadap saat Save
             -- simpan arah hadap saat menekan Save
             do
                 local facing = {}
                 local y = getCharYaw()
                 if y then facing.charYaw = y end
+
                 local cy, cp = getCamYawPitch()
                 if cy then
-                    facing.camYaw = cy
+                    facing.camYaw   = cy
                     facing.camPitch = cp
+                    -- simpan jarak kamera saat ini
+                    local cam = workspace.CurrentCamera
+                    if cam and root then
+                        facing.camDist = (cam.CFrame.Position - root.Position).Magnitude
+                    end
                 end
+
                 if next(facing) ~= nil then
                     tempLoc.facing = facing
                 else
                     tempLoc.facing = nil
                 end
             end
-
 
             -- tambahkan ke list & render UI
             table.insert(savedLocations, tempLoc)
@@ -2376,11 +2396,17 @@ local rebuildTourCounter
                     local facing = {}
                     local y = getCharYaw()
                     if y then facing.charYaw = y end
+
                     local cy, cp = getCamYawPitch()
                     if cy then
-                        facing.camYaw = cy
+                        facing.camYaw   = cy
                         facing.camPitch = cp
+                        local cam = workspace.CurrentCamera
+                        if cam and root then
+                            facing.camDist = (cam.CFrame.Position - root.Position).Magnitude
+                        end
                     end
+
                     if next(facing) ~= nil then
                         loc.facing = facing
                     else
@@ -2587,10 +2613,11 @@ local rebuildTourCounter
                 local v = unpackVec3(loc.position)
                 if v then
                     local facing = (type(loc.facing)=="table") and {
-                    charYaw  = tonumber(loc.facing.charYaw),
-                    camYaw   = tonumber(loc.facing.camYaw),
-                    camPitch = tonumber(loc.facing.camPitch)
-                } or nil
+                        charYaw  = tonumber(loc.facing.charYaw),
+                        camYaw   = tonumber(loc.facing.camYaw),
+                        camPitch = tonumber(loc.facing.camPitch),
+                        camDist  = tonumber(loc.facing.camDist),
+                    } or nil
 
                 local nd = {
                     name     = loc.name,
