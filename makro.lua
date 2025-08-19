@@ -3104,9 +3104,6 @@ attachFly()
 ensurePhysics()
 hookFallDamage()
 
-autoloadName   = (data.autoload ~= "" and data.autoload) or nil
-autoloadEnabled = (data.autoload_enabled ~= false)
-
 LocalPlayer.CharacterAdded:Connect(function()
     -- batalin tween lama waktu character baru spawn
     if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
