@@ -29,10 +29,10 @@ local function dprint(...) -- aktifkan jika perlu
 end
 
 -- ========== Facing Helpers (yaw/pitch) ==========
--- ganti yang lama: return math.atan2(-lv.X, -lv.Z)
+-- sebelum: return math.atan2(-lv.X, -lv.Z)
 local function yawFromLook(lv)
     if not lv then return nil end
-    -- yaw benar: sinθ = lv.X, cosθ = -lv.Z  ⇒ θ = atan2(lv.X, -lv.Z)
+    -- yaw Roblox yang benar: θ = atan2(lv.X, -lv.Z)
     return math.atan2(lv.X, -lv.Z)
 end
 
@@ -113,7 +113,7 @@ local function normalizeExportsForSend(exports)
                         charYaw  = loc.facing.charYaw,
                         camYaw   = loc.facing.camYaw,
                         camPitch = loc.facing.camPitch,
-                        camDist  = loc.facing.camDist,   -- ⬅️ tambah ini
+                        camDist  = loc.facing.camDist, -- ⬅️ tambah ini
                     }
                 end
                 table.insert(packedArr, rec)
@@ -498,6 +498,17 @@ local easeIdx = 1
 
 local teleporting = false
 local currentTween = nil -- referensi tween aktif (kalau ada), supaya bisa di-cancel
+
+local function enforceYaw(yaw)
+    if not yaw or not root then return end
+    local prevAuto = hum and hum.AutoRotate
+    if hum then hum.AutoRotate = false end
+    root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
+    task.delay(0.05, function()
+        if hum then hum.AutoRotate = prevAuto end
+    end)
+end
+
 -- GANTI versi lama:
 local function teleportToPosition(dest, yaw)
     if not root then return end
@@ -570,18 +581,6 @@ local function teleportToPositionAndWait(dest, yaw)
     teleporting = false
     if wasFly then setFly(true) end
 end
-
-local function enforceYaw(yaw)
-    if not yaw or not root then return end
-    local prevAuto = hum and hum.AutoRotate
-    if hum then hum.AutoRotate = false end
-    -- pastikan posisi tidak berubah, hanya rotasi
-    root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
-    task.delay(0.05, function()
-        if hum then hum.AutoRotate = prevAuto end
-    end)
-end
-
 
 -- GANTI versi lama:
 local function safeTeleport(dest, yaw)
@@ -1755,11 +1754,6 @@ end
 
                     local cy = locationData.facing.camYaw
                     local cp = locationData.facing.camPitch or 0
-                    local dist = (cam.CFrame.Position - root.Position).Magnitude
-                    if dist < 6 then dist = 12 end
-
-                    local cy = locationData.facing.camYaw
-                    local cp = locationData.facing.camPitch or 0
                     local savedDist = tonumber(locationData.facing.camDist)
                     local dist = savedDist
                     if not dist then
@@ -1767,16 +1761,23 @@ end
                     end
                     if dist < 6 then dist = 12 end
 
-                    -- rotasi yang benar: yaw (Y) lalu pitch (X)
+                    -- urutan rotasi yang benar: yaw (Y) lalu pitch (X)
                     local rot = CFrame.Angles(0, cy, 0) * CFrame.Angles(cp, 0, 0)
                     local dir = rot.LookVector
                     local pos = root.Position - dir * dist
-                    cam.CFrame = CFrame.new(pos, root.Position)
 
-
-
-                    task.delay(0.05, function()
-                        cam.CameraType = prevType -- balikin kontrol kamera
+                    -- pin 2 frame biar nggak langsung “diseruduk” camera script default
+                    local frames = 0
+                    local conn
+                    conn = game:GetService("RunService").RenderStepped:Connect(function()
+                        cam.CFrame = CFrame.new(pos, root.Position)
+                        frames += 1
+                        if frames >= 2 then
+                            conn:Disconnect()
+                            task.delay(0.02, function()
+                                cam.CameraType = prevType
+                            end)
+                        end
                     end)
                 end)
             end
@@ -2056,7 +2057,7 @@ end
                 if cy then
                     facing.camYaw   = cy
                     facing.camPitch = cp
-                    -- simpan jarak kamera saat ini
+                    -- simpan jarak kamera ke karakter saat ini
                     local cam = workspace.CurrentCamera
                     if cam and root then
                         facing.camDist = (cam.CFrame.Position - root.Position).Magnitude
@@ -2616,7 +2617,7 @@ local rebuildTourCounter
                         charYaw  = tonumber(loc.facing.charYaw),
                         camYaw   = tonumber(loc.facing.camYaw),
                         camPitch = tonumber(loc.facing.camPitch),
-                        camDist  = tonumber(loc.facing.camDist),
+                        camDist  = tonumber(loc.facing.camDist), -- ⬅️ tambah ini
                     } or nil
 
                 local nd = {
