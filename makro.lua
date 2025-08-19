@@ -1949,7 +1949,7 @@ end
         local macroLbl = Instance.new("TextLabel")
         macroLbl.BackgroundTransparency = 1
         macroLbl.Size = UDim2.new(1, -12, 0, 18)
-        macroLbl.Position = UDim2.new(0, 6, 0, 120) -- dipindah ke sini
+        macroLbl.Position = UDim2.new(0, 6, 0, 118) -- dipindah ke sini
         macroLbl.Font = Enum.Font.Gotham
         macroLbl.TextSize = 12
         macroLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -1967,7 +1967,7 @@ end
         -- Row 1: Record / Stop(Rec)
         local row1 = Instance.new("Frame")
         row1.Size = UDim2.new(1, -12, 0, 34)
-        row1.Position = UDim2.new(0, 6, 0, 120)
+        row1.Position = UDim2.new(0, 6, 0, 140)
         row1.BackgroundTransparency = 1
         row1.Parent = f
 
@@ -1995,7 +1995,7 @@ end
         -- Row 2: Play / Delete
         local row2 = Instance.new("Frame")
         row2.Size = UDim2.new(1, -12, 0, 34)
-        row2.Position = UDim2.new(0, 6, 0, 158)
+        row2.Position = UDim2.new(0, 6, 0, 178)
         row2.BackgroundTransparency = 1
         row2.Parent = f
 
