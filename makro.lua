@@ -1908,9 +1908,6 @@ end
         coord.Text = string.format("X: %.1f   Y: %.1f   Z: %.1f", capturedPos.X, capturedPos.Y, capturedPos.Z)
         coord.Parent = f
 
-        -- geser posisi macroLbl turun sedikit (dari 98 -> 120, misal)
-        macroLbl.Position = UDim2.new(0, 6, 0, 120)
-
         -- setelah 'coord' dibuat:
         local facingLbl = Instance.new("TextLabel")
         facingLbl.BackgroundTransparency = 1
@@ -1952,7 +1949,7 @@ end
         local macroLbl = Instance.new("TextLabel")
         macroLbl.BackgroundTransparency = 1
         macroLbl.Size = UDim2.new(1, -12, 0, 18)
-        macroLbl.Position = UDim2.new(0, 6, 0, 98)
+        macroLbl.Position = UDim2.new(0, 6, 0, 120) -- dipindah ke sini
         macroLbl.Font = Enum.Font.Gotham
         macroLbl.TextSize = 12
         macroLbl.TextXAlignment = Enum.TextXAlignment.Left
