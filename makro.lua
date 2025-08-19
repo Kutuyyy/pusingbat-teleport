@@ -504,6 +504,7 @@ local function teleportToPosition(dest, yaw)
         teleporting = false
         if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
         root.CFrame = goal
+        enforceYaw(yaw)  -- ⬅️ tambah ini
         return
     end
 
@@ -557,12 +558,27 @@ local function teleportToPositionAndWait(dest, yaw)
     local tw = TweenService:Create(root, info, { CFrame = goal })
     currentTween = tw
     tw:Play()
-    pcall(function() tw.Completed:Wait() end)
+    pcall(function() 
+        tw.Completed:Wait() 
+        enforceYaw(yaw)  -- ⬅️ tambah ini di akhir Completed
+    end)
 
     if currentTween == tw then currentTween = nil end
     teleporting = false
     if wasFly then setFly(true) end
 end
+
+local function enforceYaw(yaw)
+    if not yaw or not root then return end
+    local prevAuto = hum and hum.AutoRotate
+    if hum then hum.AutoRotate = false end
+    -- pastikan posisi tidak berubah, hanya rotasi
+    root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
+    task.delay(0.05, function()
+        if hum then hum.AutoRotate = prevAuto end
+    end)
+end
+
 
 -- GANTI versi lama:
 local function safeTeleport(dest, yaw)
@@ -2016,6 +2032,7 @@ end
             tempLoc.name = (nameBox.Text ~= "" and nameBox.Text) or defaultName
 
             -- simpan arah hadap saat Save
+            -- simpan arah hadap saat menekan Save
             do
                 local facing = {}
                 local y = getCharYaw()
@@ -2027,8 +2044,11 @@ end
                 end
                 if next(facing) ~= nil then
                     tempLoc.facing = facing
+                else
+                    tempLoc.facing = nil
                 end
             end
+
 
             -- tambahkan ke list & render UI
             table.insert(savedLocations, tempLoc)
