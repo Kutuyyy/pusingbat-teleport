@@ -2347,12 +2347,36 @@ local rebuildTourCounter
             b.MouseButton1Click:Connect(function()
                 local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
                 local hrp = character:WaitForChild("HumanoidRootPart")
+
+                -- update posisi
                 loc.position = hrp.Position
-                if loc.infoLabel then
-                    loc.infoLabel.Text = string.format("X: %.1f, Y: %.1f, Z: %.1f",
-                        hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+
+                -- snapshot facing saat replace
+                do
+                    local facing = {}
+                    local y = getCharYaw()
+                    if y then facing.charYaw = y end
+                    local cy, cp = getCamYawPitch()
+                    if cy then
+                        facing.camYaw = cy
+                        facing.camPitch = cp
+                    end
+                    if next(facing) ~= nil then
+                        loc.facing = facing
+                    else
+                        loc.facing = nil
+                    end
                 end
+
+                -- refresh tampilan info
+                if loc._refreshInfo then
+                    loc._refreshInfo()
+                elseif loc.infoLabel then
+                    loc.infoLabel.Text = string.format("X: %.1f  Y: %.1f  Z: %.1f", hrp.Position.X, hrp.Position.Y, hrp.Position.Z)
+                end
+
                 if statusLbl then statusLbl.Text = 'Status: Replaced "' .. (loc.name or "loc") .. '"' end
+                if rebuildTourCounter then rebuildTourCounter() end
                 pop:Destroy()
             end)
         end
