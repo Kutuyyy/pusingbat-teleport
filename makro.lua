@@ -32,7 +32,7 @@ end
 -- sebelum: return math.atan2(-lv.X, -lv.Z)
 local function yawFromLook(lv)
     if not lv then return nil end
-    -- yaw Roblox yang benar: θ = atan2(lv.X, -lv.Z)
+    -- yaw roblox: +X = kanan, -Z = depan
     return math.atan2(lv.X, -lv.Z)
 end
 
@@ -254,6 +254,40 @@ local function buildServerBody()
 end
 
 -- ========== Character helpers ==========
+local function applyCameraFacing(facing)
+    if not (facing and root) then return end
+    local cam = workspace.CurrentCamera
+    if not cam then return end
+
+    local cy = facing.camYaw
+    if not cy then return end
+    local cp = facing.camPitch or 0
+    local dist = tonumber(facing.camDist)
+
+    if not dist then
+        dist = (cam.CFrame.Position - root.Position).Magnitude
+    end
+    if dist < 6 then dist = 12 end
+
+    local prevType = cam.CameraType
+    cam.CameraType = Enum.CameraType.Scriptable
+
+    local t0 = tick()
+    local conn
+    conn = game:GetService("RunService").RenderStepped:Connect(function()
+        -- urutan benar: yaw (Y) lalu pitch (X)
+        local rot = CFrame.Angles(0, cy, 0) * CFrame.Angles(cp, 0, 0)
+        local dir = rot.LookVector
+        local pos = root.Position - dir * dist
+        cam.CFrame = CFrame.new(pos, root.Position)
+
+        if (tick() - t0) > 0.25 then
+            conn:Disconnect()
+            cam.CameraType = prevType
+        end
+    end)
+end
+
 local function getCharacter()
     char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     root = char:WaitForChild("HumanoidRootPart")
@@ -502,9 +536,12 @@ local currentTween = nil -- referensi tween aktif (kalau ada), supaya bisa di-ca
 local function enforceYaw(yaw)
     if not yaw or not root then return end
     local prevAuto = hum and hum.AutoRotate
-    if hum then hum.AutoRotate = false end
+    if hum then
+        hum.AutoRotate = false           -- tahan biar nggak auto-rotate
+        hum:Move(Vector3.zero, true)     -- nolkan input agar nggak reorient
+    end
     root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
-    task.delay(0.05, function()
+    task.delay(0.25, function()
         if hum then hum.AutoRotate = prevAuto end
     end)
 end
@@ -707,7 +744,7 @@ local function playMacro(locData)
     if macroPlaybackConn then pcall(function() macroPlaybackConn:Disconnect() end) end
     macroPlaybackConn = RunService.RenderStepped:Connect(function()
         if macroPlaying and hum then
-            hum:Move(Vector3.new(curDX, 0, curDZ), true) -- feed tiap frame
+            hum:Move(Vector3.new(curDX, 0, -curDZ), true) -- feed tiap frame
         end
     end)
 
@@ -1746,39 +1783,8 @@ end
 
             -- (opsional) arahkan kamera sesuai snapshot
             if locationData.facing and locationData.facing.camYaw and root then
-                task.delay(0.05, function()
-                    local cam = workspace.CurrentCamera
-                    if not cam then return end
-                    local prevType = cam.CameraType
-                    cam.CameraType = Enum.CameraType.Scriptable
-
-                    local cy = locationData.facing.camYaw
-                    local cp = locationData.facing.camPitch or 0
-                    local savedDist = tonumber(locationData.facing.camDist)
-                    local dist = savedDist
-                    if not dist then
-                        dist = (cam.CFrame.Position - root.Position).Magnitude
-                    end
-                    if dist < 6 then dist = 12 end
-
-                    -- urutan rotasi yang benar: yaw (Y) lalu pitch (X)
-                    local rot = CFrame.Angles(0, cy, 0) * CFrame.Angles(cp, 0, 0)
-                    local dir = rot.LookVector
-                    local pos = root.Position - dir * dist
-
-                    -- pin 2 frame biar nggak langsung “diseruduk” camera script default
-                    local frames = 0
-                    local conn
-                    conn = game:GetService("RunService").RenderStepped:Connect(function()
-                        cam.CFrame = CFrame.new(pos, root.Position)
-                        frames += 1
-                        if frames >= 2 then
-                            conn:Disconnect()
-                            task.delay(0.02, function()
-                                cam.CameraType = prevType
-                            end)
-                        end
-                    end)
+                task.defer(function()
+                    applyCameraFacing(locationData.facing)
                 end)
             end
 
@@ -2057,7 +2063,6 @@ end
                 if cy then
                     facing.camYaw   = cy
                     facing.camPitch = cp
-                    -- simpan jarak kamera ke karakter saat ini
                     local cam = workspace.CurrentCamera
                     if cam and root then
                         facing.camDist = (cam.CFrame.Position - root.Position).Magnitude
@@ -2070,6 +2075,7 @@ end
                     tempLoc.facing = nil
                 end
             end
+
 
             -- tambahkan ke list & render UI
             table.insert(savedLocations, tempLoc)
@@ -2407,6 +2413,13 @@ local rebuildTourCounter
                             facing.camDist = (cam.CFrame.Position - root.Position).Magnitude
                         end
                     end
+
+                    if next(facing) ~= nil then
+                        loc.facing = facing
+                    else
+                        loc.facing = nil
+                    end
+                end
 
                     if next(facing) ~= nil then
                         loc.facing = facing
