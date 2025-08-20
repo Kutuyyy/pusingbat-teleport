@@ -1,43 +1,29 @@
 --[[
-    Pusingbat Piano Player — Rapi + Draggable + Scrollable + Movement Lock
-    - Panel draggable via header
-    - Konten scrollable (AutomaticCanvasSize.Y) — nyaman di HP
-    - Play / Pause / Stop, Load Sample (blue.) / Clear
+    Pusingbat Piano Player — Mobile Friendly + Draggable + Scrollable + Movement Lock
+    - UI panel: Play / Pause / Stop, Load Sample (blue.), Clear
+    - TextBox multi-line buat Sheets (format bracket: [pwdj] p ...)
     - Slider: BPM, Tokens/Beat, Hold Ratio, Start Delay, Micro Stagger
-    - Movement Lock saat Playing:
-        * Utama: Disable kontrol Roblox (PlayerModule Controls)
-        * Fallback: WalkSpeed/JumpPower = 0 (restore setelah selesai)
-    - Aman di respawn: tetap terkunci jika masih Playing
+    - Status label + Minimize
+    - Saat Play: kontrol gerak karakter dimatikan (disable PlayerModule Controls / fallback zero WalkSpeed & JumpPower)
+    - Saat Stop/Selesai: kontrol dikembalikan
 
-    Cara pakai:
-    1) Klik area pianonya (chat OFF).
-    2) Paste Sheets ke kotak, atur slider → Play.
+    Tips:
+    - Klik area piano (chat OFF) sebelum Play.
+    - Atur BPM & timing sesuai feel.
 ]]
 
 -- ===== Services =====
 local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
-local VIM = game:GetService("VirtualInputManager")
+local UIS     = game:GetService("UserInputService")
+local VIM     = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
--- ===== Hapus UI lama jika ada (biar gak dobel) =====
-pcall(function()
-    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if pg then
-        for _, g in ipairs(pg:GetChildren()) do
-            if g:IsA("ScreenGui") and (g.Name == "PusingbatPianoUI" or g.Name == "PusingbatOverlay") then
-                g:Destroy()
-            end
-        end
-    end
-end)
-
--- ===== Player Params (default) =====
-local BPM            = 97
-local TOKENS_PER_BEAT= 2
-local HOLD_RATIO     = 0.65
-local START_DELAY    = 3
-local MICRO_STAGGER  = 0.004
+-- ===== Params Default =====
+local BPM             = 97       -- tempo
+local TOKENS_PER_BEAT = 2        -- token per ketukan
+local HOLD_RATIO      = 0.65     -- proporsi tahan nada
+local START_DELAY     = 3        -- detik sebelum mulai
+local MICRO_STAGGER   = 0.004    -- jeda mini saat chord
 
 -- ===== Runtime State =====
 local isPlaying, isPaused, shouldStop = false, false, false
@@ -78,14 +64,55 @@ end
 
 local function keycodeFromChar(ch)
     if ch == " " then return nil, false end
-    if digitMap[ch] then return digitMap[ch], false end
-    if nonShiftPunct[ch] then return nonShiftPunct[ch], false end
-    if shiftedPunct[ch] then return shiftedPunct[ch], true end
+    if digitMap[ch]       then return digitMap[ch], false end
+    if nonShiftPunct[ch]  then return nonShiftPunct[ch], false end
+    if shiftedPunct[ch]   then return shiftedPunct[ch], true end
     local kc = select(1, keycodeFromLetter(ch))
     if kc then return kc, false end
     warn("Karakter tidak dikenali di sheet: '"..ch.."'")
     return nil, false
 end
+
+-- ===== Movement Lock (disable gerak karakter saat Play) =====
+local function getHumanoid()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    return char:FindFirstChildOfClass("Humanoid")
+end
+
+local oldWalk, oldJump
+local function immobilize(on)
+    local hum = getHumanoid()
+    if not hum then return end
+    if on then
+        oldWalk, oldJump = hum.WalkSpeed, hum.JumpPower
+        hum.WalkSpeed = 0
+        pcall(function() hum.UseJumpPower = true end)
+        hum.JumpPower = 0
+    else
+        if oldWalk then hum.WalkSpeed = oldWalk end
+        if oldJump then hum.JumpPower = oldJump end
+    end
+end
+
+local function setMovementLock(lock)
+    local ok, controls = pcall(function()
+        local PM = require(LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
+        return PM:GetControls()
+    end)
+    if ok and controls then
+        if lock then controls:Disable() else controls:Enable() end
+    else
+        immobilize(lock)
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+    if isPlaying then task.defer(function() setMovementLock(true) end) end
+end)
+
+game:BindToClose(function()
+    setMovementLock(false)
+end)
 
 -- ===== Input Sender =====
 local function pressKey(kc, holdSec, useShift)
@@ -129,52 +156,6 @@ local function parseToken(token)
         return false, token
     end
 end
-
--- ===== Movement Lock (anti karakter jalan saat Play) =====
-local function getHumanoid()
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    return char:FindFirstChildOfClass("Humanoid")
-end
-
-local oldWalk, oldJump
-local function immobilize(on)
-    local hum = getHumanoid()
-    if not hum then return end
-    if on then
-        oldWalk, oldJump = hum.WalkSpeed, hum.JumpPower
-        hum.WalkSpeed = 0
-        pcall(function() hum.UseJumpPower = true end)
-        hum.JumpPower = 0
-    else
-        if oldWalk then hum.WalkSpeed = oldWalk end
-        if oldJump then hum.JumpPower = oldJump end
-    end
-end
-
-local controlsObj -- cache Controls
-local function setMovementLock(lock)
-    -- Coba disable default controls
-    local ok, controls = pcall(function()
-        if not controlsObj then
-            local PM = require(LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
-            controlsObj = PM:GetControls()
-        end
-        return controlsObj
-    end)
-    if ok and controls then
-        if lock then controls:Disable() else controls:Enable() end
-    else
-        -- Fallback: matikan movement lewat Walk/Jump
-        immobilize(lock)
-    end
-end
-
--- Jika respawn saat masih Playing, tetap terkunci
-LocalPlayer.CharacterAdded:Connect(function()
-    if isPlaying then
-        task.defer(function() setMovementLock(true) end)
-    end
-end)
 
 -- ===== Player Core =====
 local function playFromSheet(sheet, statusSetter)
@@ -227,20 +208,17 @@ end
 
 -- ===== UI =====
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
--- Responsive scale utk HP
 local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
 local baseScale = math.clamp(viewport.X / 900, 0.90, 1.10)
 local isTouch = UIS.TouchEnabled
 
--- Root GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "PusingbatPianoUI"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.Parent = PlayerGui
 
--- Main window (draggable)
+-- Window (draggable)
 local frame = Instance.new("Frame")
 frame.Name = "Window"
 frame.Size = UDim2.fromOffset(math.floor(420*baseScale), math.floor(520*baseScale))
@@ -272,7 +250,6 @@ title.TextColor3 = Color3.fromRGB(235,235,235)
 title.Text = "Pusingbat Piano Player"
 title.Parent = header
 
--- Minimize button
 local mini = Instance.new("TextButton")
 mini.Size = UDim2.fromOffset(math.floor(36*baseScale), math.floor(28*baseScale))
 mini.Position = UDim2.new(1, -math.floor(40*baseScale), 0.5, -math.floor(14*baseScale))
@@ -284,7 +261,7 @@ mini.Text = "-"
 mini.Parent = header
 Instance.new("UICorner", mini).CornerRadius = UDim.new(0, 6)
 
--- Drag area (header)
+-- Dragging
 do
     local dragging, startPos, startInput
     header.InputBegan:Connect(function(input)
@@ -307,7 +284,7 @@ do
     end)
 end
 
--- Body (ScrollingFrame)
+-- Body (scrollable)
 local body = Instance.new("ScrollingFrame")
 body.Name = "Body"
 body.Size = UDim2.new(1, -16, 1, -math.floor(42*baseScale) - 12)
@@ -397,5 +374,161 @@ local function makeSliderRow(titleText, minV, maxV, initial, onChange, formatter
     knob.BackgroundColor3 = Color3.fromRGB(240,240,240)
     knob.BorderSizePixel = 0
     knob.Parent = bar
-    Instance.new("UICorner", knob).CornerRadius = UDim.New(1,0) -- fix casing
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
+
+    local lbl = s:FindFirstChildOfClass("TextLabel")
+
+    local dragging, val = false, initial
+    local function setFromPct(p)
+        p = math.clamp(p, 0, 1)
+        val = minV + (maxV - minV) * p
+        fill.Size = UDim2.new(p, 0, 1, 0)
+        knob.Position = UDim2.new(p, -math.floor(9*baseScale), 0.5, -math.floor(9*baseScale))
+        lbl.Text = titleText .. ": " .. (formatter and formatter(val) or tostring(val))
+        if onChange then onChange(val) end
+    end
+
+    bar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
+            setFromPct(rel)
+        end
+    end)
+    UIS.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
+            setFromPct(rel)
+        end
+    end)
+    bar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    return {
+        Set = function(v)
+            local p = (math.clamp(v, minV, maxV) - minV) / (maxV - minV)
+            setFromPct(p)
+        end
+    }
 end
+
+-- ===== Status Section =====
+local statusSec = section(math.floor(56*baseScale))
+local statusLabel = makeLabel(statusSec, "Status: Idle", math.floor(14*baseScale))
+statusLabel.Position = UDim2.new(0, 12, 0, 10)
+statusLabel.TextColor3 = Color3.fromRGB(180,220,255)
+local function setStatus(txt) statusLabel.Text = "Status: "..txt end
+
+-- ===== Sheets Section =====
+local sheetSec = section(math.floor(200*baseScale))
+makeLabel(sheetSec, "Sheets (format bracket)", math.floor(14*baseScale))
+local box = Instance.new("TextBox")
+box.Size = UDim2.new(1, -24, 1, -math.floor(50*baseScale))
+box.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
+box.BackgroundColor3 = Color3.fromRGB(38,38,38)
+box.TextColor3 = Color3.fromRGB(235,235,235)
+box.TextSize = math.floor(14*baseScale)
+box.Font = Enum.Font.Code
+box.TextXAlignment = Enum.TextXAlignment.Left
+box.TextYAlignment = Enum.TextYAlignment.Top
+box.ClearTextOnFocus = false
+box.MultiLine = true
+box.TextWrapped = true
+box.PlaceholderText = "Tempel Sheets di sini...\nContoh: [4o] p s g f d ..."
+box.Parent = sheetSec
+Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
+
+-- ===== Preset Buttons =====
+local btnRow = section(math.floor(80*baseScale))
+makeLabel(btnRow, "Preset", math.floor(14*baseScale))
+local halfW = math.floor((frame.Size.X.Offset - 60) / 2)
+local sampleBtn = makeButton(btnRow, "Load Sample (blue.)", 12, halfW, function()
+    box.Text = table.concat({
+        "t r w t r w  t r w t y u",
+        "[4o] p s g f d   5 a s d s",
+        "[1o] u i o   [6a] s",
+        "[4o] p s g f a   5 h g f",
+        "[1s] s s d d d   [6f] f f a a a",
+        "4 t p o   [5p] o u i   [1o] i u t   [6t]"
+    }, "  ")
+end)
+local clearBtn = makeButton(btnRow, "Clear", 12 + halfW + 8, halfW, function()
+    box.Text = ""
+end)
+
+-- ===== Transport =====
+local ctlSec = section(math.floor(96*baseScale))
+makeLabel(ctlSec, "Transport", math.floor(14*baseScale))
+local thirdW = math.floor((frame.Size.X.Offset - 60) / 3)
+
+local playBtn = makeButton(ctlSec, "Play", 12, thirdW, function()
+    if isPlaying then setStatus("Sudah Playing..."); return end
+    local sheet = box.Text:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    if sheet == "" then setStatus("Sheet kosong!"); return end
+    isPlaying, isPaused, shouldStop = true, false, false
+    setMovementLock(true)           -- Kunci gerak karakter
+    setStatus("Starting...")
+    task.spawn(function()
+        playFromSheet(sheet, setStatus)
+        isPlaying, isPaused = false, false
+        setMovementLock(false)      -- Buka kunci saat selesai
+    end)
+end)
+
+local pauseBtn = makeButton(ctlSec, "Pause/Resume", 12 + thirdW + 8, thirdW, function()
+    if not isPlaying then setStatus("Belum Playing"); return end
+    isPaused = not isPaused
+    setStatus(isPaused and "Paused" or "Resumed")
+end)
+
+local stopBtn = makeButton(ctlSec, "Stop", 12 + (thirdW+8)*2, thirdW, function()
+    if not isPlaying then setStatus("Idle"); return end
+    shouldStop, isPaused = true, false
+    setMovementLock(false)          -- Guard: langsung buka kunci
+    setStatus("Stopping...")
+end)
+
+-- ===== Sliders =====
+local bpmRow = makeSliderRow("BPM", 40, 200, BPM, function(v)
+    BPM = math.floor(v + 0.5)
+end, function(v) return ("%d"):format(v) end)
+
+local tpbRow = nil
+tpbRow = makeSliderRow("Tokens per Beat", 1, 4, TOKENS_PER_BEAT, function(v)
+    TOKENS_PER_BEAT = math.max(1, math.floor(v + 0.25))
+    if tpbRow and tpbRow.Set then tpbRow.Set(TOKENS_PER_BEAT) end
+end, function(v) return ("%0.1f"):format(v) end)
+
+local hrRow  = makeSliderRow("Hold Ratio", 0.30, 0.90, HOLD_RATIO, function(v)
+    HOLD_RATIO = math.clamp(v, 0.30, 0.90)
+end, function(v) return ("%d%%"):format(math.floor(v*100+0.5)) end)
+
+local sdRow  = makeSliderRow("Start Delay (s)", 0, 8, START_DELAY, function(v)
+    START_DELAY = math.max(0, v)
+end, function(v) return ("%0.1f s"):format(v) end)
+
+local msRow  = makeSliderRow("Micro Stagger", 0.0, 0.03, MICRO_STAGGER, function(v)
+    MICRO_STAGGER = math.clamp(v, 0, 0.03)
+end, function(v) return ("%d ms"):format(math.floor(v*1000+0.5)) end)
+
+-- ===== Minimize =====
+local minimized = false
+mini.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        body.Visible = false
+        frame.Size = UDim2.fromOffset(frame.Size.X.Offset, math.floor(42*baseScale)+4)
+        mini.Text = "+"
+    else
+        body.Visible = true
+        frame.Size = UDim2.fromOffset(math.floor(420*baseScale), math.floor(520*baseScale))
+        mini.Text = "-"
+    end
+end)
+
+-- ===== Hint =====
+local hint = section(math.floor(56*baseScale))
+makeLabel(hint, "Tips: klik area piano (chat OFF). Atur BPM/Timing di slider. Saat Play, karakter dikunci.", math.floor(12*baseScale))
