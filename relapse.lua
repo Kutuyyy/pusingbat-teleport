@@ -797,10 +797,11 @@ end, function(v) return ("%d ms"):format(math.floor(v*1000+0.5)) end)
 
 -- ===== Minimize =====
 local minimized = false
-mini.MouseButton1Click:Connect(function()
-    minimized = not minimized
+local function setMinimized(state)
+    minimized = state and true or false
     if minimized then
         body.Visible = false
+        -- kecilkan hanya header biar nggak nutup piano
         frame.Size = UDim2.fromOffset(frame.Size.X.Offset, math.floor(42*baseScale)+4)
         mini.Text = "+"
     else
@@ -808,6 +809,10 @@ mini.MouseButton1Click:Connect(function()
         frame.Size = UDim2.fromOffset(math.floor(420*baseScale), math.floor(520*baseScale))
         mini.Text = "-"
     end
+end
+
+mini.MouseButton1Click:Connect(function()
+    setMinimized(not minimized)
 end)
 
 -- ===== Hint =====
