@@ -86,6 +86,38 @@ local TOKENS_PER_BEAT = 2
 local HOLD_RATIO      = 0.65
 local START_DELAY     = 3
 local MICRO_STAGGER   = 0.004
+-- ===== Touch Playback (Mobile) =====
+local TOUCH_MODE = UIS.TouchEnabled     -- otomatis ON di HP
+local touchMap = {}                     -- [char] = Vector2 screen pos
+local calibrating = false
+
+local function getMouseXY()
+    local p = UIS:GetMouseLocation()
+    return Vector2.new(p.X, p.Y)
+end
+
+local function tapAt(pos, holdSec)
+    -- tap cepat di posisi layar (button1 down/up)
+    VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
+    if holdSec and holdSec > 0 then task.wait(holdSec) end
+    VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
+end
+
+local function uniqueCharsFromSheet(sheet)
+    local set = {}
+    for tk in sheet:gmatch("%S+") do
+        local body = tk
+        if tk:sub(1,1) == "[" and tk:sub(-1) == "]" then body = tk:sub(2,-2) end
+        for i = 1, #body do
+            local ch = body:sub(i,i)
+            if ch ~= " " then set[ch] = true end
+        end
+    end
+    local list = {}
+    for ch in pairs(set) do table.insert(list, ch) end
+    table.sort(list)
+    return list
+end
 
 -- ===== Runtime =====
 local isPlaying, isPaused, shouldStop = false, false, false
@@ -232,7 +264,11 @@ local function superLock(on)
 end
 
 -- ===== Input Sender =====
-local function pressKey(kc, holdSec, useShift)
+local function pressKey(kc, holdSec, useShift, rawChar)
+    if TOUCH_MODE and touchMap[rawChar or ""] then
+        tapAt(touchMap[rawChar], holdSec)
+        return
+    end
     if useShift then VIM:SendKeyEvent(true, SHIFT, false, game) end
     VIM:SendKeyEvent(true, kc, false, game)
     task.wait(holdSec)
@@ -240,20 +276,32 @@ local function pressKey(kc, holdSec, useShift)
     if useShift then VIM:SendKeyEvent(false, SHIFT, false, game) end
 end
 
-local function pressChord(keyList, holdSec)
-    local needShift = false
-    for _, info in ipairs(keyList) do
-        if info.shift then needShift = true break end
+local function pressChord(keyList, holdSec, rawChars)
+    if TOUCH_MODE then
+        -- mainkan semua posisi yang ada; kalau ada yang belum dikalibrasi, lewati
+        local any = false
+        for _, ch in ipairs(rawChars) do
+            local pos = touchMap[ch]
+            if pos then
+                any = true
+                tapAt(pos, 0)         -- down/up cepat bergiliran
+                task.wait(MICRO_STAGGER)
+            end
+        end
+        if any and holdSec and holdSec > 0 then task.wait(holdSec) end
+        return
     end
+
+    -- mode keyboard (PC)
+    local needShift = false
+    for _, info in ipairs(keyList) do if info.shift then needShift = true break end end
     if needShift then VIM:SendKeyEvent(true, SHIFT, false, game) end
     for i, info in ipairs(keyList) do
         VIM:SendKeyEvent(true, info.kc, false, game)
         if i < #keyList then task.wait(MICRO_STAGGER) end
     end
     task.wait(holdSec)
-    for _, info in ipairs(keyList) do
-        VIM:SendKeyEvent(false, info.kc, false, game)
-    end
+    for _, info in ipairs(keyList) do VIM:SendKeyEvent(false, info.kc, false, game) end
     if needShift then VIM:SendKeyEvent(false, SHIFT, false, game) end
 end
 
@@ -298,17 +346,18 @@ local function playFromSheet(sheet, statusSetter)
         if tk then
             local isChord, body = parseToken(tk)
             if isChord then
-                local keyList = {}
+                local keyList, rawChars = {}, {}
                 for j = 1, #body do
                     local ch = body:sub(j,j)
+                    table.insert(rawChars, ch)
                     local kc, needShift = keycodeFromChar(ch)
                     if kc then table.insert(keyList, {kc = kc, shift = needShift}) end
                 end
-                if #keyList > 0 then pressChord(keyList, holdSec) end
+                if #keyList > 0 or TOUCH_MODE then pressChord(keyList, holdSec, rawChars) end
             else
                 local ch = body:sub(1,1)
                 local kc, needShift = keycodeFromChar(ch)
-                if kc then pressKey(kc, holdSec, needShift) end
+                pressKey(kc, holdSec, needShift, ch)
             end
             statusSetter(("Playing %d/%d"):format(i, total))
             task.wait(gapSec)
@@ -579,6 +628,67 @@ box.Parent = sheetSec
 Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
 
 -- ===== Preset Buttons =====
+-- Tambah tombol kalibrasi agar akurat di mobile
+local calibSec = section(math.floor(80*baseScale))
+makeLabel(calibSec, "Mobile Touch Playback", math.floor(14*baseScale))
+local wrapCal = makeHRow(calibSec, math.floor(36*baseScale))
+
+makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
+    if calibrating then setStatus("Sedang kalibrasi..."); return end
+    local sheet = box.Text:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    if sheet == "" then setStatus("Isi sheet dulu untuk kalibrasi"); return end
+    calibrating = true
+    setStatus("Kalibrasi mulai…")
+    touchMap = {}
+
+    -- daftar char yang dipakai di sheet
+    local chars = uniqueCharsFromSheet(sheet)
+    if #chars == 0 then setStatus("Tidak ada token"); calibrating=false; return end
+
+    -- overlay full-screen utk menangkap tap
+    local overlay = Instance.new("TextButton")
+    overlay.BackgroundTransparency = 1
+    overlay.Text = ""
+    overlay.Size = UDim2.fromScale(1,1)
+    overlay.ZIndex = 10
+    overlay.Parent = gui
+
+    local idx = 1
+    local prompt = Instance.new("TextLabel")
+    prompt.Size = UDim2.fromOffset(320, 36)
+    prompt.Position = UDim2.new(0, 16, 0, 60)
+    prompt.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    prompt.TextColor3 = Color3.fromRGB(255,255,255)
+    prompt.Font = Enum.Font.GothamBold
+    prompt.TextSize = 16
+    prompt.ZIndex = 11
+    prompt.Parent = gui
+    Instance.new("UICorner", prompt).CornerRadius = UDim.new(0,8)
+
+    local function setPrompt()
+        prompt.Text = ("Tap tuts bertuliskan:  %s   (%d/%d)"):format(chars[idx], idx, #chars)
+    end
+    setPrompt()
+
+    overlay.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local pos = getMouseXY()
+            local ch = chars[idx]
+            touchMap[ch] = pos
+            idx += 1
+            if idx > #chars then
+                overlay:Destroy()
+                prompt:Destroy()
+                calibrating = false
+                setStatus("Kalibrasi selesai ✓")
+            else
+                setPrompt()
+            end
+        end
+    end)
+end, Color3.fromRGB(90,140,255))
+
+
 local btnRow = section(math.floor(80*baseScale))
 makeLabel(btnRow, "Preset", math.floor(14*baseScale))
 local wrap1 = (function()
