@@ -1,41 +1,35 @@
---[[ 
-    Pusingbat Piano Player — UI Only + Player
-    - UI panel: Play, Pause, Stop, Load Sample, Clear
-    - TextBox multi-line untuk Sheets (format bracket: [pwdj] p ...)
+--[[
+    Pusingbat Piano Player — Rapi + Draggable + Scrollable (Mobile Friendly)
+    - Panel draggable via header
+    - Scrolling content (AutomaticCanvasSize.Y)
+    - Tombol besar (HP), slider & textbox rapi dalam list
+    - Minimize/Expand
+    - Play / Pause / Stop, Load Sample (blue.) / Clear
     - Slider: BPM, Tokens/Beat, Hold Ratio, Start Delay, Micro Stagger
-    - Status indicator: Idle/Playing/Paused/Stopped
-    - Penekan tombol memakai VirtualInputManager (meniru main piano manual)
-    NOTE:
-    - Fokuskan kursor ke piano (chat TIDAK aktif) sebelum Play.
-    - Kamu bisa paste Sheets-mu ke TextBox lalu klik Play.
 ]]
 
---= SERVICES =--
+-- ===== Services =====
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local VIM = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 
---= PARAM DEFAULT =--
+-- ===== Player Params (default) =====
 local BPM            = 97
 local TOKENS_PER_BEAT= 2
-local HOLD_RATIO     = 0.65   -- 0.30 .. 0.90
+local HOLD_RATIO     = 0.65
 local START_DELAY    = 3
-local MICRO_STAGGER  = 0.004  -- detik, 0..0.03
+local MICRO_STAGGER  = 0.004
 
---= STATE =--
-local isPlaying = false
-local isPaused  = false
-local shouldStop= false
-local playThread = nil
+-- ===== Runtime State =====
+local isPlaying, isPaused, shouldStop = false, false, false
 
---= KEY MAPS =--
+-- ===== Key Maps =====
 local digitMap = {
     ["0"]=Enum.KeyCode.Zero, ["1"]=Enum.KeyCode.One, ["2"]=Enum.KeyCode.Two,
     ["3"]=Enum.KeyCode.Three,["4"]=Enum.KeyCode.Four,["5"]=Enum.KeyCode.Five,
     ["6"]=Enum.KeyCode.Six,  ["7"]=Enum.KeyCode.Seven,["8"]=Enum.KeyCode.Eight, ["9"]=Enum.KeyCode.Nine,
 }
-
 local nonShiftPunct = {
     ["-"]=Enum.KeyCode.Minus, ["="]=Enum.KeyCode.Equals,
     ["["]=Enum.KeyCode.LeftBracket, ["]"]=Enum.KeyCode.RightBracket,
@@ -44,8 +38,6 @@ local nonShiftPunct = {
     ["/"]=Enum.KeyCode.Slash,      ["\\"]=Enum.KeyCode.BackSlash,
     ["`"]=Enum.KeyCode.Backquote,
 }
-
--- butuh Shift
 local shiftedPunct = {
     ["!"]=Enum.KeyCode.One,   ["@"]=Enum.KeyCode.Two,  ["#"]=Enum.KeyCode.Three,
     ["$"]=Enum.KeyCode.Four,  ["%"]=Enum.KeyCode.Five, ["^"]=Enum.KeyCode.Six,
@@ -56,7 +48,6 @@ local shiftedPunct = {
     ["<"]=Enum.KeyCode.Comma, [">"]=Enum.KeyCode.Period, ["?"]=Enum.KeyCode.Slash,
     ["|"]=Enum.KeyCode.BackSlash, ["~"]=Enum.KeyCode.Backquote,
 }
-
 local SHIFT = Enum.KeyCode.LeftShift
 
 local function keycodeFromLetter(letter)
@@ -78,7 +69,7 @@ local function keycodeFromChar(ch)
     return nil, false
 end
 
---= INPUT SENDER =--
+-- ===== Input Sender =====
 local function pressKey(kc, holdSec, useShift)
     if useShift then VIM:SendKeyEvent(true, SHIFT, false, game) end
     VIM:SendKeyEvent(true, kc, false, game)
@@ -104,7 +95,7 @@ local function pressChord(keyList, holdSec)
     if needShift then VIM:SendKeyEvent(false, SHIFT, false, game) end
 end
 
---= PARSER =--
+-- ===== Parser =====
 local function tokenize(sheet)
     local tokens = {}
     for tk in sheet:gmatch("%S+") do
@@ -121,7 +112,7 @@ local function parseToken(token)
     end
 end
 
---= PLAYER CORE =--
+-- ===== Player Core =====
 local function playFromSheet(sheet, statusSetter)
     local beatSec = 60 / BPM
     local stepSec = beatSec / math.max(TOKENS_PER_BEAT, 1)
@@ -132,8 +123,7 @@ local function playFromSheet(sheet, statusSetter)
     task.wait(START_DELAY)
 
     local tokens = tokenize(sheet)
-    local total = #tokens
-    local i = 1
+    local i, total = 1, #tokens
 
     while i <= total do
         if shouldStop then break end
@@ -152,9 +142,7 @@ local function playFromSheet(sheet, statusSetter)
                     local kc, needShift = keycodeFromChar(ch)
                     if kc then table.insert(keyList, {kc = kc, shift = needShift}) end
                 end
-                if #keyList > 0 then
-                    pressChord(keyList, holdSec)
-                end
+                if #keyList > 0 then pressChord(keyList, holdSec) end
             else
                 local ch = body:sub(1,1)
                 local kc, needShift = keycodeFromChar(ch)
@@ -165,79 +153,77 @@ local function playFromSheet(sheet, statusSetter)
         end
         i += 1
     end
+
+    if shouldStop then
+        statusSetter("Stopped")
+    else
+        statusSetter("Selesai")
+    end
 end
 
---= UI BUILDER =--
+-- ===== UI =====
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Overlay 5s
-do
-    local overlay = Instance.new("ScreenGui")
-    overlay.Name = "PusingbatOverlay"
-    overlay.IgnoreGuiInset = true
-    overlay.ResetOnSpawn = false
-    overlay.Parent = PlayerGui
+-- Responsive scale utk HP: 0.9..1.1
+local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
+local baseScale = math.clamp(viewport.X / 900, 0.90, 1.10)
+local isTouch = UIS.TouchEnabled
 
-    local dim = Instance.new("Frame")
-    dim.Size = UDim2.fromScale(1,1)
-    dim.BackgroundColor3 = Color3.new(0,0,0)
-    dim.BackgroundTransparency = 0.5
-    dim.BorderSizePixel = 0
-    dim.Parent = overlay
-
-    local text = Instance.new("TextLabel")
-    text.AnchorPoint = Vector2.new(0.5,0.5)
-    text.Position = UDim2.fromScale(0.5,0.5)
-    text.Size = UDim2.fromOffset(640,80)
-    text.BackgroundTransparency = 1
-    text.Text = "Pusingbat Piano Player"
-    text.Font = Enum.Font.GothamBlack
-    text.TextSize = 42
-    text.TextColor3 = Color3.fromRGB(255,255,255)
-    text.Parent = overlay
-
-    task.delay(5, function() overlay:Destroy() end)
-end
-
+-- Root GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "PusingbatPianoUI"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
 gui.Parent = PlayerGui
 
+-- Main window (draggable)
 local frame = Instance.new("Frame")
-frame.Size = UDim2.fromOffset(420, 510)
+frame.Name = "Window"
+frame.Size = UDim2.fromOffset(math.floor(420*baseScale), math.floor(520*baseScale))
 frame.Position = UDim2.new(0, 24, 0, 120)
-frame.BackgroundColor3 = Color3.fromRGB(30,30,30)
-frame.BackgroundTransparency = 0.1
+frame.BackgroundColor3 = Color3.fromRGB(28,28,28)
+frame.BackgroundTransparency = 0.06
 frame.BorderSizePixel = 0
 frame.Active = true
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
-local header = Instance.new("TextLabel")
-header.BackgroundTransparency = 1
-header.Size = UDim2.new(1, -16, 0, 28)
-header.Position = UDim2.new(0, 8, 0, 8)
-header.Font = Enum.Font.GothamBold
-header.TextSize = 18
-header.TextXAlignment = Enum.TextXAlignment.Left
-header.TextColor3 = Color3.fromRGB(255,255,255)
-header.Text = "Pusingbat Piano Player"
+-- Header
+local header = Instance.new("Frame")
+header.Name = "Header"
+header.Size = UDim2.new(1,0,0, math.floor(42*baseScale))
+header.BackgroundColor3 = Color3.fromRGB(22,22,22)
+header.BorderSizePixel = 0
 header.Parent = frame
+Instance.new("UICorner", header).CornerRadius = UDim.new(0,12)
 
-local drag = Instance.new("TextButton")
-drag.BackgroundTransparency = 1
-drag.Size = UDim2.new(1, 0, 0, 36)
-drag.Position = UDim2.new(0, 0, 0, 0)
-drag.Text = ""
-drag.Parent = frame
+local title = Instance.new("TextLabel")
+title.BackgroundTransparency = 1
+title.Size = UDim2.new(1, -120, 1, 0)
+title.Position = UDim2.new(0, 12, 0, 0)
+title.Font = Enum.Font.GothamBold
+title.TextSize = math.floor(18*baseScale)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.TextColor3 = Color3.fromRGB(235,235,235)
+title.Text = "Pusingbat Piano Player"
+title.Parent = header
 
--- draggable
+-- Minimize button
+local mini = Instance.new("TextButton")
+mini.Size = UDim2.fromOffset(math.floor(36*baseScale), math.floor(28*baseScale))
+mini.Position = UDim2.new(1, -math.floor(40*baseScale), 0.5, -math.floor(14*baseScale))
+mini.BackgroundColor3 = Color3.fromRGB(55,120,255)
+mini.TextColor3 = Color3.new(1,1,1)
+mini.TextSize = math.floor(14*baseScale)
+mini.Font = Enum.Font.GothamBold
+mini.Text = "-"
+mini.Parent = header
+Instance.new("UICorner", mini).CornerRadius = UDim.new(0, 6)
+
+-- Drag area (header)
 do
-    local dragging = false
-    local startPos, startInput
-    drag.InputBegan:Connect(function(input)
+    local dragging, startPos, startInput
+    header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             startInput = input
@@ -250,60 +236,91 @@ do
             frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
-    drag.InputEnded:Connect(function(input)
+    header.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = false
         end
     end)
 end
 
--- helpers
-local function button(parent, text, pos, size, callback)
+-- Body (ScrollingFrame)
+local body = Instance.new("ScrollingFrame")
+body.Name = "Body"
+body.Size = UDim2.new(1, -16, 1, -math.floor(42*baseScale) - 12)
+body.Position = UDim2.new(0, 8, 0, math.floor(42*baseScale) + 4)
+body.BackgroundTransparency = 1
+body.ScrollBarThickness = isTouch and math.floor(10*baseScale) or math.floor(6*baseScale)
+body.ScrollingDirection = Enum.ScrollingDirection.Y
+body.AutomaticCanvasSize = Enum.AutomaticSize.Y
+body.CanvasSize = UDim2.new()
+body.Parent = frame
+
+local padding = Instance.new("UIPadding")
+padding.PaddingTop = UDim.new(0,8)
+padding.PaddingBottom = UDim.new(0,8)
+padding.PaddingLeft = UDim.new(0,4)
+padding.PaddingRight = UDim.new(0,4)
+padding.Parent = body
+
+local list = Instance.new("UIListLayout")
+list.SortOrder = Enum.SortOrder.LayoutOrder
+list.Padding = UDim.new(0, math.floor(8*baseScale))
+list.Parent = body
+
+-- Helper: section container
+local function section(height)
+    local f = Instance.new("Frame")
+    f.Size = UDim2.new(1, -8, 0, height)
+    f.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    f.BorderSizePixel = 0
+    f.LayoutOrder = #body:GetChildren()+1
+    f.Parent = body
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0,8)
+    return f
+end
+
+-- Helper: label
+local function makeLabel(parent, text, size)
+    local l = Instance.new("TextLabel")
+    l.BackgroundTransparency = 1
+    l.Size = UDim2.new(1, -16, 0, math.floor(22*baseScale))
+    l.Position = UDim2.new(0, 8, 0, 6)
+    l.Font = Enum.Font.Gotham
+    l.TextSize = size or math.floor(14*baseScale)
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.TextColor3 = Color3.fromRGB(220,220,220)
+    l.Text = text
+    l.Parent = parent
+    return l
+end
+
+-- Helper: rounded button
+local function makeButton(parent, label, x, w, cb)
     local btn = Instance.new("TextButton")
-    btn.Size = size
-    btn.Position = pos
-    btn.BackgroundColor3 = Color3.fromRGB(55, 120, 255)
+    btn.Size = UDim2.new(0, w, 0, math.floor(36*baseScale))
+    btn.Position = UDim2.new(0, x, 0, math.floor(36*baseScale))
+    btn.BackgroundColor3 = Color3.fromRGB(55,120,255)
     btn.TextColor3 = Color3.new(1,1,1)
-    btn.TextSize = 16
+    btn.TextSize = math.floor(16*baseScale)
     btn.Font = Enum.Font.GothamBold
-    btn.Text = text
-    btn.AutoButtonColor = true
+    btn.Text = label
     btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-    btn.MouseButton1Click:Connect(function()
-        if callback then callback() end
-    end)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+    btn.MouseButton1Click:Connect(function() if cb then cb() end end)
     return btn
 end
 
-local function slider(parent, labelText, minV, maxV, initial, posY, formatFn, onChange)
-    local container = Instance.new("Frame")
-    container.Size = UDim2.new(1, -16, 0, 56)
-    container.Position = UDim2.new(0, 8, 0, posY)
-    container.BackgroundTransparency = 1
-    container.Parent = parent
-
-    local lbl = Instance.new("TextLabel")
-    lbl.BackgroundTransparency = 1
-    lbl.Size = UDim2.new(1, 0, 0, 20)
-    lbl.Position = UDim2.new(0, 0, 0, 0)
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 16
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.TextColor3 = Color3.fromRGB(235,235,235)
-    local function setLabel(val)
-        lbl.Text = string.format("%s: %s", labelText, formatFn and formatFn(val) or tostring(val))
-    end
-    setLabel(initial)
-    lbl.Parent = container
-
+-- Helper: slider row
+local function makeSliderRow(titleText, minV, maxV, initial, onChange, formatter)
+    local s = section(math.floor(74*baseScale))
+    makeLabel(s, titleText .. ": " .. (formatter and formatter(initial) or tostring(initial)))
     local bar = Instance.new("Frame")
-    bar.Size = UDim2.new(1, 0, 0, 8)
-    bar.Position = UDim2.new(0, 0, 0, 28)
+    bar.Size = UDim2.new(1, -24, 0, math.floor(10*baseScale))
+    bar.Position = UDim2.new(0, 12, 0, math.floor(40*baseScale))
     bar.BackgroundColor3 = Color3.fromRGB(60,60,60)
     bar.BorderSizePixel = 0
-    bar.Parent = container
-    Instance.new("UICorner", bar).CornerRadius = UDim.new(0, 8)
+    bar.Parent = s
+    Instance.new("UICorner", bar).CornerRadius = UDim.new(0,6)
 
     local fill = Instance.new("Frame")
     local pct0 = (initial - minV) / (maxV - minV)
@@ -311,25 +328,27 @@ local function slider(parent, labelText, minV, maxV, initial, posY, formatFn, on
     fill.BackgroundColor3 = Color3.fromRGB(0,170,255)
     fill.BorderSizePixel = 0
     fill.Parent = bar
-    Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 8)
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(0,6)
 
     local knob = Instance.new("Frame")
-    knob.Size = UDim2.fromOffset(18,18)
-    knob.Position = UDim2.new(pct0, -9, 0.5, -9)
+    knob.Size = UDim2.fromOffset(math.floor(18*baseScale), math.floor(18*baseScale))
+    knob.Position = UDim2.new(pct0, -math.floor(9*baseScale), 0.5, -math.floor(9*baseScale))
     knob.BackgroundColor3 = Color3.fromRGB(240,240,240)
     knob.BorderSizePixel = 0
     knob.Parent = bar
     Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 
-    local currentVal = initial
+    local lbl = s:FindFirstChildOfClass("TextLabel")
+
     local dragging = false
-    local function setFromPct(pct)
-        pct = math.clamp(pct, 0, 1)
-        currentVal = minV + (maxV - minV) * pct
-        fill.Size = UDim2.new(pct, 0, 1, 0)
-        knob.Position = UDim2.new(pct, -9, 0.5, -9)
-        setLabel(currentVal)
-        if onChange then onChange(currentVal) end
+    local val = initial
+    local function setFromPct(p)
+        p = math.clamp(p, 0, 1)
+        val = minV + (maxV - minV) * p
+        fill.Size = UDim2.new(p, 0, 1, 0)
+        knob.Position = UDim2.new(p, -math.floor(9*baseScale), 0.5, -math.floor(9*baseScale))
+        lbl.Text = titleText .. ": " .. (formatter and formatter(val) or tostring(val))
+        if onChange then onChange(val) end
     end
 
     bar.InputBegan:Connect(function(input)
@@ -352,49 +371,46 @@ local function slider(parent, labelText, minV, maxV, initial, posY, formatFn, on
     end)
 
     return {
-        Get = function() return currentVal end,
         Set = function(v)
-            local pct = (math.clamp(v, minV, maxV) - minV) / (maxV - minV)
-            setFromPct(pct)
+            local p = (math.clamp(v, minV, maxV) - minV) / (maxV - minV)
+            setFromPct(p)
         end
     }
 end
 
--- Status label
-local statusLabel = Instance.new("TextLabel")
-statusLabel.BackgroundTransparency = 1
-statusLabel.Size = UDim2.new(1, -16, 0, 20)
-statusLabel.Position = UDim2.new(0, 8, 0, 40)
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.TextSize = 14
-statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+-- ===== Status Section =====
+local statusSec = section(math.floor(56*baseScale))
+local statusLabel = makeLabel(statusSec, "Status: Idle")
+statusLabel.Position = UDim2.new(0, 12, 0, 10)
 statusLabel.TextColor3 = Color3.fromRGB(180,220,255)
-statusLabel.Text = "Status: Idle"
-statusLabel.Parent = frame
+statusLabel.TextSize = math.floor(14*baseScale)
+local function setStatus(txt) statusLabel.Text = "Status: "..txt end
 
-local function setStatus(txt)
-    statusLabel.Text = "Status: " .. txt
-end
+-- ===== Sheets Section =====
+local sheetSec = section(math.floor(200*baseScale))
+makeLabel(sheetSec, "Sheets (format bracket)", math.floor(14*baseScale))
 
--- TextBox untuk Sheets
 local box = Instance.new("TextBox")
-box.Size = UDim2.new(1, -16, 0, 170)
-box.Position = UDim2.new(0, 8, 0, 68)
+box.Size = UDim2.new(1, -24, 1, -math.floor(50*baseScale))
+box.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
 box.BackgroundColor3 = Color3.fromRGB(38,38,38)
 box.TextColor3 = Color3.fromRGB(235,235,235)
-box.TextSize = 14
+box.TextSize = math.floor(14*baseScale)
 box.Font = Enum.Font.Code
 box.TextXAlignment = Enum.TextXAlignment.Left
 box.TextYAlignment = Enum.TextYAlignment.Top
 box.ClearTextOnFocus = false
 box.MultiLine = true
-box.PlaceholderText = "Tempel Sheets bracket-mu di sini...\nContoh: [4o] p s g f d ..."
-box.Text = ""
-box.Parent = frame
-Instance.new("UICorner", box).CornerRadius = UDim.new(0, 8)
+box.TextWrapped = true
+box.PlaceholderText = "Tempel Sheets di sini...\nContoh: [4o] p s g f d ..."
+box.Parent = sheetSec
+Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
 
--- Tombol atas: Load Sample / Clear
-button(frame, "Load Sample (blue.)", UDim2.new(0, 8, 0, 246), UDim2.fromOffset(200, 32), function()
+-- Row tombol sample/clear
+local btnRow = section(math.floor(80*baseScale))
+makeLabel(btnRow, "Preset", math.floor(14*baseScale))
+local bw = math.floor( (btnRow.AbsoluteSize.X > 0 and btnRow.AbsoluteSize.X or 360) / 2 ) -- fallback
+local sampleBtn = makeButton(btnRow, "Load Sample (blue.)", 12, math.floor( (frame.AbsoluteSize.X-60) / 2 ), function()
     box.Text = table.concat({
         "t r w t r w  t r w t y u",
         "[4o] p s g f d   5 a s d s",
@@ -404,92 +420,72 @@ button(frame, "Load Sample (blue.)", UDim2.new(0, 8, 0, 246), UDim2.fromOffset(2
         "4 t p o   [5p] o u i   [1o] i u t   [6t]"
     }, "  ")
 end)
-
-button(frame, "Clear", UDim2.new(0, 220, 0, 246), UDim2.fromOffset(192, 32), function()
+local clearBtn = makeButton(btnRow, "Clear", 12 + math.floor((frame.AbsoluteSize.X-60)/2) + 8, math.floor((frame.AbsoluteSize.X-60)/2), function()
     box.Text = ""
 end)
 
--- Sliders
-local y = 286
-local bpmSlider = slider(frame, "BPM", 40, 200, BPM, y, function(v) return ("%d"):format(v) end, function(v)
-    BPM = math.floor(v + 0.5)
-end); y = y + 56
-
-local tpbSlider = slider(frame, "Tokens per Beat", 1, 4, TOKENS_PER_BEAT, y, function(v) return ("%0.1f"):format(v) end, function(v)
-    TOKENS_PER_BEAT = math.max(1, math.floor(v + 0.25))  -- bulatkan ke 1..4
-    tpbSlider.Set(TOKENS_PER_BEAT)
-end); y = y + 56
-
-local hrSlider = slider(frame, "Hold Ratio", 0.30, 0.90, HOLD_RATIO, y, function(v) return ("%d%%"):format(math.floor(v*100+0.5)) end, function(v)
-    HOLD_RATIO = math.clamp(v, 0.30, 0.90)
-end); y = y + 56
-
-local sdSlider = slider(frame, "Start Delay (s)", 0, 8, START_DELAY, y, function(v) return ("%0.1f s"):format(v) end, function(v)
-    START_DELAY = math.max(0, v)
-end); y = y + 56
-
-local msSlider = slider(frame, "Micro Stagger", 0.0, 0.03, MICRO_STAGGER, y, function(v) return ("%d ms"):format(math.floor(v*1000+0.5)) end, function(v)
-    MICRO_STAGGER = math.clamp(v, 0, 0.03)
-end); y = y + 56
-
--- Tombol Play / Pause / Stop
-button(frame, "Play", UDim2.new(0, 8, 0, y), UDim2.fromOffset(120, 36), function()
-    if isPlaying then
-        setStatus("Sudah Playing...")
-        return
-    end
+-- ===== Controls Section (Play/Pause/Stop) =====
+local ctlSec = section(math.floor(96*baseScale))
+makeLabel(ctlSec, "Transport", math.floor(14*baseScale))
+local btnW = math.floor( (frame.AbsoluteSize.X - 60) / 3 )
+local playBtn = makeButton(ctlSec, "Play", 12, btnW, function()
+    if isPlaying then setStatus("Sudah Playing..."); return end
     local sheet = box.Text:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-    if sheet == "" then
-        setStatus("Sheet kosong!")
-        return
-    end
-    isPlaying = true
-    isPaused = false
-    shouldStop = false
+    if sheet == "" then setStatus("Sheet kosong!"); return end
+    isPlaying, isPaused, shouldStop = true, false, false
     setStatus("Starting...")
-    playThread = task.spawn(function()
+    task.spawn(function()
         playFromSheet(sheet, setStatus)
-        isPlaying = false
-        isPaused = false
-        if shouldStop then
-            setStatus("Stopped")
-        else
-            setStatus("Selesai")
-        end
+        isPlaying, isPaused = false, false
     end)
 end)
-
-button(frame, "Pause/Resume", UDim2.new(0, 142, 0, y), UDim2.fromOffset(140, 36), function()
-    if not isPlaying then
-        setStatus("Belum Playing")
-        return
-    end
+local pauseBtn = makeButton(ctlSec, "Pause/Resume", 12 + btnW + 8, btnW, function()
+    if not isPlaying then setStatus("Belum Playing"); return end
     isPaused = not isPaused
-    if isPaused then
-        setStatus("Paused")
-    else
-        setStatus("Resumed")
-    end
+    setStatus(isPaused and "Paused" or "Resumed")
 end)
-
-button(frame, "Stop", UDim2.new(0, 298, 0, y), UDim2.fromOffset(114, 36), function()
-    if not isPlaying then
-        setStatus("Idle")
-        return
-    end
-    shouldStop = true
-    isPaused = false
+local stopBtn = makeButton(ctlSec, "Stop", 12 + (btnW+8)*2, btnW, function()
+    if not isPlaying then setStatus("Idle"); return end
+    shouldStop, isPaused = true, false
     setStatus("Stopping...")
 end)
 
--- Hint kecil
-local hint = Instance.new("TextLabel")
-hint.BackgroundTransparency = 1
-hint.Size = UDim2.new(1, -16, 0, 18)
-hint.Position = UDim2.new(0, 8, 0, y + 42)
-hint.Font = Enum.Font.Gotham
-hint.TextSize = 12
-hint.TextXAlignment = Enum.TextXAlignment.Left
-hint.TextColor3 = Color3.fromRGB(180,180,180)
-hint.Text = "Tips: klik area piano (chat off). Tempo/Timing bisa diatur lewat slider."
-hint.Parent = frame
+-- ===== Sliders =====
+local bpmRow = makeSliderRow("BPM", 40, 200, BPM, function(v) BPM = math.floor(v + 0.5) end,
+    function(v) return ("%d"):format(v) end)
+
+local tpbRow = makeSliderRow("Tokens per Beat", 1, 4, TOKENS_PER_BEAT, function(v)
+    TOKENS_PER_BEAT = math.max(1, math.floor(v + 0.25))
+    tpbRow.Set(TOKENS_PER_BEAT)
+end, function(v) return ("%0.1f"):format(v) end)
+
+local hrRow  = makeSliderRow("Hold Ratio", 0.30, 0.90, HOLD_RATIO, function(v)
+    HOLD_RATIO = math.clamp(v, 0.30, 0.90)
+end, function(v) return ("%d%%"):format(math.floor(v*100+0.5)) end)
+
+local sdRow  = makeSliderRow("Start Delay (s)", 0, 8, START_DELAY, function(v)
+    START_DELAY = math.max(0, v)
+end, function(v) return ("%0.1f s"):format(v) end)
+
+local msRow  = makeSliderRow("Micro Stagger", 0.0, 0.03, MICRO_STAGGER, function(v)
+    MICRO_STAGGER = math.clamp(v, 0, 0.03)
+end, function(v) return ("%d ms"):format(math.floor(v*1000+0.5)) end)
+
+-- ===== Minimize / Expand =====
+local minimized = false
+mini.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        body.Visible = false
+        frame.Size = UDim2.fromOffset(frame.Size.X.Offset, math.floor(42*baseScale)+4)
+        mini.Text = "+"
+    else
+        body.Visible = true
+        frame.Size = UDim2.fromOffset(math.floor(420*baseScale), math.floor(520*baseScale))
+        mini.Text = "-"
+    end
+end)
+
+-- ===== Helpful hint (optional) =====
+local hint = section(math.floor(56*baseScale))
+makeLabel(hint, "Tips: klik area piano (chat off). Sesuaikan BPM, Tokens/Beat, Hold Ratio, dst.", math.floor(12*baseScale))
