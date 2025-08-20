@@ -1,9 +1,5 @@
---[[
-    Pusingbat Piano Player — Mobile Friendly + Draggable + Scrollable + Movement Lock (SAFE INIT)
-    - Perbaikan: safe init (game loaded, LocalPlayer, PlayerGui, CurrentCamera), DisplayOrder tinggi, toast "UI Ready"
-    - UI: Play / Pause / Stop, Load Sample, Clear, sliders (BPM, Tokens/Beat, Hold, Delay, MicroStagger)
-    - Movement lock saat Play (disable Controls / fallback zero WalkSpeed & JumpPower)
-]]
+-- Pusingbat Piano Player — Delta Safe GUI + Watchdog
+-- UI: Play/Pause/Stop, Load Sample, Clear, Sliders; Movement lock saat Play
 
 -- ===== Services =====
 local Players = game:GetService("Players")
@@ -11,29 +7,87 @@ local UIS     = game:GetService("UserInputService")
 local VIM     = game:GetService("VirtualInputManager")
 local RS      = game:GetService("RunService")
 
--- ===== Safe init guard =====
-if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
-while not Players.LocalPlayer do
-    task.wait()
-end
+-- ===== Safe init =====
+if not game:IsLoaded() then game.Loaded:Wait() end
+while not Players.LocalPlayer do task.wait() end
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 5)
 
--- Tunggukan PlayerGui & CurrentCamera (beberapa game spawn-nya lambat, apalagi di mobile)
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-while not workspace.CurrentCamera do
-    RS.RenderStepped:Wait()
+-- Tunggu kamera (beberapa game delay, terutama di mobile/emulator)
+while not workspace.CurrentCamera do RS.RenderStepped:Wait() end
+
+-- ===== Safe GUI parent (Delta-friendly) =====
+local function getSafeGuiParent()
+    -- 1) gethui / get_hidden_gui (executor)
+    local ok, hui = pcall(function()
+        return (gethui and gethui()) or (get_hidden_gui and get_hidden_gui()) or nil
+    end)
+    if ok and typeof(hui) == "Instance" then
+        return hui
+    end
+
+    -- 2) syn.protect_gui (kalau tersedia)
+    local container = Instance.new("ScreenGui")
+    container.Name = "PusingbatContainerPre"
+    pcall(function()
+        if syn and syn.protect_gui then syn.protect_gui(container) end
+    end)
+    container.ResetOnSpawn = false
+    container.IgnoreGuiInset = true
+    container.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    container.DisplayOrder = 999
+
+    -- 3) PlayerGui (fallback normal)
+    if PlayerGui then
+        container.Parent = PlayerGui
+        return container
+    end
+
+    -- 4) CoreGui sebagai last resort (kadang ditolak)
+    local CoreGui = game:FindService("CoreGui") or game:GetService("CoreGui")
+    container.Parent = CoreGui
+    return container
 end
 
--- ===== Params Default =====
+-- Kalau pakai container ScreenGui sendiri, kita akan isi di dalamnya
+local rootParent = getSafeGuiParent()
+local rootIsScreenGui = rootParent:IsA("ScreenGui")
+local gui = rootIsScreenGui and rootParent or Instance.new("ScreenGui")
+if not rootIsScreenGui then
+    gui.Name = "PusingbatPianoUI"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.DisplayOrder = 999
+    gui.Enabled = true
+    gui.Parent = rootParent
+else
+    gui.Name = "PusingbatPianoUI"
+    gui.Enabled = true
+end
+
+-- Watchdog: kalau parent di-null-kan oleh anti-cheat, reparent kembali
+task.spawn(function()
+    while gui and gui.Parent == nil do
+        task.wait(0.25)
+    end
+    while gui do
+        if gui.Parent == nil then
+            local newParent = getSafeGuiParent()
+            gui.Parent = newParent
+        end
+        task.wait(0.5)
+    end
+end)
+
+-- ===== Params Player =====
 local BPM             = 97
 local TOKENS_PER_BEAT = 2
 local HOLD_RATIO      = 0.65
 local START_DELAY     = 3
 local MICRO_STAGGER   = 0.004
 
--- ===== Runtime State =====
+-- ===== Runtime =====
 local isPlaying, isPaused, shouldStop = false, false, false
 
 -- ===== Key Maps =====
@@ -215,23 +269,14 @@ local viewport = workspace.CurrentCamera.ViewportSize
 local baseScale = math.clamp(viewport.X / 900, 0.90, 1.10)
 local isTouch = UIS.TouchEnabled
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "PusingbatPianoUI"
-gui.IgnoreGuiInset = true
-gui.ResetOnSpawn = false
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.DisplayOrder = 999  -- di atas kebanyakan UI
-gui.Enabled = true
-gui.Parent = PlayerGui
-
--- Toast kecil biar tahu UI hidup
+-- kecil toast supaya yakin UI hidup
 do
     local toast = Instance.new("TextLabel")
     toast.Size = UDim2.fromOffset(220, 36)
     toast.Position = UDim2.new(0, 16, 0, 60)
     toast.BackgroundColor3 = Color3.fromRGB(30,140,80)
     toast.TextColor3 = Color3.fromRGB(255,255,255)
-    toast.Text = "UI Ready"
+    toast.Text = "UI Ready (Delta)"
     toast.Font = Enum.Font.GothamBold
     toast.TextSize = 16
     toast.Parent = gui
@@ -239,7 +284,6 @@ do
     task.delay(2, function() if toast then toast:Destroy() end end)
 end
 
--- Window (draggable)
 local frame = Instance.new("Frame")
 frame.Name = "Window"
 frame.Size = UDim2.fromOffset(math.floor(420*baseScale), math.floor(520*baseScale))
@@ -251,7 +295,6 @@ frame.Active = true
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
--- Header
 local header = Instance.new("Frame")
 header.Name = "Header"
 header.Size = UDim2.new(1,0,0, math.floor(42*baseScale))
@@ -354,7 +397,6 @@ local function makeLabel(parent, text, size)
     return l
 end
 
--- (helper) buat baris tombol horizontal
 local function makeHRow(parent, height)
     local wrap = Instance.new("Frame")
     wrap.Size = UDim2.new(1, -24, 0, height)
@@ -441,12 +483,10 @@ local function makeSliderRow(titleText, minV, maxV, initial, onChange, formatter
         end
     end)
 
-    return {
-        Set = function(v)
-            local p = (math.clamp(v, minV, maxV) - minV) / (maxV - minV)
-            setFromPct(p)
-        end
-    }
+    return { Set = function(v)
+        local p = (math.clamp(v, minV, maxV) - minV) / (maxV - minV)
+        setFromPct(p)
+    end }
 end
 
 -- ===== Status =====
@@ -475,37 +515,67 @@ box.PlaceholderText = "Tempel Sheets di sini...\nContoh: [4o] p s g f d ..."
 box.Parent = sheetSec
 Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
 
--- ===== Preset Buttons (horizontal, pakai Scale) =====
+-- ===== Preset Buttons =====
 local btnRow = section(math.floor(80*baseScale))
 makeLabel(btnRow, "Preset", math.floor(14*baseScale))
-local wrap1 = makeHRow(btnRow, math.floor(36*baseScale))
+local wrap1 = (function()
+    local wrap = Instance.new("Frame")
+    wrap.Size = UDim2.new(1, -24, 0, math.floor(36*baseScale))
+    wrap.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
+    wrap.BackgroundTransparency = 1
+    wrap.Parent = btnRow
+    local h = Instance.new("UIListLayout")
+    h.FillDirection = Enum.FillDirection.Horizontal
+    h.SortOrder = Enum.SortOrder.LayoutOrder
+    h.Padding = UDim.new(0, 8)
+    h.VerticalAlignment = Enum.VerticalAlignment.Center
+    h.Parent = wrap
+    return wrap
+end)()
 
-local sampleBtn = makeButton(
-    wrap1, "Load Sample (blue.)",
-    UDim2.new(0.5, -4, 1, 0),
-    function()
-        box.Text = table.concat({
-            "t r w t r w  t r w t y u",
-            "[4o] p s g f d   5 a s d s",
-            "[1o] u i o   [6a] s",
-            "[4o] p s g f a   5 h g f",
-            "[1s] s s d d d   [6f] f f a a a",
-            "4 t p o   [5p] o u i   [1o] i u t   [6t]"
-        }, "  ")
-    end
-)
+local function makeButton(parent, label, sizeUDim2, cb, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = sizeUDim2
+    btn.BackgroundColor3 = color or Color3.fromRGB(55,120,255)
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextSize = math.floor(16*baseScale)
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = label
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+    btn.MouseButton1Click:Connect(function() if cb then cb() end end)
+    return btn
+end
 
-local clearBtn = makeButton(
-    wrap1, "Clear",
-    UDim2.new(0.5, -4, 1, 0),
-    function() box.Text = "" end,
-    Color3.fromRGB(80,80,80)
-)
+local sampleBtn = makeButton(wrap1, "Load Sample (blue.)", UDim2.new(0.5, -4, 1, 0), function()
+    box.Text = table.concat({
+        "t r w t r w  t r w t y u",
+        "[4o] p s g f d   5 a s d s",
+        "[1o] u i o   [6a] s",
+        "[4o] p s g f a   5 h g f",
+        "[1s] s s d d d   [6f] f f a a a",
+        "4 t p o   [5p] o u i   [1o] i u t   [6t]"
+    }, "  ")
+end)
+local clearBtn = makeButton(wrap1, "Clear", UDim2.new(0.5, -4, 1, 0), function() box.Text = "" end, Color3.fromRGB(80,80,80))
 
 -- ===== Transport =====
 local ctlSec = section(math.floor(96*baseScale))
 makeLabel(ctlSec, "Transport", math.floor(14*baseScale))
-local wrap2 = makeHRow(ctlSec, math.floor(36*baseScale))
+local wrap2 = (function()
+    local wrap = Instance.new("Frame")
+    wrap.Size = UDim2.new(1, -24, 0, math.floor(36*baseScale))
+    wrap.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
+    wrap.BackgroundTransparency = 1
+    wrap.Parent = ctlSec
+    local h = Instance.new("UIListLayout")
+    h.FillDirection = Enum.FillDirection.Horizontal
+    h.SortOrder = Enum.SortOrder.LayoutOrder
+    h.Padding = UDim.new(0, 8)
+    h.VerticalAlignment = Enum.VerticalAlignment.Center
+    h.Parent = wrap
+    return wrap
+end)()
 
 local function makeTransportButton(text, color)
     return makeButton(wrap2, text, UDim2.new(1/3, -6, 1, 0), nil, color)
@@ -543,6 +613,9 @@ stopBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ===== Sliders =====
+local function makeSliderRow(titleText, minV, maxV, initial, onChange, formatter)
+    -- (sama seperti di atas; sudah didefinisikan, dipanggil lagi biar jelas)
+end
 local bpmRow = makeSliderRow("BPM", 40, 200, BPM, function(v)
     BPM = math.floor(v + 0.5)
 end, function(v) return ("%d"):format(v) end)
