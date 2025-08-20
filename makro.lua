@@ -3364,6 +3364,14 @@ local rebuildTourCounter
         setFOV(defaultFOV)
         rebuildCfgList()
     end)
+    -- Watchdog: kalau setelah 6 dtk UI belum kebuka, buka paksa
+    task.delay(6, function()
+        if MainGUI and not MainGUI.Enabled then
+            warn("[PB] UI watchdog enabling MainGUI")
+            pcall(function() overlay:Destroy() end)
+            MainGUI.Enabled = true
+        end
+    end)
 end
 
 -- ========== Init ==========
