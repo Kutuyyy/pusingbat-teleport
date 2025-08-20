@@ -259,7 +259,7 @@ local function applyCameraFacing(facing)
     local cam = workspace.CurrentCamera
     if not cam then return end
 
-    local cy = facing.camYaw
+    local cy = -(facing.camYaw)
     if not cy then return end
     local cp = facing.camPitch or 0
     local dist = tonumber(facing.camDist)
