@@ -633,16 +633,39 @@ local calibSec = section(math.floor(80*baseScale))
 makeLabel(calibSec, "Mobile Touch Playback", math.floor(14*baseScale))
 local wrapCal = makeHRow(calibSec, math.floor(36*baseScale))
 
+-- ===== Minimize (diletakkan sebelum Calibrate) =====
+local minimized = false
+local function setMinimized(state)
+    minimized = state and true or false
+    if minimized then
+        body.Visible = false
+        frame.Size = UDim2.fromOffset(frame.Size.X.Offset, math.floor(42*baseScale)+4)
+        mini.Text = "+"
+    else
+        body.Visible = true
+        frame.Size = UDim2.fromOffset(math.floor(420*baseScale), math.floor(520*baseScale))
+        mini.Text = "-"
+    end
+end
+
+mini.MouseButton1Click:Connect(function()
+    setMinimized(not minimized)
+end)
+
+mini.MouseButton1Click:Connect(function()
+    setMinimized(not minimized)
+end)
+
 makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
     if calibrating then setStatus("Sedang kalibrasi..."); return end
     local sheet = box.Text:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
     if sheet == "" then setStatus("Isi sheet dulu untuk kalibrasi"); return end
 
-    -- *** AUTO MINIMIZE ***
+    -- Auto-minimize biar piano kelihatan
     local prevPos = frame.Position
     local prevMin = minimized
-    setMinimized(true)             -- kecilkan supaya tidak nutup tuts
-    frame.Position = UDim2.new(0, 12, 0, 12) -- geser ke pojok biar aman
+    setMinimized(true)
+    frame.Position = UDim2.new(0, 12, 0, 12)
 
     calibrating = true
     setStatus("Kalibrasi mulai…")
@@ -652,7 +675,6 @@ makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
     if #chars == 0 then
         setStatus("Tidak ada token")
         calibrating = false
-        -- *** RESTORE UI ***
         frame.Position = prevPos
         setMinimized(prevMin)
         return
@@ -660,9 +682,11 @@ makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
 
     local overlay = Instance.new("TextButton")
     overlay.BackgroundTransparency = 1
+    overlay.AutoButtonColor = false
     overlay.Text = ""
     overlay.Size = UDim2.fromScale(1,1)
-    overlay.ZIndex = 1000        -- pastikan di atas semua
+    overlay.ZIndex = 9999
+    overlay.Modal = true
     overlay.Parent = gui
 
     local idx = 1
@@ -673,7 +697,7 @@ makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
     prompt.TextColor3 = Color3.fromRGB(255,255,255)
     prompt.Font = Enum.Font.GothamBold
     prompt.TextSize = 16
-    prompt.ZIndex = 1001
+    prompt.ZIndex = 10000
     prompt.Parent = gui
     Instance.new("UICorner", prompt).CornerRadius = UDim.new(0,8)
 
@@ -687,16 +711,19 @@ makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
         if prompt  then prompt:Destroy()  end
         calibrating = false
         setStatus("Kalibrasi selesai ✓")
-        -- *** RESTORE UI ***
         frame.Position = prevPos
         setMinimized(prevMin)
     end
 
     overlay.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local pos = getMouseXY()
+            -- PAKAI POSISI DARI EVENT (lebih akurat di mobile)
+            local p = input.Position
+            local pos = Vector2.new(p.X, p.Y)
+
             local ch = chars[idx]
             touchMap[ch] = pos
+
             idx += 1
             if idx > #chars then
                 finishCalib()
@@ -706,7 +733,6 @@ makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
         end
     end)
 end, Color3.fromRGB(90,140,255))
-
 
 local btnRow = section(math.floor(80*baseScale))
 makeLabel(btnRow, "Preset", math.floor(14*baseScale))
@@ -813,26 +839,6 @@ end, function(v) return ("%0.1f s"):format(v) end)
 local msRow  = makeSliderRow("Micro Stagger", 0.0, 0.03, MICRO_STAGGER, function(v)
     MICRO_STAGGER = math.clamp(v, 0, 0.03)
 end, function(v) return ("%d ms"):format(math.floor(v*1000+0.5)) end)
-
--- ===== Minimize =====
-local minimized = false
-local function setMinimized(state)
-    minimized = state and true or false
-    if minimized then
-        body.Visible = false
-        -- kecilkan hanya header biar nggak nutup piano
-        frame.Size = UDim2.fromOffset(frame.Size.X.Offset, math.floor(42*baseScale)+4)
-        mini.Text = "+"
-    else
-        body.Visible = true
-        frame.Size = UDim2.fromOffset(math.floor(420*baseScale), math.floor(520*baseScale))
-        mini.Text = "-"
-    end
-end
-
-mini.MouseButton1Click:Connect(function()
-    setMinimized(not minimized)
-end)
 
 -- ===== Hint =====
 local hint = section(math.floor(56*baseScale))
