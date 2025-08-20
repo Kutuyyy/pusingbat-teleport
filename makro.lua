@@ -254,6 +254,27 @@ local function buildServerBody()
 end
 
 -- ========== Character helpers ==========
+local dest = item.position
+local facing = item.facing
+local yaw = facing and facing.charYaw
+
+-- teleport ke lokasi
+safeTeleport(dest, yaw)
+
+-- tegaskan arah karakter
+if yaw then
+    enforceYaw(yaw, 0.8)   -- tahan sebentar supaya nggak diputar balik
+    task.delay(0.65, function()
+        enforceYaw(yaw, 0.25) -- final nudge setelah kamera normal lagi
+        if align then
+            align.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
+        end
+    end)
+end
+
+-- set kamera sesuai data save
+applyCameraFacing(facing)
+
 local function applyCameraFacing(facing)
     if not (facing and root) then return end
     local cam = workspace.CurrentCamera
