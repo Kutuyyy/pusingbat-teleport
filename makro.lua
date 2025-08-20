@@ -562,6 +562,19 @@ local function enforceYaw(yaw, holdSec)
     end)
 end
 
+local function enforceYaw(yaw)
+    if not yaw or not root then return end
+    local prevAuto = hum and hum.AutoRotate
+    if hum then
+        hum.AutoRotate = false
+        hum:Move(Vector3.zero, true)
+    end
+    root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
+    task.delay(0.25, function()
+        if hum then hum.AutoRotate = prevAuto end
+    end)
+end
+
 
 -- GANTI versi lama:
 local function teleportToPosition(dest, yaw)
@@ -1793,12 +1806,12 @@ end
         if not v then return end
         task.spawn(function()
             local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
-            local yaw = locationData.facing and locationData.facing.charYaw or nil
+            local yaw  = locationData.facing and locationData.facing.charYaw or nil
 
-            safeTeleport(dest, yaw)
+            safeTeleport(dest, yaw)   -- <-- yaw karakter di-apply via enforceYaw
             jumpOnce()
 
-            -- (opsional) arahkan kamera sesuai snapshot
+            -- optional: arahkan kamera sesuai snapshot
             if locationData.facing and locationData.facing.camYaw and root then
                 task.defer(function()
                     applyCameraFacing(locationData.facing)
@@ -2112,9 +2125,10 @@ end
             -- simpan arah hadap saat menekan Save
             do
                 local facing = {}
+                -- karakter
                 local y = getCharYaw()
                 if y then facing.charYaw = y end
-
+                -- kamera
                 local cy, cp = getCamYawPitch()
                 if cy then
                     facing.camYaw   = cy
@@ -2124,7 +2138,6 @@ end
                         facing.camDist = (cam.CFrame.Position - root.Position).Magnitude
                     end
                 end
-
                 if next(facing) ~= nil then
                     tempLoc.facing = facing
                 else
@@ -2470,6 +2483,7 @@ local rebuildTourCounter
                     end
                 end
                 loc.facing = (next(facing) ~= nil) and facing or nil
+
 
                 -- refresh tampilan info
                 if loc._refreshInfo then
