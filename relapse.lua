@@ -1,5 +1,5 @@
--- Pusingbat Piano Player — Delta Safe GUI + Watchdog
--- UI: Play/Pause/Stop, Load Sample, Clear, Sliders; Movement lock saat Play
+-- Pusingbat Piano Player — Delta Safe GUI + Watchdog (Mobile+PC)
+-- UI: Play/Pause/Stop, Load Sample, Clear, Sliders; Movement lock + SuperLock; Touch Calibrate
 
 -- ===== Services =====
 local Players = game:GetService("Players")
@@ -12,44 +12,33 @@ if not game:IsLoaded() then game.Loaded:Wait() end
 while not Players.LocalPlayer do task.wait() end
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 5)
-
--- Tunggu kamera (beberapa game delay, terutama di mobile/emulator)
 while not workspace.CurrentCamera do RS.RenderStepped:Wait() end
 
 -- ===== Safe GUI parent (Delta-friendly) =====
 local function getSafeGuiParent()
-    -- 1) gethui / get_hidden_gui (executor)
     local ok, hui = pcall(function()
         return (gethui and gethui()) or (get_hidden_gui and get_hidden_gui()) or nil
     end)
-    if ok and typeof(hui) == "Instance" then
-        return hui
-    end
+    if ok and typeof(hui) == "Instance" then return hui end
 
-    -- 2) syn.protect_gui (kalau tersedia)
     local container = Instance.new("ScreenGui")
     container.Name = "PusingbatContainerPre"
-    pcall(function()
-        if syn and syn.protect_gui then syn.protect_gui(container) end
-    end)
+    pcall(function() if syn and syn.protect_gui then syn.protect_gui(container) end end)
     container.ResetOnSpawn = false
     container.IgnoreGuiInset = true
     container.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     container.DisplayOrder = 999
 
-    -- 3) PlayerGui (fallback normal)
     if PlayerGui then
         container.Parent = PlayerGui
         return container
     end
 
-    -- 4) CoreGui sebagai last resort (kadang ditolak)
     local CoreGui = game:FindService("CoreGui") or game:GetService("CoreGui")
     container.Parent = CoreGui
     return container
 end
 
--- Kalau pakai container ScreenGui sendiri, kita akan isi di dalamnya
 local rootParent = getSafeGuiParent()
 local rootIsScreenGui = rootParent:IsA("ScreenGui")
 local gui = rootIsScreenGui and rootParent or Instance.new("ScreenGui")
@@ -66,31 +55,27 @@ else
     gui.Enabled = true
 end
 
--- Watchdog: kalau parent di-null-kan oleh anti-cheat, reparent kembali
+-- Watchdog reparent
 task.spawn(function()
-    while gui and gui.Parent == nil do
-        task.wait(0.25)
-    end
+    while gui and gui.Parent == nil do task.wait(0.25) end
     while gui do
-        if gui.Parent == nil then
-            local newParent = getSafeGuiParent()
-            gui.Parent = newParent
-        end
+        if gui.Parent == nil then gui.Parent = getSafeGuiParent() end
         task.wait(0.5)
     end
 end)
 
 -- ===== Params Player =====
-local BPM             = 97
-local TOKENS_PER_BEAT = 2
-local HOLD_RATIO      = 0.65
-local START_DELAY     = 3
-local MICRO_STAGGER   = 0.004
-local TOUCH_CHORD_ROLL_MS = 12   -- 0..30 ms; makin kecil makin "barengan"
-local TOUCH_ROLL_MODE = "center" -- "left", "right", "center"
+local BPM                   = 97
+local TOKENS_PER_BEAT       = 2
+local HOLD_RATIO            = 0.65
+local START_DELAY           = 3
+local MICRO_STAGGER         = 0.004
+local TOUCH_CHORD_ROLL_MS   = 12    -- 0..30 ms; makin kecil makin barengan
+local TOUCH_ROLL_MODE       = "center" -- "left" | "right" | "center"
+
 -- ===== Touch Playback (Mobile) =====
-local TOUCH_MODE = UIS.TouchEnabled     -- otomatis ON di HP
-local touchMap = {}                     -- [char] = Vector2 screen pos
+local TOUCH_MODE = UIS.TouchEnabled
+local touchMap   = {}      -- [char] = Vector2 screen pos
 local calibrating = false
 
 local function getMouseXY()
@@ -99,7 +84,6 @@ local function getMouseXY()
 end
 
 local function tapAt(pos, holdSec)
-    -- tap cepat di posisi layar (button1 down/up)
     VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
     if holdSec and holdSec > 0 then task.wait(holdSec) end
     VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
@@ -160,9 +144,9 @@ end
 
 local function keycodeFromChar(ch)
     if ch == " " then return nil, false end
-    if digitMap[ch]       then return digitMap[ch], false end
-    if nonShiftPunct[ch]  then return nonShiftPunct[ch], false end
-    if shiftedPunct[ch]   then return shiftedPunct[ch], true end
+    if digitMap[ch]      then return digitMap[ch], false end
+    if nonShiftPunct[ch] then return nonShiftPunct[ch], false end
+    if shiftedPunct[ch]  then return shiftedPunct[ch], true end
     local kc = select(1, keycodeFromLetter(ch))
     if kc then return kc, false end
     warn("Karakter tidak dikenali di sheet: '"..ch.."'")
@@ -202,6 +186,50 @@ local function setMovementLock(lock)
     end
 end
 
+-- ===== Super Lock (mobile proof) =====
+local freezeConn
+local prev = {anchored=false, autoRotate=true, ws=nil, jp=nil, ragdoll=true}
+
+local function superLock(on)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not (hum and root) then return end
+
+    if on then
+        prev.anchored   = root.Anchored
+        prev.autoRotate = hum.AutoRotate
+        prev.ws         = hum.WalkSpeed
+        prev.jp         = pcall(function() return hum.JumpPower end) and hum.JumpPower or nil
+        prev.ragdoll    = pcall(function() return hum:GetStateEnabled(Enum.HumanoidStateType.Ragdoll) end) or true
+
+        hum.AutoRotate = false
+        hum.WalkSpeed  = 0
+        pcall(function() hum.UseJumpPower = true hum.JumpPower = 0 end)
+        pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end)
+        pcall(function() hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics) end)
+
+        root.Anchored = true
+
+        if not freezeConn then
+            freezeConn = RS.Stepped:Connect(function()
+                if not (root and hum) then return end
+                root.AssemblyLinearVelocity  = Vector3.zero
+                root.AssemblyAngularVelocity = Vector3.zero
+                hum:Move(Vector3.new(), false)
+            end)
+        end
+    else
+        if freezeConn then freezeConn:Disconnect(); freezeConn = nil end
+        root.Anchored = prev.anchored
+        hum.AutoRotate = prev.autoRotate
+        if prev.ws then hum.WalkSpeed = prev.ws end
+        if prev.jp then pcall(function() hum.JumpPower = prev.jp end) end
+        pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, prev.ragdoll) end)
+        pcall(function() hum:ChangeState(Enum.HumanoidStateType.Running) end)
+    end
+end
+
 LocalPlayer.CharacterAdded:Connect(function()
     if isPlaying then
         task.defer(function()
@@ -216,60 +244,10 @@ local function cleanup()
     superLock(false)
 end
 
--- ===== Super Lock (mobile proof) =====
-local freezeConn
-local prev = {anchored=false, autoRotate=true, ws=nil, jp=nil, ragdoll=true}
-
-local function superLock(on)
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hum  = char and char:FindFirstChildOfClass("Humanoid")
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not (hum and root) then return end
-
-    if on then
-        -- simpan state
-        prev.anchored   = root.Anchored
-        prev.autoRotate = hum.AutoRotate
-        prev.ws         = hum.WalkSpeed
-        prev.jp         = pcall(function() return hum.JumpPower end) and hum.JumpPower or nil
-        prev.ragdoll    = pcall(function() return hum:GetStateEnabled(Enum.HumanoidStateType.Ragdoll) end) or true
-
-        -- kunci gerak & anti jatuh/tersungkur
-        hum.AutoRotate = false
-        hum.WalkSpeed = 0
-        pcall(function() hum.UseJumpPower = true hum.JumpPower = 0 end)
-        pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end)
-        pcall(function() hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics) end)
-
-        root.Anchored = true  -- ini yang paling penting di mobile
-
-        -- jaga tiap frame benar2 diam & tegak
-        if not freezeConn then
-            freezeConn = RS.Stepped:Connect(function()
-                if not (root and hum) then return end
-                root.AssemblyLinearVelocity  = Vector3.zero
-                root.AssemblyAngularVelocity = Vector3.zero
-                hum:Move(Vector3.new(), false)
-            end)
-        end
-    else
-        if freezeConn then freezeConn:Disconnect(); freezeConn = nil end
-
-        -- lepas kunci
-        root.Anchored = prev.anchored
-        hum.AutoRotate = prev.autoRotate
-        if prev.ws   then hum.WalkSpeed = prev.ws end
-        if prev.jp   then pcall(function() hum.JumpPower = prev.jp end) end
-        pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, prev.ragdoll) end)
-        pcall(function() hum:ChangeState(Enum.HumanoidStateType.Running) end)
-    end
-end
-
 -- ===== Input Sender =====
 local function pressKey(kc, holdSec, useShift, rawChar)
     if TOUCH_MODE and touchMap[rawChar or ""] then
-        tapAt(touchMap[rawChar], holdSec)
-        return
+        tapAt(touchMap[rawChar], holdSec); return
     end
     if useShift then VIM:SendKeyEvent(true, SHIFT, false, game) end
     VIM:SendKeyEvent(true, kc, false, game)
@@ -280,7 +258,6 @@ end
 
 local function pressChord(keyList, holdSec, rawChars)
     if TOUCH_MODE then
-        -- filter yang sudah terkalibrasi
         local pts = {}
         for _, ch in ipairs(rawChars) do
             local p = touchMap[ch]
@@ -288,14 +265,13 @@ local function pressChord(keyList, holdSec, rawChars)
         end
         if #pts == 0 then return end
 
-        -- urutan roll
         if TOUCH_ROLL_MODE == "left" then
             table.sort(pts, function(a,b) return a.p.X < b.p.X end)
         elseif TOUCH_ROLL_MODE == "right" then
             table.sort(pts, function(a,b) return a.p.X > b.p.X end)
-        else -- "center": dari tengah keluar
+        else
+            local cx = workspace.CurrentCamera.ViewportSize.X/2
             table.sort(pts, function(a,b)
-                local cx = workspace.CurrentCamera.ViewportSize.X/2
                 return math.abs(a.p.X - cx) < math.abs(b.p.X - cx)
             end)
         end
@@ -306,14 +282,10 @@ local function pressChord(keyList, holdSec, rawChars)
             VIM:SendMouseButtonEvent(it.p.X, it.p.Y, 0, false, game, 0)
             if i < #pts and step > 0 then task.wait(step) end
         end
-        -- tahan total kira-kira sama dengan holdSec
-        if holdSec > (#pts-1)*step then
-            task.wait(holdSec - (#pts-1)*step)
-        end
+        if holdSec > (#pts-1)*step then task.wait(holdSec - (#pts-1)*step) end
         return
     end
 
-    -- === mode keyboard (PC) tetap seperti semula ===
     local needShift=false
     for _,info in ipairs(keyList) do if info.shift then needShift=true break end end
     if needShift then VIM:SendKeyEvent(true, SHIFT, false, game) end
@@ -329,14 +301,12 @@ end
 -- ===== Parser =====
 local function tokenize(sheet)
     local tokens = {}
-    for tk in sheet:gmatch("%S+") do
-        table.insert(tokens, tk)
-    end
+    for tk in sheet:gmatch("%S+") do table.insert(tokens, tk) end
     return tokens
 end
 
 local function parseToken(token)
-    if token:sub(1,1) == "[" and token:sub(-1,-1) == "]" then
+    if token:sub(1,1) == "[" and token:sub(-1) == "]" then
         return true, token:sub(2, -2)
     else
         return false, token
@@ -394,7 +364,7 @@ local viewport = workspace.CurrentCamera.ViewportSize
 local baseScale = math.clamp(viewport.X / 900, 0.90, 1.10)
 local isTouch = UIS.TouchEnabled
 
--- kecil toast supaya yakin UI hidup
+-- Toast kecil
 do
     local toast = Instance.new("TextLabel")
     toast.Size = UDim2.fromOffset(220, 36)
@@ -407,16 +377,17 @@ do
     toast.Parent = gui
     Instance.new("UICorner", toast).CornerRadius = UDim.new(0,8)
     task.delay(2, function() if toast then toast:Destroy() end end)
+
     if gui then
         gui.AncestryChanged:Connect(function(_, parent)
             if parent == nil then cleanup() end
         end)
     end
 
--- Saat karakter respawn / keluar tempat
-Players.LocalPlayer.CharacterRemoving:Connect(cleanup)
+    Players.LocalPlayer.CharacterRemoving:Connect(cleanup)
 end
 
+-- Frame utama
 local frame = Instance.new("Frame")
 frame.Name = "Window"
 frame.Size = UDim2.fromOffset(math.floor(420*baseScale), math.floor(520*baseScale))
@@ -428,21 +399,16 @@ frame.Active = true
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
+-- Header
 local header = Instance.new("Frame")
 header.Name = "Header"
 header.Size = UDim2.new(1,0,0, math.floor(42*baseScale))
 header.BackgroundColor3 = Color3.fromRGB(22,22,22)
 header.BorderSizePixel = 0
 header.Parent = frame
-header.Active = true           -- << WAJIB untuk terima Touch
+header.Active = true
 header.ZIndex = 2
 Instance.new("UICorner", header).CornerRadius = UDim.new(0,12)
-
--- Pastikan body di bawah header
-body.ZIndex = 1
-
--- Tombol minimize di atas header
-mini.ZIndex = 3
 
 local title = Instance.new("TextLabel")
 title.BackgroundTransparency = 1
@@ -453,8 +419,10 @@ title.TextSize = math.floor(18*baseScale)
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.TextColor3 = Color3.fromRGB(235,235,235)
 title.Text = "Pusingbat Piano Player"
+title.ZIndex = 3
 title.Parent = header
 
+-- Minimize button
 local mini = Instance.new("TextButton")
 mini.Size = UDim2.fromOffset(math.floor(36*baseScale), math.floor(28*baseScale))
 mini.Position = UDim2.new(1, -math.floor(40*baseScale), 0.5, -math.floor(14*baseScale))
@@ -463,45 +431,27 @@ mini.TextColor3 = Color3.new(1,1,1)
 mini.TextSize = math.floor(14*baseScale)
 mini.Font = Enum.Font.GothamBold
 mini.Text = "-"
+mini.ZIndex = 4
 mini.Parent = header
 Instance.new("UICorner", mini).CornerRadius = UDim.new(0, 6)
 
--- Dragging
+-- Drag ramah mobile
 do
-    local dragging = false
-    local startPos, startXY, dragInput
-
-    local function update(input)
-        local delta = input.Position - startXY
-        frame.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-        )
+  local dragging=false; local startPos; local startXY; local dragInput
+  local function update(input)
+    local d = input.Position - startXY
+    frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+  end
+  header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+      dragging = true; startPos = frame.Position; startXY = input.Position; dragInput = input
     end
-
-    header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            startPos = frame.Position
-            startXY  = input.Position
-            dragInput = input
-        end
-    end)
-
-    header.InputEnded:Connect(function(input)
-        if input == dragInput then dragging = false end
-    end)
-
-    UIS.InputChanged:Connect(function(input)
-        if dragging and input == dragInput then
-            update(input)
-        end
-    end)
+  end)
+  header.InputEnded:Connect(function(input) if input == dragInput then dragging = false end end)
+  UIS.InputChanged:Connect(function(input) if dragging and input == dragInput then update(input) end end)
 end
 
-
--- Body (scrollable)
+-- Body (1x saja!)
 local body = Instance.new("ScrollingFrame")
 body.Name = "Body"
 body.Size = UDim2.new(1, -16, 1, -math.floor(42*baseScale) - 12)
@@ -511,6 +461,7 @@ body.ScrollBarThickness = isTouch and math.floor(10*baseScale) or math.floor(6*b
 body.ScrollingDirection = Enum.ScrollingDirection.Y
 body.AutomaticCanvasSize = Enum.AutomaticSize.Y
 body.CanvasSize = UDim2.new()
+body.ZIndex = 1
 body.Parent = frame
 
 local padding = Instance.new("UIPadding")
@@ -576,15 +527,9 @@ local function makeButton(parent, label, sizeUDim2, cb, color)
     btn.AutoButtonColor = true
     btn.Parent = parent
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
-
-    -- gunakan Activated (mobile/pc)
-    btn.Activated:Connect(function()
-        if cb then cb() end
-    end)
-
+    btn.Activated:Connect(function() if cb then cb() end end)
     return btn
 end
-
 
 local function makeSliderRow(titleText, minV, maxV, initial, onChange, formatter)
     local s = section(math.floor(74*baseScale))
@@ -675,13 +620,7 @@ box.PlaceholderText = "Tempel Sheets di sini...\nContoh: [4o] p s g f d ..."
 box.Parent = sheetSec
 Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
 
--- ===== Preset Buttons =====
--- Tambah tombol kalibrasi agar akurat di mobile
-local calibSec = section(math.floor(80*baseScale))
-makeLabel(calibSec, "Mobile Touch Playback", math.floor(14*baseScale))
-local wrapCal = makeHRow(calibSec, math.floor(36*baseScale))
-
--- ===== Minimize (diletakkan sebelum Calibrate) =====
+-- ===== Minimize helper (harus setelah 'mini' dibuat) =====
 local minimized = false
 local function setMinimized(state)
     minimized = state and true or false
@@ -695,17 +634,18 @@ local function setMinimized(state)
         mini.Text = "-"
     end
 end
+mini.Activated:Connect(function() setMinimized(not minimized) end)
 
-mini.Activated:Connect(function()
-    setMinimized(not minimized)
-end)
+-- ===== Calibrate (Touch) =====
+local calibSec = section(math.floor(80*baseScale))
+makeLabel(calibSec, "Mobile Touch Playback", math.floor(14*baseScale))
+local wrapCal = makeHRow(calibSec, math.floor(36*baseScale))
 
 makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
     if calibrating then setStatus("Sedang kalibrasi..."); return end
     local sheet = box.Text:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
     if sheet == "" then setStatus("Isi sheet dulu untuk kalibrasi"); return end
 
-    -- Auto-minimize biar piano kelihatan
     local prevPos = frame.Position
     local prevMin = minimized
     setMinimized(true)
@@ -761,23 +701,17 @@ makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
 
     overlay.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            -- PAKAI POSISI DARI EVENT (lebih akurat di mobile)
             local p = input.Position
             local pos = Vector2.new(p.X, p.Y)
-
             local ch = chars[idx]
             touchMap[ch] = pos
-
             idx += 1
-            if idx > #chars then
-                finishCalib()
-            else
-                setPrompt()
-            end
+            if idx > #chars then finishCalib() else setPrompt() end
         end
     end)
 end, Color3.fromRGB(90,140,255))
 
+-- ===== Preset Buttons =====
 local btnRow = section(math.floor(80*baseScale))
 makeLabel(btnRow, "Preset", math.floor(14*baseScale))
 local wrap1 = (function()
@@ -795,7 +729,7 @@ local wrap1 = (function()
     return wrap
 end)()
 
-local sampleBtn = makeButton(wrap1, "Load Sample (blue.)", UDim2.new(0.5, -4, 1, 0), function()
+makeButton(wrap1, "Load Sample (blue.)", UDim2.new(0.5, -4, 1, 0), function()
     box.Text = table.concat({
         "t r w t r w  t r w t y u",
         "[4o] p s g f d   5 a s d s",
@@ -805,7 +739,7 @@ local sampleBtn = makeButton(wrap1, "Load Sample (blue.)", UDim2.new(0.5, -4, 1,
         "4 t p o   [5p] o u i   [1o] i u t   [6t]"
     }, "  ")
 end)
-local clearBtn = makeButton(wrap1, "Clear", UDim2.new(0.5, -4, 1, 0), function() box.Text = "" end, Color3.fromRGB(80,80,80))
+makeButton(wrap1, "Clear", UDim2.new(0.5, -4, 1, 0), function() box.Text = "" end, Color3.fromRGB(80,80,80))
 
 -- ===== Transport =====
 local ctlSec = section(math.floor(96*baseScale))
@@ -833,31 +767,33 @@ local playBtn  = makeTransportButton("Play")
 local pauseBtn = makeTransportButton("Pause/Resume")
 local stopBtn  = makeTransportButton("Stop", Color3.fromRGB(200,70,70))
 
-playBtn.MouseButton1Click:Connect(function()
+playBtn.Activated:Connect(function()
     if isPlaying then setStatus("Sudah Playing..."); return end
     local sheet = box.Text:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
     if sheet == "" then setStatus("Sheet kosong!"); return end
     isPlaying, isPaused, shouldStop = true, false, false
     setMovementLock(true)
+    superLock(true)                       -- ON saat mulai
     setStatus("Starting...")
     task.spawn(function()
         playFromSheet(sheet, setStatus)
         isPlaying, isPaused = false, false
         setMovementLock(false)
+        superLock(false)                  -- OFF saat selesai normal
     end)
 end)
 
-pauseBtn.MouseButton1Click:Connect(function()
+pauseBtn.Activated:Connect(function()
     if not isPlaying then setStatus("Belum Playing"); return end
     isPaused = not isPaused
     setStatus(isPaused and "Paused" or "Resumed")
 end)
 
-stopBtn.MouseButton1Click:Connect(function()
+stopBtn.Activated:Connect(function()
     if not isPlaying then setStatus("Idle"); return end
     shouldStop, isPaused = true, false
     setMovementLock(false)
-    superLock(false)  -- << TAMBAH
+    superLock(false)                      -- OFF saat stop
     setStatus("Stopping...")
 end)
 
