@@ -444,8 +444,32 @@ Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
 -- ===== Preset Buttons =====
 local btnRow = section(math.floor(80*baseScale))
 makeLabel(btnRow, "Preset", math.floor(14*baseScale))
-local halfW = math.floor((frame.Size.X.Offset - 60) / 2)
-local sampleBtn = makeButton(btnRow, "Load Sample (blue.)", 12, halfW, function()
+
+-- wrapper horizontal + auto padding
+local wrap1 = Instance.new("Frame")
+wrap1.Size = UDim2.new(1, -24, 0, math.floor(36*baseScale))
+wrap1.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
+wrap1.BackgroundTransparency = 1
+wrap1.Parent = btnRow
+
+local hlist1 = Instance.new("UIListLayout")
+hlist1.FillDirection = Enum.FillDirection.Horizontal
+hlist1.SortOrder = Enum.SortOrder.LayoutOrder
+hlist1.Padding = UDim.new(0, 8)
+hlist1.VerticalAlignment = Enum.VerticalAlignment.Center
+hlist1.Parent = wrap1
+
+-- tombol kiri: Load Sample (pakai Scale 0.5)
+local sampleBtn = Instance.new("TextButton")
+sampleBtn.Size = UDim2.new(0.5, -4, 1, 0)
+sampleBtn.BackgroundColor3 = Color3.fromRGB(55,120,255)
+sampleBtn.TextColor3 = Color3.new(1,1,1)
+sampleBtn.TextSize = math.floor(16*baseScale)
+sampleBtn.Font = Enum.Font.GothamBold
+sampleBtn.Text = "Load Sample (blue.)"
+sampleBtn.Parent = wrap1
+Instance.new("UICorner", sampleBtn).CornerRadius = UDim.new(0,8)
+sampleBtn.MouseButton1Click:Connect(function()
     box.Text = table.concat({
         "t r w t r w  t r w t y u",
         "[4o] p s g f d   5 a s d s",
@@ -455,41 +479,82 @@ local sampleBtn = makeButton(btnRow, "Load Sample (blue.)", 12, halfW, function(
         "4 t p o   [5p] o u i   [1o] i u t   [6t]"
     }, "  ")
 end)
-local clearBtn = makeButton(btnRow, "Clear", 12 + halfW + 8, halfW, function()
+
+-- tombol kanan: Clear
+local clearBtn = Instance.new("TextButton")
+clearBtn.Size = UDim2.new(0.5, -4, 1, 0)
+clearBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+clearBtn.TextColor3 = Color3.new(1,1,1)
+clearBtn.TextSize = math.floor(16*baseScale)
+clearBtn.Font = Enum.Font.GothamBold
+clearBtn.Text = "Clear"
+clearBtn.Parent = wrap1
+Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0,8)
+clearBtn.MouseButton1Click:Connect(function()
     box.Text = ""
 end)
 
 -- ===== Transport =====
 local ctlSec = section(math.floor(96*baseScale))
 makeLabel(ctlSec, "Transport", math.floor(14*baseScale))
-local thirdW = math.floor((frame.Size.X.Offset - 60) / 3)
 
-local playBtn = makeButton(ctlSec, "Play", 12, thirdW, function()
+local wrap2 = Instance.new("Frame")
+wrap2.Size = UDim2.new(1, -24, 0, math.floor(36*baseScale))
+wrap2.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
+wrap2.BackgroundTransparency = 1
+wrap2.Parent = ctlSec
+
+local hlist2 = Instance.new("UIListLayout")
+hlist2.FillDirection = Enum.FillDirection.Horizontal
+hlist2.SortOrder = Enum.SortOrder.LayoutOrder
+hlist2.Padding = UDim.new(0, 8)
+hlist2.VerticalAlignment = Enum.VerticalAlignment.Center
+hlist2.Parent = wrap2
+
+local function makeTransportButton(text)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1/3, -6, 1, 0) -- 3 tombol sebaris, -6 biar muat padding
+    b.BackgroundColor3 = Color3.fromRGB(55,120,255)
+    b.TextColor3 = Color3.new(1,1,1)
+    b.TextSize = math.floor(16*baseScale)
+    b.Font = Enum.Font.GothamBold
+    b.Text = text
+    b.Parent = wrap2
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0,8)
+    return b
+end
+
+local playBtn  = makeTransportButton("Play")
+local pauseBtn = makeTransportButton("Pause/Resume")
+local stopBtn  = makeTransportButton("Stop")
+
+playBtn.MouseButton1Click:Connect(function()
     if isPlaying then setStatus("Sudah Playing..."); return end
     local sheet = box.Text:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
     if sheet == "" then setStatus("Sheet kosong!"); return end
     isPlaying, isPaused, shouldStop = true, false, false
-    setMovementLock(true)           -- Kunci gerak karakter
+    setMovementLock(true)
     setStatus("Starting...")
     task.spawn(function()
         playFromSheet(sheet, setStatus)
         isPlaying, isPaused = false, false
-        setMovementLock(false)      -- Buka kunci saat selesai
+        setMovementLock(false)
     end)
 end)
 
-local pauseBtn = makeButton(ctlSec, "Pause/Resume", 12 + thirdW + 8, thirdW, function()
+pauseBtn.MouseButton1Click:Connect(function()
     if not isPlaying then setStatus("Belum Playing"); return end
     isPaused = not isPaused
     setStatus(isPaused and "Paused" or "Resumed")
 end)
 
-local stopBtn = makeButton(ctlSec, "Stop", 12 + (thirdW+8)*2, thirdW, function()
+stopBtn.MouseButton1Click:Connect(function()
     if not isPlaying then setStatus("Idle"); return end
     shouldStop, isPaused = true, false
-    setMovementLock(false)          -- Guard: langsung buka kunci
+    setMovementLock(false)
     setStatus("Stopping...")
 end)
+
 
 -- ===== Sliders =====
 local bpmRow = makeSliderRow("BPM", 40, 200, BPM, function(v)
