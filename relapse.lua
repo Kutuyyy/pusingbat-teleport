@@ -86,6 +86,8 @@ local TOKENS_PER_BEAT = 2
 local HOLD_RATIO      = 0.65
 local START_DELAY     = 3
 local MICRO_STAGGER   = 0.004
+local TOUCH_CHORD_ROLL_MS = 12   -- 0..30 ms; makin kecil makin "barengan"
+local TOUCH_ROLL_MODE = "center" -- "left", "right", "center"
 -- ===== Touch Playback (Mobile) =====
 local TOUCH_MODE = UIS.TouchEnabled     -- otomatis ON di HP
 local touchMap = {}                     -- [char] = Vector2 screen pos
@@ -278,23 +280,42 @@ end
 
 local function pressChord(keyList, holdSec, rawChars)
     if TOUCH_MODE then
-        -- mainkan semua posisi yang ada; kalau ada yang belum dikalibrasi, lewati
-        local any = false
+        -- filter yang sudah terkalibrasi
+        local pts = {}
         for _, ch in ipairs(rawChars) do
-            local pos = touchMap[ch]
-            if pos then
-                any = true
-                tapAt(pos, 0)         -- down/up cepat bergiliran
-                task.wait(MICRO_STAGGER)
-            end
+            local p = touchMap[ch]
+            if p then table.insert(pts, {ch = ch, p = p}) end
         end
-        if any and holdSec and holdSec > 0 then task.wait(holdSec) end
+        if #pts == 0 then return end
+
+        -- urutan roll
+        if TOUCH_ROLL_MODE == "left" then
+            table.sort(pts, function(a,b) return a.p.X < b.p.X end)
+        elseif TOUCH_ROLL_MODE == "right" then
+            table.sort(pts, function(a,b) return a.p.X > b.p.X end)
+        else -- "center": dari tengah keluar
+            table.sort(pts, function(a,b)
+                local cx = workspace.CurrentCamera.ViewportSize.X/2
+                return math.abs(a.p.X - cx) < math.abs(b.p.X - cx)
+            end)
+        end
+
+        local step = math.max(TOUCH_CHORD_ROLL_MS, 0) / 1000
+        for i, it in ipairs(pts) do
+            VIM:SendMouseButtonEvent(it.p.X, it.p.Y, 0, true, game, 0)
+            VIM:SendMouseButtonEvent(it.p.X, it.p.Y, 0, false, game, 0)
+            if i < #pts and step > 0 then task.wait(step) end
+        end
+        -- tahan total kira-kira sama dengan holdSec
+        if holdSec > (#pts-1)*step then
+            task.wait(holdSec - (#pts-1)*step)
+        end
         return
     end
 
-    -- mode keyboard (PC)
-    local needShift = false
-    for _, info in ipairs(keyList) do if info.shift then needShift = true break end end
+    -- === mode keyboard (PC) tetap seperti semula ===
+    local needShift=false
+    for _,info in ipairs(keyList) do if info.shift then needShift=true break end end
     if needShift then VIM:SendKeyEvent(true, SHIFT, false, game) end
     for i, info in ipairs(keyList) do
         VIM:SendKeyEvent(true, info.kc, false, game)
@@ -413,7 +434,15 @@ header.Size = UDim2.new(1,0,0, math.floor(42*baseScale))
 header.BackgroundColor3 = Color3.fromRGB(22,22,22)
 header.BorderSizePixel = 0
 header.Parent = frame
+header.Active = true           -- << WAJIB untuk terima Touch
+header.ZIndex = 2
 Instance.new("UICorner", header).CornerRadius = UDim.new(0,12)
+
+-- Pastikan body di bawah header
+body.ZIndex = 1
+
+-- Tombol minimize di atas header
+mini.ZIndex = 3
 
 local title = Instance.new("TextLabel")
 title.BackgroundTransparency = 1
@@ -439,26 +468,38 @@ Instance.new("UICorner", mini).CornerRadius = UDim.new(0, 6)
 
 -- Dragging
 do
-    local dragging, startPos, startInput
+    local dragging = false
+    local startPos, startXY, dragInput
+
+    local function update(input)
+        local delta = input.Position - startXY
+        frame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+
     header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
-            startInput = input
             startPos = frame.Position
+            startXY  = input.Position
+            dragInput = input
         end
     end)
-    UIS.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local delta = input.Position - startInput.Position
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
+
     header.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
+        if input == dragInput then dragging = false end
+    end)
+
+    UIS.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            update(input)
         end
     end)
 end
+
 
 -- Body (scrollable)
 local body = Instance.new("ScrollingFrame")
@@ -532,11 +573,18 @@ local function makeButton(parent, label, sizeUDim2, cb, color)
     btn.TextSize = math.floor(16*baseScale)
     btn.Font = Enum.Font.GothamBold
     btn.Text = label
+    btn.AutoButtonColor = true
     btn.Parent = parent
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
-    btn.MouseButton1Click:Connect(function() if cb then cb() end end)
+
+    -- gunakan Activated (mobile/pc)
+    btn.Activated:Connect(function()
+        if cb then cb() end
+    end)
+
     return btn
 end
+
 
 local function makeSliderRow(titleText, minV, maxV, initial, onChange, formatter)
     local s = section(math.floor(74*baseScale))
@@ -648,11 +696,7 @@ local function setMinimized(state)
     end
 end
 
-mini.MouseButton1Click:Connect(function()
-    setMinimized(not minimized)
-end)
-
-mini.MouseButton1Click:Connect(function()
+mini.Activated:Connect(function()
     setMinimized(not minimized)
 end)
 
@@ -707,8 +751,8 @@ makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
     setPrompt()
 
     local function finishCalib()
-        if overlay then overlay:Destroy() end
-        if prompt  then prompt:Destroy()  end
+        if overlay then overlay:Destroy() overlay = nil end
+        if prompt  then prompt:Destroy()  prompt  = nil end
         calibrating = false
         setStatus("Kalibrasi selesai ✓")
         frame.Position = prevPos
