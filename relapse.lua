@@ -176,6 +176,51 @@ local function cleanup()
     setMovementLock(false)
 end
 
+-- ===== Hard Freeze (anti jalan saat Play) =====
+local freezeLV, freezeConn
+local function hardFreeze(on)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hum  = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not (hum and root) then return end
+
+    if on then
+        -- Attachment untuk LinearVelocity
+        local att = root:FindFirstChild("RootAttachment")
+        if not att then
+            att = Instance.new("Attachment")
+            att.Name = "RootAttachment"
+            att.Parent = root
+        end
+        -- Buat LV kalau belum ada
+        if not freezeLV then
+            freezeLV = Instance.new("LinearVelocity")
+            freezeLV.Name = "PB_Freeze"
+            freezeLV.Attachment0 = att
+            freezeLV.RelativeTo = Enum.ActuatorRelativeTo.World
+            freezeLV.MaxForce   = math.huge
+            freezeLV.VectorVelocity = Vector3.zero
+            freezeLV.Parent = root
+        end
+        freezeLV.Enabled = true
+
+        -- Jaga tiap frame benar-benar 0
+        if not freezeConn then
+            freezeConn = RS.Stepped:Connect(function()
+                if not (root and hum) then return end
+                root.AssemblyLinearVelocity  = Vector3.zero
+                root.AssemblyAngularVelocity = Vector3.zero
+                hum:Move(Vector3.new(), false) -- matikan intent gerak
+                hum.WalkSpeed = 0              -- backup lock
+            end)
+        end
+    else
+        if freezeConn then freezeConn:Disconnect(); freezeConn = nil end
+        if freezeLV then freezeLV:Destroy(); freezeLV = nil end
+    end
+end
+
+
 -- ===== Input Sender =====
 local function pressKey(kc, holdSec, useShift)
     if useShift then VIM:SendKeyEvent(true, SHIFT, false, game) end
