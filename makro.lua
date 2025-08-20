@@ -272,8 +272,6 @@ if yaw then
     end)
 end
 
--- set kamera sesuai data save
-applyCameraFacing(facing)
 
 local function applyCameraFacing(facing)
     if not (facing and root) then return end
@@ -309,6 +307,9 @@ local function applyCameraFacing(facing)
         end
     end)
 end
+
+-- set kamera sesuai data save
+applyCameraFacing(facing)
 
 local function getCharacter()
     char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -3372,15 +3373,36 @@ attachFly()
 ensurePhysics()
 hookFallDamage()
 
+-- 1) UI dulu, jangan nunggu karakter
+local function safeCreateUI()
+    local ok, err = pcall(function()
+        createUI()
+    end)
+    if not ok then
+        warn("[PB] createUI failed: ", err)
+        -- fallback minimal; kalau UI gagal dibuat, tetap kasih pill
+        pcall(showPill)
+    end
+end
+task.defer(safeCreateUI)
+
+-- 2) Inisialisasi gameplay di background
+task.defer(function()
+    pcall(tryLoadFromServer)
+    pcall(getCharacter)
+    pcall(attachFly)
+    pcall(ensurePhysics)
+    pcall(hookFallDamage)
+end)
+
+-- 3) Character lifecycle (tetap)
 LocalPlayer.CharacterAdded:Connect(function()
-    -- batalin tween lama waktu character baru spawn
     if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
     teleporting = false
-
-    getCharacter()
-    attachFly()
-    ensurePhysics()
-    hookFallDamage()
+    pcall(getCharacter)
+    pcall(attachFly)
+    pcall(ensurePhysics)
+    pcall(hookFallDamage)
     fly = false
     noclip = false
 end)
