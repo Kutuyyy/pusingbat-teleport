@@ -169,57 +169,67 @@ local function setMovementLock(lock)
 end
 
 LocalPlayer.CharacterAdded:Connect(function()
-    if isPlaying then task.defer(function() setMovementLock(true) end) end
+    if isPlaying then
+        task.defer(function()
+            setMovementLock(true)
+            superLock(true)
+        end)
+    end
 end)
 
 local function cleanup()
     setMovementLock(false)
+    superLock(false)
 end
 
--- ===== Hard Freeze (anti jalan saat Play) =====
-local freezeLV, freezeConn
-local function hardFreeze(on)
+-- ===== Super Lock (mobile proof) =====
+local freezeConn
+local prev = {anchored=false, autoRotate=true, ws=nil, jp=nil, ragdoll=true}
+
+local function superLock(on)
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local hum  = char and char:FindFirstChildOfClass("Humanoid")
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not (hum and root) then return end
 
     if on then
-        -- Attachment untuk LinearVelocity
-        local att = root:FindFirstChild("RootAttachment")
-        if not att then
-            att = Instance.new("Attachment")
-            att.Name = "RootAttachment"
-            att.Parent = root
-        end
-        -- Buat LV kalau belum ada
-        if not freezeLV then
-            freezeLV = Instance.new("LinearVelocity")
-            freezeLV.Name = "PB_Freeze"
-            freezeLV.Attachment0 = att
-            freezeLV.RelativeTo = Enum.ActuatorRelativeTo.World
-            freezeLV.MaxForce   = math.huge
-            freezeLV.VectorVelocity = Vector3.zero
-            freezeLV.Parent = root
-        end
-        freezeLV.Enabled = true
+        -- simpan state
+        prev.anchored   = root.Anchored
+        prev.autoRotate = hum.AutoRotate
+        prev.ws         = hum.WalkSpeed
+        prev.jp         = pcall(function() return hum.JumpPower end) and hum.JumpPower or nil
+        prev.ragdoll    = pcall(function() return hum:GetStateEnabled(Enum.HumanoidStateType.Ragdoll) end) or true
 
-        -- Jaga tiap frame benar-benar 0
+        -- kunci gerak & anti jatuh/tersungkur
+        hum.AutoRotate = false
+        hum.WalkSpeed = 0
+        pcall(function() hum.UseJumpPower = true hum.JumpPower = 0 end)
+        pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false) end)
+        pcall(function() hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics) end)
+
+        root.Anchored = true  -- ini yang paling penting di mobile
+
+        -- jaga tiap frame benar2 diam & tegak
         if not freezeConn then
             freezeConn = RS.Stepped:Connect(function()
                 if not (root and hum) then return end
                 root.AssemblyLinearVelocity  = Vector3.zero
                 root.AssemblyAngularVelocity = Vector3.zero
-                hum:Move(Vector3.new(), false) -- matikan intent gerak
-                hum.WalkSpeed = 0              -- backup lock
+                hum:Move(Vector3.new(), false)
             end)
         end
     else
         if freezeConn then freezeConn:Disconnect(); freezeConn = nil end
-        if freezeLV then freezeLV:Destroy(); freezeLV = nil end
+
+        -- lepas kunci
+        root.Anchored = prev.anchored
+        hum.AutoRotate = prev.autoRotate
+        if prev.ws   then hum.WalkSpeed = prev.ws end
+        if prev.jp   then pcall(function() hum.JumpPower = prev.jp end) end
+        pcall(function() hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, prev.ragdoll) end)
+        pcall(function() hum:ChangeState(Enum.HumanoidStateType.Running) end)
     end
 end
-
 
 -- ===== Input Sender =====
 local function pressKey(kc, holdSec, useShift)
@@ -648,6 +658,7 @@ stopBtn.MouseButton1Click:Connect(function()
     if not isPlaying then setStatus("Idle"); return end
     shouldStop, isPaused = true, false
     setMovementLock(false)
+    superLock(false)  -- << TAMBAH
     setStatus("Stopping...")
 end)
 
