@@ -1,5 +1,5 @@
--- Pusingbat Piano Player — Delta Friendly (Parent = gethui/PlayerGui/CoreGui) + Error Toast
--- UI: Draggable, Scrollable, Transport, Preset, Sliders; Movement Lock saat Play
+-- Pusingbat Piano Player — Delta Safe GUI + Watchdog
+-- UI: Play/Pause/Stop, Load Sample, Clear, Sliders; Movement lock saat Play
 
 -- ===== Services =====
 local Players = game:GetService("Players")
@@ -11,45 +11,74 @@ local RS      = game:GetService("RunService")
 if not game:IsLoaded() then game.Loaded:Wait() end
 while not Players.LocalPlayer do task.wait() end
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 5)
 
--- Tunggu kamera untuk ukuran viewport
+-- Tunggu kamera (beberapa game delay, terutama di mobile/emulator)
 while not workspace.CurrentCamera do RS.RenderStepped:Wait() end
 
--- ===== Parent persis seperti PROBE =====
-local function getGuiParent()
-    local ok, hui = pcall(function() return gethui and gethui() end)
+-- ===== Safe GUI parent (Delta-friendly) =====
+local function getSafeGuiParent()
+    -- 1) gethui / get_hidden_gui (executor)
+    local ok, hui = pcall(function()
+        return (gethui and gethui()) or (get_hidden_gui and get_hidden_gui()) or nil
+    end)
     if ok and typeof(hui) == "Instance" then
         return hui
     end
-    local pg = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui", 5)
-    if pg then return pg end
-    return game:GetService("CoreGui")
+
+    -- 2) syn.protect_gui (kalau tersedia)
+    local container = Instance.new("ScreenGui")
+    container.Name = "PusingbatContainerPre"
+    pcall(function()
+        if syn and syn.protect_gui then syn.protect_gui(container) end
+    end)
+    container.ResetOnSpawn = false
+    container.IgnoreGuiInset = true
+    container.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    container.DisplayOrder = 999
+
+    -- 3) PlayerGui (fallback normal)
+    if PlayerGui then
+        container.Parent = PlayerGui
+        return container
+    end
+
+    -- 4) CoreGui sebagai last resort (kadang ditolak)
+    local CoreGui = game:FindService("CoreGui") or game:GetService("CoreGui")
+    container.Parent = CoreGui
+    return container
 end
-local parent = getGuiParent()
 
--- ===== Error Toast helper =====
-local function showToast(msg, color)
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "PusingbatToast"
-    sg.IgnoreGuiInset = true
-    sg.ResetOnSpawn = false
-    sg.DisplayOrder = 1000
-    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    sg.Parent = parent
-
-    local box = Instance.new("TextLabel")
-    box.Size = UDim2.fromOffset(360, 42)
-    box.Position = UDim2.new(0, 16, 0, 60)
-    box.BackgroundColor3 = color or Color3.fromRGB(30,140,80)
-    box.TextColor3 = Color3.new(1,1,1)
-    box.Text = msg
-    box.Font = Enum.Font.GothamBold
-    box.TextSize = 16
-    box.Parent = sg
-    Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
-
-    task.delay(2.5, function() if sg then sg:Destroy() end end)
+-- Kalau pakai container ScreenGui sendiri, kita akan isi di dalamnya
+local rootParent = getSafeGuiParent()
+local rootIsScreenGui = rootParent:IsA("ScreenGui")
+local gui = rootIsScreenGui and rootParent or Instance.new("ScreenGui")
+if not rootIsScreenGui then
+    gui.Name = "PusingbatPianoUI"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.DisplayOrder = 999
+    gui.Enabled = true
+    gui.Parent = rootParent
+else
+    gui.Name = "PusingbatPianoUI"
+    gui.Enabled = true
 end
+
+-- Watchdog: kalau parent di-null-kan oleh anti-cheat, reparent kembali
+task.spawn(function()
+    while gui and gui.Parent == nil do
+        task.wait(0.25)
+    end
+    while gui do
+        if gui.Parent == nil then
+            local newParent = getSafeGuiParent()
+            gui.Parent = newParent
+        end
+        task.wait(0.5)
+    end
+end)
 
 -- ===== Params Player =====
 local BPM             = 97
@@ -143,9 +172,9 @@ LocalPlayer.CharacterAdded:Connect(function()
     if isPlaying then task.defer(function() setMovementLock(true) end) end
 end)
 
-game:BindToClose(function()
+local function cleanup()
     setMovementLock(false)
-end)
+end
 
 -- ===== Input Sender =====
 local function pressKey(kc, holdSec, useShift)
@@ -229,30 +258,40 @@ local function playFromSheet(sheet, statusSetter)
             statusSetter(("Playing %d/%d"):format(i, total))
             task.wait(gapSec)
         end
-        i += 1
+        i = i + 1
     end
 
     if shouldStop then statusSetter("Stopped") else statusSetter("Selesai") end
 end
 
--- ===== UI (build persis) =====
+-- ===== UI =====
 local viewport = workspace.CurrentCamera.ViewportSize
 local baseScale = math.clamp(viewport.X / 900, 0.90, 1.10)
 local isTouch = UIS.TouchEnabled
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "PusingbatPianoUI"
-gui.IgnoreGuiInset = true
-gui.ResetOnSpawn = false
-gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.DisplayOrder = 999
-gui.Enabled = true
-gui.Parent = parent
+-- kecil toast supaya yakin UI hidup
+do
+    local toast = Instance.new("TextLabel")
+    toast.Size = UDim2.fromOffset(220, 36)
+    toast.Position = UDim2.new(0, 16, 0, 60)
+    toast.BackgroundColor3 = Color3.fromRGB(30,140,80)
+    toast.TextColor3 = Color3.fromRGB(255,255,255)
+    toast.Text = "UI Ready (Delta)"
+    toast.Font = Enum.Font.GothamBold
+    toast.TextSize = 16
+    toast.Parent = gui
+    Instance.new("UICorner", toast).CornerRadius = UDim.new(0,8)
+    task.delay(2, function() if toast then toast:Destroy() end end)
+    if gui then
+        gui.AncestryChanged:Connect(function(_, parent)
+            if parent == nil then cleanup() end
+        end)
+    end
 
--- Toast “UI Ready”
-showToast("UI Ready (Delta)", Color3.fromRGB(30,140,80))
+-- Saat karakter respawn / keluar tempat
+Players.LocalPlayer.CharacterRemoving:Connect(cleanup)
+end
 
--- Window
 local frame = Instance.new("Frame")
 frame.Name = "Window"
 frame.Size = UDim2.fromOffset(math.floor(420*baseScale), math.floor(520*baseScale))
@@ -264,7 +303,6 @@ frame.Active = true
 frame.Parent = gui
 Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
--- Header + drag
 local header = Instance.new("Frame")
 header.Name = "Header"
 header.Size = UDim2.new(1,0,0, math.floor(42*baseScale))
@@ -295,17 +333,20 @@ mini.Text = "-"
 mini.Parent = header
 Instance.new("UICorner", mini).CornerRadius = UDim.new(0, 6)
 
+-- Dragging
 do
     local dragging, startPos, startInput
     header.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true; startInput = input; startPos = frame.Position
+            dragging = true
+            startInput = input
+            startPos = frame.Position
         end
     end)
     UIS.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local d = input.Position - startInput.Position
-            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+            local delta = input.Position - startInput.Position
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
     header.InputEnded:Connect(function(input)
@@ -315,7 +356,7 @@ do
     end)
 end
 
--- Body scroll
+-- Body (scrollable)
 local body = Instance.new("ScrollingFrame")
 body.Name = "Body"
 body.Size = UDim2.new(1, -16, 1, -math.floor(42*baseScale) - 12)
@@ -482,12 +523,25 @@ box.PlaceholderText = "Tempel Sheets di sini...\nContoh: [4o] p s g f d ..."
 box.Parent = sheetSec
 Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
 
--- ===== Preset Buttons (horizontal, Scale) =====
+-- ===== Preset Buttons =====
 local btnRow = section(math.floor(80*baseScale))
 makeLabel(btnRow, "Preset", math.floor(14*baseScale))
-local wrap1 = makeHRow(btnRow, math.floor(36*baseScale))
+local wrap1 = (function()
+    local wrap = Instance.new("Frame")
+    wrap.Size = UDim2.new(1, -24, 0, math.floor(36*baseScale))
+    wrap.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
+    wrap.BackgroundTransparency = 1
+    wrap.Parent = btnRow
+    local h = Instance.new("UIListLayout")
+    h.FillDirection = Enum.FillDirection.Horizontal
+    h.SortOrder = Enum.SortOrder.LayoutOrder
+    h.Padding = UDim.new(0, 8)
+    h.VerticalAlignment = Enum.VerticalAlignment.Center
+    h.Parent = wrap
+    return wrap
+end)()
 
-makeButton(wrap1, "Load Sample (blue.)", UDim2.new(0.5, -4, 1, 0), function()
+local sampleBtn = makeButton(wrap1, "Load Sample (blue.)", UDim2.new(0.5, -4, 1, 0), function()
     box.Text = table.concat({
         "t r w t r w  t r w t y u",
         "[4o] p s g f d   5 a s d s",
@@ -497,16 +551,30 @@ makeButton(wrap1, "Load Sample (blue.)", UDim2.new(0.5, -4, 1, 0), function()
         "4 t p o   [5p] o u i   [1o] i u t   [6t]"
     }, "  ")
 end)
-makeButton(wrap1, "Clear", UDim2.new(0.5, -4, 1, 0), function() box.Text = "" end, Color3.fromRGB(80,80,80))
+local clearBtn = makeButton(wrap1, "Clear", UDim2.new(0.5, -4, 1, 0), function() box.Text = "" end, Color3.fromRGB(80,80,80))
 
 -- ===== Transport =====
 local ctlSec = section(math.floor(96*baseScale))
 makeLabel(ctlSec, "Transport", math.floor(14*baseScale))
-local wrap2 = makeHRow(ctlSec, math.floor(36*baseScale))
+local wrap2 = (function()
+    local wrap = Instance.new("Frame")
+    wrap.Size = UDim2.new(1, -24, 0, math.floor(36*baseScale))
+    wrap.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
+    wrap.BackgroundTransparency = 1
+    wrap.Parent = ctlSec
+    local h = Instance.new("UIListLayout")
+    h.FillDirection = Enum.FillDirection.Horizontal
+    h.SortOrder = Enum.SortOrder.LayoutOrder
+    h.Padding = UDim.new(0, 8)
+    h.VerticalAlignment = Enum.VerticalAlignment.Center
+    h.Parent = wrap
+    return wrap
+end)()
 
 local function makeTransportButton(text, color)
     return makeButton(wrap2, text, UDim2.new(1/3, -6, 1, 0), nil, color)
 end
+
 local playBtn  = makeTransportButton("Play")
 local pauseBtn = makeTransportButton("Pause/Resume")
 local stopBtn  = makeTransportButton("Stop", Color3.fromRGB(200,70,70))
@@ -519,12 +587,7 @@ playBtn.MouseButton1Click:Connect(function()
     setMovementLock(true)
     setStatus("Starting...")
     task.spawn(function()
-        local ok, err = xpcall(function()
-            playFromSheet(sheet, setStatus)
-        end, debug.traceback)
-        if not ok then
-            showToast("Error: "..tostring(err), Color3.fromRGB(190,60,60))
-        end
+        playFromSheet(sheet, setStatus)
         isPlaying, isPaused = false, false
         setMovementLock(false)
     end)
@@ -581,4 +644,6 @@ mini.MouseButton1Click:Connect(function()
     end
 end)
 
--- ===== Done =====
+-- ===== Hint =====
+local hint = section(math.floor(56*baseScale))
+makeLabel(hint, "Tips: klik area piano (chat OFF). Atur BPM/Timing di slider. Saat Play, karakter dikunci.", math.floor(12*baseScale))
