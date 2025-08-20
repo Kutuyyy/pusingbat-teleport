@@ -270,19 +270,20 @@ local function applyCameraFacing(facing)
     if dist < 6 then dist = 12 end
 
     local prevType = cam.CameraType
+    local hold = 0.6  -- tahan seirama dengan enforceYaw
     cam.CameraType = Enum.CameraType.Scriptable
 
     local t0 = tick()
     local conn
-    conn = game:GetService("RunService").RenderStepped:Connect(function()
+    conn = RunService.RenderStepped:Connect(function()
         -- urutan benar: yaw (Y) lalu pitch (X)
         local rot = CFrame.Angles(0, cy, 0) * CFrame.Angles(cp, 0, 0)
         local dir = rot.LookVector
         local pos = root.Position - dir * dist
         cam.CFrame = CFrame.new(pos, root.Position)
 
-        if (tick() - t0) > 0.25 then
-            conn:Disconnect()
+        if (tick() - t0) > hold then
+            if conn then pcall(function() conn:Disconnect() end) end
             cam.CameraType = prevType
         end
     end)
@@ -533,18 +534,34 @@ local easeIdx = 1
 local teleporting = false
 local currentTween = nil -- referensi tween aktif (kalau ada), supaya bisa di-cancel
 
-local function enforceYaw(yaw)
+local function enforceYaw(yaw, holdSec)
     if not yaw or not root then return end
+    holdSec = holdSec or 0.6  -- tahan sedikit lebih lama
+
     local prevAuto = hum and hum.AutoRotate
     if hum then
-        hum.AutoRotate = false           -- tahan biar nggak auto-rotate
-        hum:Move(Vector3.zero, true)     -- nolkan input agar nggak reorient
+        hum.AutoRotate = false
+        hum:Move(Vector3.zero, true) -- netralkan input supaya nggak reorient
     end
+
+    -- set yaw
     root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
-    task.delay(0.25, function()
-        if hum then hum.AutoRotate = prevAuto end
+
+    -- selama holdSec, paksa Move(0) biar modul kontrol nggak muter lagi
+    local t0 = tick()
+    local rsConn
+    rsConn = RunService.RenderStepped:Connect(function()
+        if hum then hum:Move(Vector3.zero, true) end
+        if tick() - t0 > holdSec then
+            if rsConn then pcall(function() rsConn:Disconnect() end) end
+        end
+    end)
+
+    task.delay(holdSec, function()
+        if hum and prevAuto ~= nil then hum.AutoRotate = prevAuto end
     end)
 end
+
 
 -- GANTI versi lama:
 local function teleportToPosition(dest, yaw)
@@ -555,7 +572,7 @@ local function teleportToPosition(dest, yaw)
         teleporting = false
         if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
         root.CFrame = goal
-        enforceYaw(yaw)  -- ⬅️ tambah ini
+        enforceYaw(yaw, 0.6)  -- ⬅️ pakai hold lebih lama
         return
     end
 
@@ -611,7 +628,7 @@ local function teleportToPositionAndWait(dest, yaw)
     tw:Play()
     pcall(function() 
         tw.Completed:Wait() 
-        enforceYaw(yaw)  -- ⬅️ tambah ini di akhir Completed
+        enforceYaw(yaw, 0.6)  -- ⬅️ sini juga
     end)
 
     if currentTween == tw then currentTween = nil end
