@@ -78,15 +78,33 @@ local TOUCH_MODE = UIS.TouchEnabled
 local touchMap   = {}      -- [char] = Vector2 screen pos
 local calibrating = false
 
-local function getMouseXY()
-    local p = UIS:GetMouseLocation()
-    return Vector2.new(p.X, p.Y)
+-- helper gerakkan kursor (opsional, bantu aim)
+local function moveMouse(x, y)
+    if VIM.SendMouseMove then
+        VIM:SendMouseMove(x, y)
+    end
 end
 
+-- TAP universal (prioritas touch)
 local function tapAt(pos, holdSec)
-    VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
-    if holdSec and holdSec > 0 then task.wait(holdSec) end
-    VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
+    holdSec = holdSec or 0
+    local x, y = math.floor(pos.X), math.floor(pos.Y)
+
+    -- 1) coba touch asli (lebih dipercaya UI mobile)
+    if typeof(VIM.SendTouchEvent) == "function" then
+        -- fingerId bebas (0), down -> (optional hold) -> up
+        VIM:SendTouchEvent(x, y, 0, true)   -- touch down
+        if holdSec > 0 then task.wait(holdSec) end
+        VIM:SendTouchEvent(x, y, 0, false)  -- touch up
+        return
+    end
+
+    -- 2) fallback mouse (pastikan signature BENAR)
+    moveMouse(x, y)
+    -- SendMouseButtonEvent(x, y, mouseButton(0=Left), isDown, gameProcessed:boolean)
+    VIM:SendMouseButtonEvent(x, y, 0, true,  false)
+    if holdSec > 0 then task.wait(holdSec) end
+    VIM:SendMouseButtonEvent(x, y, 0, false, false)
 end
 
 local function uniqueCharsFromSheet(sheet)
@@ -261,30 +279,47 @@ local function pressChord(keyList, holdSec, rawChars)
         local pts = {}
         for _, ch in ipairs(rawChars) do
             local p = touchMap[ch]
-            if p then table.insert(pts, {ch = ch, p = p}) end
+            if p then table.insert(pts, p) end
         end
         if #pts == 0 then return end
 
+        -- urutan roll (optional)
         if TOUCH_ROLL_MODE == "left" then
-            table.sort(pts, function(a,b) return a.p.X < b.p.X end)
+            table.sort(pts, function(a,b) return a.X < b.X end)
         elseif TOUCH_ROLL_MODE == "right" then
-            table.sort(pts, function(a,b) return a.p.X > b.p.X end)
+            table.sort(pts, function(a,b) return a.X > b.X end)
         else
             local cx = workspace.CurrentCamera.ViewportSize.X/2
-            table.sort(pts, function(a,b)
-                return math.abs(a.p.X - cx) < math.abs(b.p.X - cx)
-            end)
+            table.sort(pts, function(a,b) return math.abs(a.X-cx) < math.abs(b.X-cx) end)
         end
 
         local step = math.max(TOUCH_CHORD_ROLL_MS, 0) / 1000
-        for i, it in ipairs(pts) do
-            VIM:SendMouseButtonEvent(it.p.X, it.p.Y, 0, true, game, 0)
-            VIM:SendMouseButtonEvent(it.p.X, it.p.Y, 0, false, game, 0)
-            if i < #pts and step > 0 then task.wait(step) end
+
+        if typeof(VIM.SendTouchEvent) == "function" then
+            -- multi-finger: assign fingerId berbeda biar sejajar dengan input asli
+            for i, p in ipairs(pts) do
+                VIM:SendTouchEvent(p.X, p.Y, i, true)     -- down
+                if i < #pts and step > 0 then task.wait(step) end
+            end
+            -- tahan kira2 sesuai holdSec
+            if holdSec and holdSec > 0 then task.wait(math.max(holdSec - (#pts-1)*step, 0)) end
+            for i, p in ipairs(pts) do
+                VIM:SendTouchEvent(p.X, p.Y, i, false)    -- up
+            end
+        else
+            -- fallback mouse: klik beruntun cepat
+            for i, p in ipairs(pts) do
+                VIM:SendMouseButtonEvent(p.X, p.Y, 0, true,  false)
+                VIM:SendMouseButtonEvent(p.X, p.Y, 0, false, false)
+                if i < #pts and step > 0 then task.wait(step) end
+            end
+            if holdSec and holdSec > 0 then
+                task.wait(math.max(holdSec - (#pts-1)*step, 0))
+            end
         end
-        if holdSec > (#pts-1)*step then task.wait(holdSec - (#pts-1)*step) end
         return
     end
+
 
     local needShift=false
     for _,info in ipairs(keyList) do if info.shift then needShift=true break end end
@@ -774,6 +809,7 @@ playBtn.Activated:Connect(function()
     isPlaying, isPaused, shouldStop = true, false, false
     setMovementLock(true)
     superLock(true)                       -- ON saat mulai
+    calibrating = false  -- force off
     setStatus("Starting...")
     task.spawn(function()
         playFromSheet(sheet, setStatus)
