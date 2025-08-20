@@ -254,25 +254,6 @@ local function buildServerBody()
 end
 
 -- ========== Character helpers ==========
-local dest = item.position
-local facing = item.facing
-local yaw = facing and facing.charYaw
-
--- teleport ke lokasi
-safeTeleport(dest, yaw)
-
--- tegaskan arah karakter
-if yaw then
-    enforceYaw(yaw, 0.8)   -- tahan sebentar supaya nggak diputar balik
-    task.delay(0.65, function()
-        enforceYaw(yaw, 0.25) -- final nudge setelah kamera normal lagi
-        if align then
-            align.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
-        end
-    end)
-end
-
-
 local function applyCameraFacing(facing)
     if not (facing and root) then return end
     local cam = workspace.CurrentCamera
@@ -307,9 +288,6 @@ local function applyCameraFacing(facing)
         end
     end)
 end
-
--- set kamera sesuai data save
-applyCameraFacing(facing)
 
 local function getCharacter()
     char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -581,19 +559,6 @@ local function enforceYaw(yaw, holdSec)
 
     task.delay(holdSec, function()
         if hum and prevAuto ~= nil then hum.AutoRotate = prevAuto end
-    end)
-end
-
-local function enforceYaw(yaw)
-    if not yaw or not root then return end
-    local prevAuto = hum and hum.AutoRotate
-    if hum then
-        hum.AutoRotate = false
-        hum:Move(Vector3.zero, true)
-    end
-    root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
-    task.delay(0.25, function()
-        if hum then hum.AutoRotate = prevAuto end
     end)
 end
 
@@ -1828,12 +1793,12 @@ end
         if not v then return end
         task.spawn(function()
             local dest = Vector3.new(v.X, v.Y, v.Z) + Vector3.new(0,3,0)
-            local yaw  = locationData.facing and locationData.facing.charYaw or nil
+            local yaw = locationData.facing and locationData.facing.charYaw or nil
 
-            safeTeleport(dest, yaw)   -- <-- yaw karakter di-apply via enforceYaw
+            safeTeleport(dest, yaw)
             jumpOnce()
 
-            -- optional: arahkan kamera sesuai snapshot
+            -- (opsional) arahkan kamera sesuai snapshot
             if locationData.facing and locationData.facing.camYaw and root then
                 task.defer(function()
                     applyCameraFacing(locationData.facing)
@@ -2147,10 +2112,9 @@ end
             -- simpan arah hadap saat menekan Save
             do
                 local facing = {}
-                -- karakter
                 local y = getCharYaw()
                 if y then facing.charYaw = y end
-                -- kamera
+
                 local cy, cp = getCamYawPitch()
                 if cy then
                     facing.camYaw   = cy
@@ -2160,6 +2124,7 @@ end
                         facing.camDist = (cam.CFrame.Position - root.Position).Magnitude
                     end
                 end
+
                 if next(facing) ~= nil then
                     tempLoc.facing = facing
                 else
@@ -3363,14 +3328,6 @@ local rebuildTourCounter
         setFOV(defaultFOV)
         rebuildCfgList()
     end)
-    -- Watchdog: kalau setelah 6 dtk UI belum kebuka, buka paksa
-    task.delay(6, function()
-        if MainGUI and not MainGUI.Enabled then
-            warn("[PB] UI watchdog enabling MainGUI")
-            pcall(function() overlay:Destroy() end)
-            MainGUI.Enabled = true
-        end
-    end)
 end
 
 -- ========== Init ==========
@@ -3380,36 +3337,15 @@ attachFly()
 ensurePhysics()
 hookFallDamage()
 
--- 1) UI dulu, jangan nunggu karakter
-local function safeCreateUI()
-    local ok, err = pcall(function()
-        createUI()
-    end)
-    if not ok then
-        warn("[PB] createUI failed: ", err)
-        -- fallback minimal; kalau UI gagal dibuat, tetap kasih pill
-        pcall(showPill)
-    end
-end
-task.defer(safeCreateUI)
-
--- 2) Inisialisasi gameplay di background
-task.defer(function()
-    pcall(tryLoadFromServer)
-    pcall(getCharacter)
-    pcall(attachFly)
-    pcall(ensurePhysics)
-    pcall(hookFallDamage)
-end)
-
--- 3) Character lifecycle (tetap)
 LocalPlayer.CharacterAdded:Connect(function()
+    -- batalin tween lama waktu character baru spawn
     if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
     teleporting = false
-    pcall(getCharacter)
-    pcall(attachFly)
-    pcall(ensurePhysics)
-    pcall(hookFallDamage)
+
+    getCharacter()
+    attachFly()
+    ensurePhysics()
+    hookFallDamage()
     fly = false
     noclip = false
 end)
