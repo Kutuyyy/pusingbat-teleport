@@ -254,25 +254,6 @@ local function buildServerBody()
 end
 
 -- ========== Character helpers ==========
-local dest = item.position
-local facing = item.facing
-local yaw = facing and facing.charYaw
-
--- teleport ke lokasi
-safeTeleport(dest, yaw)
-
--- tegaskan arah karakter
-if yaw then
-    enforceYaw(yaw, 0.8)   -- tahan sebentar supaya nggak diputar balik
-    task.delay(0.65, function()
-        enforceYaw(yaw, 0.25) -- final nudge setelah kamera normal lagi
-        if align then
-            align.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, yaw, 0)
-        end
-    end)
-end
-
-
 local function applyCameraFacing(facing)
     if not (facing and root) then return end
     local cam = workspace.CurrentCamera
@@ -307,9 +288,6 @@ local function applyCameraFacing(facing)
         end
     end)
 end
-
--- set kamera sesuai data save
-applyCameraFacing(facing)
 
 local function getCharacter()
     char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -3364,14 +3342,6 @@ local rebuildTourCounter
         setFOV(defaultFOV)
         rebuildCfgList()
     end)
-    -- Watchdog: kalau setelah 6 dtk UI belum kebuka, buka paksa
-    task.delay(6, function()
-        if MainGUI and not MainGUI.Enabled then
-            warn("[PB] UI watchdog enabling MainGUI")
-            pcall(function() overlay:Destroy() end)
-            MainGUI.Enabled = true
-        end
-    end)
 end
 
 -- ========== Init ==========
@@ -3381,36 +3351,15 @@ attachFly()
 ensurePhysics()
 hookFallDamage()
 
--- 1) UI dulu, jangan nunggu karakter
-local function safeCreateUI()
-    local ok, err = pcall(function()
-        createUI()
-    end)
-    if not ok then
-        warn("[PB] createUI failed: ", err)
-        -- fallback minimal; kalau UI gagal dibuat, tetap kasih pill
-        pcall(showPill)
-    end
-end
-task.defer(safeCreateUI)
-
--- 2) Inisialisasi gameplay di background
-task.defer(function()
-    pcall(tryLoadFromServer)
-    pcall(getCharacter)
-    pcall(attachFly)
-    pcall(ensurePhysics)
-    pcall(hookFallDamage)
-end)
-
--- 3) Character lifecycle (tetap)
 LocalPlayer.CharacterAdded:Connect(function()
+    -- batalin tween lama waktu character baru spawn
     if currentTween then pcall(function() currentTween:Cancel() end); currentTween = nil end
     teleporting = false
-    pcall(getCharacter)
-    pcall(attachFly)
-    pcall(ensurePhysics)
-    pcall(hookFallDamage)
+
+    getCharacter()
+    attachFly()
+    ensurePhysics()
+    hookFallDamage()
     fly = false
     noclip = false
 end)
