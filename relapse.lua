@@ -1,29 +1,37 @@
 --[[
-    Pusingbat Piano Player — Mobile Friendly + Draggable + Scrollable + Movement Lock
-    - UI panel: Play / Pause / Stop, Load Sample (blue.), Clear
-    - TextBox multi-line buat Sheets (format bracket: [pwdj] p ...)
-    - Slider: BPM, Tokens/Beat, Hold Ratio, Start Delay, Micro Stagger
-    - Status label + Minimize
-    - Saat Play: kontrol gerak karakter dimatikan (disable PlayerModule Controls / fallback zero WalkSpeed & JumpPower)
-    - Saat Stop/Selesai: kontrol dikembalikan
-
-    Tips:
-    - Klik area piano (chat OFF) sebelum Play.
-    - Atur BPM & timing sesuai feel.
+    Pusingbat Piano Player — Mobile Friendly + Draggable + Scrollable + Movement Lock (SAFE INIT)
+    - Perbaikan: safe init (game loaded, LocalPlayer, PlayerGui, CurrentCamera), DisplayOrder tinggi, toast "UI Ready"
+    - UI: Play / Pause / Stop, Load Sample, Clear, sliders (BPM, Tokens/Beat, Hold, Delay, MicroStagger)
+    - Movement lock saat Play (disable Controls / fallback zero WalkSpeed & JumpPower)
 ]]
 
 -- ===== Services =====
 local Players = game:GetService("Players")
 local UIS     = game:GetService("UserInputService")
 local VIM     = game:GetService("VirtualInputManager")
+local RS      = game:GetService("RunService")
+
+-- ===== Safe init guard =====
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+while not Players.LocalPlayer do
+    task.wait()
+end
 local LocalPlayer = Players.LocalPlayer
 
+-- Tunggukan PlayerGui & CurrentCamera (beberapa game spawn-nya lambat, apalagi di mobile)
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+while not workspace.CurrentCamera do
+    RS.RenderStepped:Wait()
+end
+
 -- ===== Params Default =====
-local BPM             = 97       -- tempo
-local TOKENS_PER_BEAT = 2        -- token per ketukan
-local HOLD_RATIO      = 0.65     -- proporsi tahan nada
-local START_DELAY     = 3        -- detik sebelum mulai
-local MICRO_STAGGER   = 0.004    -- jeda mini saat chord
+local BPM             = 97
+local TOKENS_PER_BEAT = 2
+local HOLD_RATIO      = 0.65
+local START_DELAY     = 3
+local MICRO_STAGGER   = 0.004
 
 -- ===== Runtime State =====
 local isPlaying, isPaused, shouldStop = false, false, false
@@ -73,7 +81,7 @@ local function keycodeFromChar(ch)
     return nil, false
 end
 
--- ===== Movement Lock (disable gerak karakter saat Play) =====
+-- ===== Movement Lock =====
 local function getHumanoid()
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     return char:FindFirstChildOfClass("Humanoid")
@@ -199,16 +207,11 @@ local function playFromSheet(sheet, statusSetter)
         i += 1
     end
 
-    if shouldStop then
-        statusSetter("Stopped")
-    else
-        statusSetter("Selesai")
-    end
+    if shouldStop then statusSetter("Stopped") else statusSetter("Selesai") end
 end
 
 -- ===== UI =====
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
+local viewport = workspace.CurrentCamera.ViewportSize
 local baseScale = math.clamp(viewport.X / 900, 0.90, 1.10)
 local isTouch = UIS.TouchEnabled
 
@@ -216,7 +219,25 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "PusingbatPianoUI"
 gui.IgnoreGuiInset = true
 gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.DisplayOrder = 999  -- di atas kebanyakan UI
+gui.Enabled = true
 gui.Parent = PlayerGui
+
+-- Toast kecil biar tahu UI hidup
+do
+    local toast = Instance.new("TextLabel")
+    toast.Size = UDim2.fromOffset(220, 36)
+    toast.Position = UDim2.new(0, 16, 0, 60)
+    toast.BackgroundColor3 = Color3.fromRGB(30,140,80)
+    toast.TextColor3 = Color3.fromRGB(255,255,255)
+    toast.Text = "UI Ready"
+    toast.Font = Enum.Font.GothamBold
+    toast.TextSize = 16
+    toast.Parent = gui
+    Instance.new("UICorner", toast).CornerRadius = UDim.new(0,8)
+    task.delay(2, function() if toast then toast:Destroy() end end)
+end
 
 -- Window (draggable)
 local frame = Instance.new("Frame")
@@ -314,7 +335,6 @@ local function section(height)
     f.Size = UDim2.new(1, -8, 0, height)
     f.BackgroundColor3 = Color3.fromRGB(35,35,35)
     f.BorderSizePixel = 0
-    f.LayoutOrder = #body:GetChildren()+1
     f.Parent = body
     Instance.new("UICorner", f).CornerRadius = UDim.new(0,8)
     return f
@@ -334,11 +354,26 @@ local function makeLabel(parent, text, size)
     return l
 end
 
-local function makeButton(parent, label, x, w, cb)
+-- (helper) buat baris tombol horizontal
+local function makeHRow(parent, height)
+    local wrap = Instance.new("Frame")
+    wrap.Size = UDim2.new(1, -24, 0, height)
+    wrap.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
+    wrap.BackgroundTransparency = 1
+    wrap.Parent = parent
+    local hlist = Instance.new("UIListLayout")
+    hlist.FillDirection = Enum.FillDirection.Horizontal
+    hlist.SortOrder = Enum.SortOrder.LayoutOrder
+    hlist.Padding = UDim.new(0, 8)
+    hlist.VerticalAlignment = Enum.VerticalAlignment.Center
+    hlist.Parent = wrap
+    return wrap
+end
+
+local function makeButton(parent, label, sizeUDim2, cb, color)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, w, 0, math.floor(36*baseScale))
-    btn.Position = UDim2.new(0, x, 0, math.floor(36*baseScale))
-    btn.BackgroundColor3 = Color3.fromRGB(55,120,255)
+    btn.Size = sizeUDim2
+    btn.BackgroundColor3 = color or Color3.fromRGB(55,120,255)
     btn.TextColor3 = Color3.new(1,1,1)
     btn.TextSize = math.floor(16*baseScale)
     btn.Font = Enum.Font.GothamBold
@@ -377,7 +412,6 @@ local function makeSliderRow(titleText, minV, maxV, initial, onChange, formatter
     Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
 
     local lbl = s:FindFirstChildOfClass("TextLabel")
-
     local dragging, val = false, initial
     local function setFromPct(p)
         p = math.clamp(p, 0, 1)
@@ -415,14 +449,14 @@ local function makeSliderRow(titleText, minV, maxV, initial, onChange, formatter
     }
 end
 
--- ===== Status Section =====
+-- ===== Status =====
 local statusSec = section(math.floor(56*baseScale))
 local statusLabel = makeLabel(statusSec, "Status: Idle", math.floor(14*baseScale))
 statusLabel.Position = UDim2.new(0, 12, 0, 10)
 statusLabel.TextColor3 = Color3.fromRGB(180,220,255)
 local function setStatus(txt) statusLabel.Text = "Status: "..txt end
 
--- ===== Sheets Section =====
+-- ===== Sheets =====
 local sheetSec = section(math.floor(200*baseScale))
 makeLabel(sheetSec, "Sheets (format bracket)", math.floor(14*baseScale))
 local box = Instance.new("TextBox")
@@ -441,93 +475,45 @@ box.PlaceholderText = "Tempel Sheets di sini...\nContoh: [4o] p s g f d ..."
 box.Parent = sheetSec
 Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
 
--- ===== Preset Buttons =====
+-- ===== Preset Buttons (horizontal, pakai Scale) =====
 local btnRow = section(math.floor(80*baseScale))
 makeLabel(btnRow, "Preset", math.floor(14*baseScale))
+local wrap1 = makeHRow(btnRow, math.floor(36*baseScale))
 
--- wrapper horizontal + auto padding
-local wrap1 = Instance.new("Frame")
-wrap1.Size = UDim2.new(1, -24, 0, math.floor(36*baseScale))
-wrap1.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
-wrap1.BackgroundTransparency = 1
-wrap1.Parent = btnRow
+local sampleBtn = makeButton(
+    wrap1, "Load Sample (blue.)",
+    UDim2.new(0.5, -4, 1, 0),
+    function()
+        box.Text = table.concat({
+            "t r w t r w  t r w t y u",
+            "[4o] p s g f d   5 a s d s",
+            "[1o] u i o   [6a] s",
+            "[4o] p s g f a   5 h g f",
+            "[1s] s s d d d   [6f] f f a a a",
+            "4 t p o   [5p] o u i   [1o] i u t   [6t]"
+        }, "  ")
+    end
+)
 
-local hlist1 = Instance.new("UIListLayout")
-hlist1.FillDirection = Enum.FillDirection.Horizontal
-hlist1.SortOrder = Enum.SortOrder.LayoutOrder
-hlist1.Padding = UDim.new(0, 8)
-hlist1.VerticalAlignment = Enum.VerticalAlignment.Center
-hlist1.Parent = wrap1
-
--- tombol kiri: Load Sample (pakai Scale 0.5)
-local sampleBtn = Instance.new("TextButton")
-sampleBtn.Size = UDim2.new(0.5, -4, 1, 0)
-sampleBtn.BackgroundColor3 = Color3.fromRGB(55,120,255)
-sampleBtn.TextColor3 = Color3.new(1,1,1)
-sampleBtn.TextSize = math.floor(16*baseScale)
-sampleBtn.Font = Enum.Font.GothamBold
-sampleBtn.Text = "Load Sample (blue.)"
-sampleBtn.Parent = wrap1
-Instance.new("UICorner", sampleBtn).CornerRadius = UDim.new(0,8)
-sampleBtn.MouseButton1Click:Connect(function()
-    box.Text = table.concat({
-        "t r w t r w  t r w t y u",
-        "[4o] p s g f d   5 a s d s",
-        "[1o] u i o   [6a] s",
-        "[4o] p s g f a   5 h g f",
-        "[1s] s s d d d   [6f] f f a a a",
-        "4 t p o   [5p] o u i   [1o] i u t   [6t]"
-    }, "  ")
-end)
-
--- tombol kanan: Clear
-local clearBtn = Instance.new("TextButton")
-clearBtn.Size = UDim2.new(0.5, -4, 1, 0)
-clearBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-clearBtn.TextColor3 = Color3.new(1,1,1)
-clearBtn.TextSize = math.floor(16*baseScale)
-clearBtn.Font = Enum.Font.GothamBold
-clearBtn.Text = "Clear"
-clearBtn.Parent = wrap1
-Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0,8)
-clearBtn.MouseButton1Click:Connect(function()
-    box.Text = ""
-end)
-
+local clearBtn = makeButton(
+    wrap1, "Clear",
+    UDim2.new(0.5, -4, 1, 0),
+    function() box.Text = "" end,
+    Color3.fromRGB(80,80,80)
+)
 
 -- ===== Transport =====
 local ctlSec = section(math.floor(96*baseScale))
 makeLabel(ctlSec, "Transport", math.floor(14*baseScale))
+local wrap2 = makeHRow(ctlSec, math.floor(36*baseScale))
 
-local wrap2 = Instance.new("Frame")
-wrap2.Size = UDim2.new(1, -24, 0, math.floor(36*baseScale))
-wrap2.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
-wrap2.BackgroundTransparency = 1
-wrap2.Parent = ctlSec
-
-local hlist2 = Instance.new("UIListLayout")
-hlist2.FillDirection = Enum.FillDirection.Horizontal
-hlist2.SortOrder = Enum.SortOrder.LayoutOrder
-hlist2.Padding = UDim.new(0, 8)
-hlist2.VerticalAlignment = Enum.VerticalAlignment.Center
-hlist2.Parent = wrap2
-
-local function makeTransportButton(text)
-    local b = Instance.new("TextButton")
-    b.Size = UDim2.new(1/3, -6, 1, 0) -- 3 tombol sebaris, -6 biar muat padding
-    b.BackgroundColor3 = Color3.fromRGB(55,120,255)
-    b.TextColor3 = Color3.new(1,1,1)
-    b.TextSize = math.floor(16*baseScale)
-    b.Font = Enum.Font.GothamBold
-    b.Text = text
-    b.Parent = wrap2
-    Instance.new("UICorner", b).CornerRadius = UDim.new(0,8)
-    return b
+local function makeTransportButton(text, color)
+    return makeButton(wrap2, text, UDim2.new(1/3, -6, 1, 0), nil, color)
 end
 
 local playBtn  = makeTransportButton("Play")
 local pauseBtn = makeTransportButton("Pause/Resume")
-local stopBtn  = makeTransportButton("Stop")
+local stopBtn  = makeTransportButton("Stop", Color3.fromRGB(200,70,70))
 
 playBtn.MouseButton1Click:Connect(function()
     if isPlaying then setStatus("Sudah Playing..."); return end
@@ -555,7 +541,6 @@ stopBtn.MouseButton1Click:Connect(function()
     setMovementLock(false)
     setStatus("Stopping...")
 end)
-
 
 -- ===== Sliders =====
 local bpmRow = makeSliderRow("BPM", 40, 200, BPM, function(v)
