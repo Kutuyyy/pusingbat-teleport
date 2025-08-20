@@ -1,11 +1,17 @@
 --[[
-    Pusingbat Piano Player — Rapi + Draggable + Scrollable (Mobile Friendly)
+    Pusingbat Piano Player — Rapi + Draggable + Scrollable + Movement Lock
     - Panel draggable via header
-    - Scrolling content (AutomaticCanvasSize.Y)
-    - Tombol besar (HP), slider & textbox rapi dalam list
-    - Minimize/Expand
+    - Konten scrollable (AutomaticCanvasSize.Y) — nyaman di HP
     - Play / Pause / Stop, Load Sample (blue.) / Clear
     - Slider: BPM, Tokens/Beat, Hold Ratio, Start Delay, Micro Stagger
+    - Movement Lock saat Playing:
+        * Utama: Disable kontrol Roblox (PlayerModule Controls)
+        * Fallback: WalkSpeed/JumpPower = 0 (restore setelah selesai)
+    - Aman di respawn: tetap terkunci jika masih Playing
+
+    Cara pakai:
+    1) Klik area pianonya (chat OFF).
+    2) Paste Sheets ke kotak, atur slider → Play.
 ]]
 
 -- ===== Services =====
@@ -13,6 +19,18 @@ local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local VIM = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
+
+-- ===== Hapus UI lama jika ada (biar gak dobel) =====
+pcall(function()
+    local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if pg then
+        for _, g in ipairs(pg:GetChildren()) do
+            if g:IsA("ScreenGui") and (g.Name == "PusingbatPianoUI" or g.Name == "PusingbatOverlay") then
+                g:Destroy()
+            end
+        end
+    end
+end)
 
 -- ===== Player Params (default) =====
 local BPM            = 97
@@ -112,6 +130,52 @@ local function parseToken(token)
     end
 end
 
+-- ===== Movement Lock (anti karakter jalan saat Play) =====
+local function getHumanoid()
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    return char:FindFirstChildOfClass("Humanoid")
+end
+
+local oldWalk, oldJump
+local function immobilize(on)
+    local hum = getHumanoid()
+    if not hum then return end
+    if on then
+        oldWalk, oldJump = hum.WalkSpeed, hum.JumpPower
+        hum.WalkSpeed = 0
+        pcall(function() hum.UseJumpPower = true end)
+        hum.JumpPower = 0
+    else
+        if oldWalk then hum.WalkSpeed = oldWalk end
+        if oldJump then hum.JumpPower = oldJump end
+    end
+end
+
+local controlsObj -- cache Controls
+local function setMovementLock(lock)
+    -- Coba disable default controls
+    local ok, controls = pcall(function()
+        if not controlsObj then
+            local PM = require(LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("PlayerModule"))
+            controlsObj = PM:GetControls()
+        end
+        return controlsObj
+    end)
+    if ok and controls then
+        if lock then controls:Disable() else controls:Enable() end
+    else
+        -- Fallback: matikan movement lewat Walk/Jump
+        immobilize(lock)
+    end
+end
+
+-- Jika respawn saat masih Playing, tetap terkunci
+LocalPlayer.CharacterAdded:Connect(function()
+    if isPlaying then
+        task.defer(function() setMovementLock(true) end)
+    end
+end)
+
 -- ===== Player Core =====
 local function playFromSheet(sheet, statusSetter)
     local beatSec = 60 / BPM
@@ -164,7 +228,7 @@ end
 -- ===== UI =====
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Responsive scale utk HP: 0.9..1.1
+-- Responsive scale utk HP
 local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720)
 local baseScale = math.clamp(viewport.X / 900, 0.90, 1.10)
 local isTouch = UIS.TouchEnabled
@@ -267,7 +331,7 @@ list.SortOrder = Enum.SortOrder.LayoutOrder
 list.Padding = UDim.new(0, math.floor(8*baseScale))
 list.Parent = body
 
--- Helper: section container
+-- Helpers
 local function section(height)
     local f = Instance.new("Frame")
     f.Size = UDim2.new(1, -8, 0, height)
@@ -279,12 +343,11 @@ local function section(height)
     return f
 end
 
--- Helper: label
 local function makeLabel(parent, text, size)
     local l = Instance.new("TextLabel")
     l.BackgroundTransparency = 1
     l.Size = UDim2.new(1, -16, 0, math.floor(22*baseScale))
-    l.Position = UDim2.new(0, 8, 0, 6)
+    l.Position = UDim2.new(0, 12, 0, 6)
     l.Font = Enum.Font.Gotham
     l.TextSize = size or math.floor(14*baseScale)
     l.TextXAlignment = Enum.TextXAlignment.Left
@@ -294,7 +357,6 @@ local function makeLabel(parent, text, size)
     return l
 end
 
--- Helper: rounded button
 local function makeButton(parent, label, x, w, cb)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0, w, 0, math.floor(36*baseScale))
@@ -310,7 +372,6 @@ local function makeButton(parent, label, x, w, cb)
     return btn
 end
 
--- Helper: slider row
 local function makeSliderRow(titleText, minV, maxV, initial, onChange, formatter)
     local s = section(math.floor(74*baseScale))
     makeLabel(s, titleText .. ": " .. (formatter and formatter(initial) or tostring(initial)))
@@ -336,156 +397,5 @@ local function makeSliderRow(titleText, minV, maxV, initial, onChange, formatter
     knob.BackgroundColor3 = Color3.fromRGB(240,240,240)
     knob.BorderSizePixel = 0
     knob.Parent = bar
-    Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
-
-    local lbl = s:FindFirstChildOfClass("TextLabel")
-
-    local dragging = false
-    local val = initial
-    local function setFromPct(p)
-        p = math.clamp(p, 0, 1)
-        val = minV + (maxV - minV) * p
-        fill.Size = UDim2.new(p, 0, 1, 0)
-        knob.Position = UDim2.new(p, -math.floor(9*baseScale), 0.5, -math.floor(9*baseScale))
-        lbl.Text = titleText .. ": " .. (formatter and formatter(val) or tostring(val))
-        if onChange then onChange(val) end
-    end
-
-    bar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
-            setFromPct(rel)
-        end
-    end)
-    UIS.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local rel = (input.Position.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X
-            setFromPct(rel)
-        end
-    end)
-    bar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-
-    return {
-        Set = function(v)
-            local p = (math.clamp(v, minV, maxV) - minV) / (maxV - minV)
-            setFromPct(p)
-        end
-    }
+    Instance.new("UICorner", knob).CornerRadius = UDim.New(1,0) -- fix casing
 end
-
--- ===== Status Section =====
-local statusSec = section(math.floor(56*baseScale))
-local statusLabel = makeLabel(statusSec, "Status: Idle")
-statusLabel.Position = UDim2.new(0, 12, 0, 10)
-statusLabel.TextColor3 = Color3.fromRGB(180,220,255)
-statusLabel.TextSize = math.floor(14*baseScale)
-local function setStatus(txt) statusLabel.Text = "Status: "..txt end
-
--- ===== Sheets Section =====
-local sheetSec = section(math.floor(200*baseScale))
-makeLabel(sheetSec, "Sheets (format bracket)", math.floor(14*baseScale))
-
-local box = Instance.new("TextBox")
-box.Size = UDim2.new(1, -24, 1, -math.floor(50*baseScale))
-box.Position = UDim2.new(0, 12, 0, math.floor(36*baseScale))
-box.BackgroundColor3 = Color3.fromRGB(38,38,38)
-box.TextColor3 = Color3.fromRGB(235,235,235)
-box.TextSize = math.floor(14*baseScale)
-box.Font = Enum.Font.Code
-box.TextXAlignment = Enum.TextXAlignment.Left
-box.TextYAlignment = Enum.TextYAlignment.Top
-box.ClearTextOnFocus = false
-box.MultiLine = true
-box.TextWrapped = true
-box.PlaceholderText = "Tempel Sheets di sini...\nContoh: [4o] p s g f d ..."
-box.Parent = sheetSec
-Instance.new("UICorner", box).CornerRadius = UDim.new(0,8)
-
--- Row tombol sample/clear
-local btnRow = section(math.floor(80*baseScale))
-makeLabel(btnRow, "Preset", math.floor(14*baseScale))
-local bw = math.floor( (btnRow.AbsoluteSize.X > 0 and btnRow.AbsoluteSize.X or 360) / 2 ) -- fallback
-local sampleBtn = makeButton(btnRow, "Load Sample (blue.)", 12, math.floor( (frame.AbsoluteSize.X-60) / 2 ), function()
-    box.Text = table.concat({
-        "t r w t r w  t r w t y u",
-        "[4o] p s g f d   5 a s d s",
-        "[1o] u i o   [6a] s",
-        "[4o] p s g f a   5 h g f",
-        "[1s] s s d d d   [6f] f f a a a",
-        "4 t p o   [5p] o u i   [1o] i u t   [6t]"
-    }, "  ")
-end)
-local clearBtn = makeButton(btnRow, "Clear", 12 + math.floor((frame.AbsoluteSize.X-60)/2) + 8, math.floor((frame.AbsoluteSize.X-60)/2), function()
-    box.Text = ""
-end)
-
--- ===== Controls Section (Play/Pause/Stop) =====
-local ctlSec = section(math.floor(96*baseScale))
-makeLabel(ctlSec, "Transport", math.floor(14*baseScale))
-local btnW = math.floor( (frame.AbsoluteSize.X - 60) / 3 )
-local playBtn = makeButton(ctlSec, "Play", 12, btnW, function()
-    if isPlaying then setStatus("Sudah Playing..."); return end
-    local sheet = box.Text:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-    if sheet == "" then setStatus("Sheet kosong!"); return end
-    isPlaying, isPaused, shouldStop = true, false, false
-    setStatus("Starting...")
-    task.spawn(function()
-        playFromSheet(sheet, setStatus)
-        isPlaying, isPaused = false, false
-    end)
-end)
-local pauseBtn = makeButton(ctlSec, "Pause/Resume", 12 + btnW + 8, btnW, function()
-    if not isPlaying then setStatus("Belum Playing"); return end
-    isPaused = not isPaused
-    setStatus(isPaused and "Paused" or "Resumed")
-end)
-local stopBtn = makeButton(ctlSec, "Stop", 12 + (btnW+8)*2, btnW, function()
-    if not isPlaying then setStatus("Idle"); return end
-    shouldStop, isPaused = true, false
-    setStatus("Stopping...")
-end)
-
--- ===== Sliders =====
-local bpmRow = makeSliderRow("BPM", 40, 200, BPM, function(v) BPM = math.floor(v + 0.5) end,
-    function(v) return ("%d"):format(v) end)
-
-local tpbRow = makeSliderRow("Tokens per Beat", 1, 4, TOKENS_PER_BEAT, function(v)
-    TOKENS_PER_BEAT = math.max(1, math.floor(v + 0.25))
-    tpbRow.Set(TOKENS_PER_BEAT)
-end, function(v) return ("%0.1f"):format(v) end)
-
-local hrRow  = makeSliderRow("Hold Ratio", 0.30, 0.90, HOLD_RATIO, function(v)
-    HOLD_RATIO = math.clamp(v, 0.30, 0.90)
-end, function(v) return ("%d%%"):format(math.floor(v*100+0.5)) end)
-
-local sdRow  = makeSliderRow("Start Delay (s)", 0, 8, START_DELAY, function(v)
-    START_DELAY = math.max(0, v)
-end, function(v) return ("%0.1f s"):format(v) end)
-
-local msRow  = makeSliderRow("Micro Stagger", 0.0, 0.03, MICRO_STAGGER, function(v)
-    MICRO_STAGGER = math.clamp(v, 0, 0.03)
-end, function(v) return ("%d ms"):format(math.floor(v*1000+0.5)) end)
-
--- ===== Minimize / Expand =====
-local minimized = false
-mini.MouseButton1Click:Connect(function()
-    minimized = not minimized
-    if minimized then
-        body.Visible = false
-        frame.Size = UDim2.fromOffset(frame.Size.X.Offset, math.floor(42*baseScale)+4)
-        mini.Text = "+"
-    else
-        body.Visible = true
-        frame.Size = UDim2.fromOffset(math.floor(420*baseScale), math.floor(520*baseScale))
-        mini.Text = "-"
-    end
-end)
-
--- ===== Helpful hint (optional) =====
-local hint = section(math.floor(56*baseScale))
-makeLabel(hint, "Tips: klik area piano (chat off). Sesuaikan BPM, Tokens/Beat, Hold Ratio, dst.", math.floor(12*baseScale))
