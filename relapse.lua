@@ -637,31 +637,43 @@ makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
     if calibrating then setStatus("Sedang kalibrasi..."); return end
     local sheet = box.Text:gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", "")
     if sheet == "" then setStatus("Isi sheet dulu untuk kalibrasi"); return end
+
+    -- *** AUTO MINIMIZE ***
+    local prevPos = frame.Position
+    local prevMin = minimized
+    setMinimized(true)             -- kecilkan supaya tidak nutup tuts
+    frame.Position = UDim2.new(0, 12, 0, 12) -- geser ke pojok biar aman
+
     calibrating = true
     setStatus("Kalibrasi mulai…")
     touchMap = {}
 
-    -- daftar char yang dipakai di sheet
     local chars = uniqueCharsFromSheet(sheet)
-    if #chars == 0 then setStatus("Tidak ada token"); calibrating=false; return end
+    if #chars == 0 then
+        setStatus("Tidak ada token")
+        calibrating = false
+        -- *** RESTORE UI ***
+        frame.Position = prevPos
+        setMinimized(prevMin)
+        return
+    end
 
-    -- overlay full-screen utk menangkap tap
     local overlay = Instance.new("TextButton")
     overlay.BackgroundTransparency = 1
     overlay.Text = ""
     overlay.Size = UDim2.fromScale(1,1)
-    overlay.ZIndex = 10
+    overlay.ZIndex = 1000        -- pastikan di atas semua
     overlay.Parent = gui
 
     local idx = 1
     local prompt = Instance.new("TextLabel")
-    prompt.Size = UDim2.fromOffset(320, 36)
+    prompt.Size = UDim2.fromOffset(360, 36)
     prompt.Position = UDim2.new(0, 16, 0, 60)
     prompt.BackgroundColor3 = Color3.fromRGB(50,50,50)
     prompt.TextColor3 = Color3.fromRGB(255,255,255)
     prompt.Font = Enum.Font.GothamBold
     prompt.TextSize = 16
-    prompt.ZIndex = 11
+    prompt.ZIndex = 1001
     prompt.Parent = gui
     Instance.new("UICorner", prompt).CornerRadius = UDim.new(0,8)
 
@@ -670,6 +682,16 @@ makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
     end
     setPrompt()
 
+    local function finishCalib()
+        if overlay then overlay:Destroy() end
+        if prompt  then prompt:Destroy()  end
+        calibrating = false
+        setStatus("Kalibrasi selesai ✓")
+        -- *** RESTORE UI ***
+        frame.Position = prevPos
+        setMinimized(prevMin)
+    end
+
     overlay.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
             local pos = getMouseXY()
@@ -677,10 +699,7 @@ makeButton(wrapCal, "Calibrate (Touch)", UDim2.new(1, 0, 1, 0), function()
             touchMap[ch] = pos
             idx += 1
             if idx > #chars then
-                overlay:Destroy()
-                prompt:Destroy()
-                calibrating = false
-                setStatus("Kalibrasi selesai ✓")
+                finishCalib()
             else
                 setPrompt()
             end
