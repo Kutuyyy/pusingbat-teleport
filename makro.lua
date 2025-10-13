@@ -2723,19 +2723,52 @@ local rebuildTourCounter
     local doRespawn
     local respawnDelayAfterLast = 4 -- sudah ada di atas? kalau ada, pakai yang globalmu
 
-    -- Row: Interval (text) + Toggle Use Interval
+    -- Row: Min / Max Interval + Toggle Use Interval
     local intervalRow = createRow(atContent, 36)
-    intervalRow:SetAttribute("label","Auto Tour interval")
-    intervalBox = Instance.new("TextBox")
-    intervalBox.Size = UDim2.new(0.4, -20, 0, 24)
-    intervalBox.Position = UDim2.new(0,10,0.5,-12)
-    intervalBox.Text = "3"
-    intervalBox.PlaceholderText = "Interval detik"
-    intervalBox.TextColor3 = Color3.new(1,1,1)
-    intervalBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
-    intervalBox.BorderSizePixel = 0
-    intervalBox.Parent = intervalRow
-    Instance.new("UICorner", intervalBox).CornerRadius = UDim.new(0,6)
+    intervalRow:SetAttribute("label", "Auto Tour interval")
+
+    local minIntervalBox = Instance.new("TextBox")
+    minIntervalBox.Size = UDim2.new(0.18, -10, 0, 24)
+    minIntervalBox.Position = UDim2.new(0, 10, 0.5, -12)
+    minIntervalBox.Text = "2"
+    minIntervalBox.PlaceholderText = "Min"
+    minIntervalBox.TextColor3 = Color3.new(1,1,1)
+    minIntervalBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
+    minIntervalBox.BorderSizePixel = 0
+    minIntervalBox.Parent = intervalRow
+    Instance.new("UICorner", minIntervalBox).CornerRadius = UDim.new(0,6)
+
+    local toLabel = Instance.new("TextLabel")
+    toLabel.Size = UDim2.new(0.1, 0, 0, 24)
+    toLabel.Position = UDim2.new(0.18, 0, 0.5, -12)
+    toLabel.BackgroundTransparency = 1
+    toLabel.Text = "to"
+    toLabel.TextColor3 = Color3.fromRGB(220,220,220)
+    toLabel.Font = Enum.Font.Gotham
+    toLabel.TextSize = 14
+    toLabel.Parent = intervalRow
+
+    local maxIntervalBox = Instance.new("TextBox")
+    maxIntervalBox.Size = UDim2.new(0.18, -10, 0, 24)
+    maxIntervalBox.Position = UDim2.new(0.28, 10, 0.5, -12)
+    maxIntervalBox.Text = "5"
+    maxIntervalBox.PlaceholderText = "Max"
+    maxIntervalBox.TextColor3 = Color3.new(1,1,1)
+    maxIntervalBox.BackgroundColor3 = Color3.fromRGB(55,55,60)
+    maxIntervalBox.BorderSizePixel = 0
+    maxIntervalBox.Parent = intervalRow
+    Instance.new("UICorner", maxIntervalBox).CornerRadius = UDim.new(0,6)
+
+    -- Store references globally in this scope
+    intervalBox = nil  -- no longer used
+    local getMinInterval = function()
+        local n = tonumber((minIntervalBox.Text:gsub("[^%d%.]", ""))) or 2
+        return math.max(0.1, n)
+    end
+    local getMaxInterval = function()
+        local n = tonumber((maxIntervalBox.Text:gsub("[^%d%.]", ""))) or 5
+        return math.max(getMinInterval(), n)
+    end
 
     local useIntSw = makeSwitch(atContent, "Use Interval", true, function(v)
         useInterval = v
@@ -2858,11 +2891,13 @@ local rebuildTourCounter
 
                         if not played then
                             if useInterval then
-                                local raw = (intervalBox and intervalBox.Text) or ""
-                                local n = tonumber((raw:gsub("[^%d%.]",""))) or 3
-                                if n < 0.1 then n = 0.1 end
+                                local minT = getMinInterval()
+                                local maxT = getMaxInterval()
+                                local delay = math.random() * (maxT - minT) + minT
                                 local t0 = tick()
-                                while tourRunning and (tick() - t0) < n do task.wait(0.05) end
+                                while tourRunning and (tick() - t0) < delay do
+                                    task.wait(0.05)
+                                end
                             else
                                 task.wait(0.05)
                             end
