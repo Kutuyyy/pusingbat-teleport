@@ -448,7 +448,7 @@ local function startFly()
             end
         end
     end
-    setVisibility(true)
+    setVisibility(false)
     rootPart.Anchored = true
     humanoid.PlatformStand = true
     for _, part in ipairs(char:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = false end end
