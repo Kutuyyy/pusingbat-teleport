@@ -1675,7 +1675,11 @@ local function createMainUI()
 
     if WindUI and mainTab then
         -- MAIN TAB
-        mainTab:Paragraph({ Title = "Papi Dimz HUB", Desc = "Godmode, AntiAFK, Auto Sacrifice Lava, Auto Farm, Aura, Webhook DayDisplay.\nHotkey PC: P untuk toggle UI.", Color = "Grey" })
+        mainTab:Paragraph({ 
+            Title = "Papi Dimz HUB", 
+            Desc = "Godmode, AntiAFK, Auto Sacrifice Lava, Auto Farm, Aura, Webhook DayDisplay.\nHotkey PC: P untuk toggle UI.", 
+            Color = "Grey" 
+        })
         mainTab:Toggle({ Title = "GodMode (Damage -∞)", Icon = "shield", Default = false, Callback = function(state) GodmodeEnabled = state end })
         mainTab:Toggle({ Title = "Anti AFK", Icon = "mouse-pointer-2", Default = true, Callback = function(state) AntiAFKEnabled = state end })
         mainTab:Button({ Title = "Tutup UI & Matikan Script", Icon = "power", Variant = "Destructive", Callback = resetAll })
@@ -1965,7 +1969,7 @@ local function createMainUI()
             notifyUI("Fishing Clean", "Fishing features dibersihkan.", 3)
         end })
 
-                -- FARM TAB (original)
+        -- FARM TAB (original)
         farmTab:Toggle({ Title = "Auto Crockpot (Carrot + Corn)", Icon = "flame", Default = false, Callback = function(state)
             if scriptDisabled then return end
             if state then
@@ -2048,7 +2052,7 @@ local function createMainUI()
             end
         end)
     end
-end
+
 
 -- INITIAL NON-BLOCKING RESOURCE WATCHERS
 backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
