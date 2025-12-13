@@ -45,16 +45,35 @@ end
 ---------------------------------------------------------
 -- LOAD WINDUI
 ---------------------------------------------------------
-local WindUI
-local ok, result = pcall(function()
-    return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-end)
-
-if ok and type(result) == "table" and result.CreateWindow then
-    WindUI = result
-else
-    warn("[PapiDimz] WindUI gagal dimuat. Value:", result)
-    return print("[PapiDimz] UI tidak bisa tampil karena WindUI nil.")
+---------------------------------------------------------
+-- LOAD WINDUI WITH RETRY & DEBUG
+---------------------------------------------------------
+local WindUI = nil
+local maxRetries = 5
+local retryDelay = 2
+for i = 1, maxRetries do
+    local ok, res = pcall(function()
+        local url = "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+        local code = game:HttpGet(url)
+        print("[DEBUG] HttpGet sukses, panjang kode: " .. #code)  -- Debug length
+        return loadstring(code)()
+    end)
+    if ok and res then
+        WindUI = res
+        print("[WindUI] Loaded sukses di attempt " .. i)
+        pcall(function()
+            WindUI:SetTheme("Dark")
+            WindUI.TransparencyValue = 0.2
+        end)
+        break
+    else
+        warn("[WindUI] Gagal attempt " .. i .. "/" .. maxRetries .. " - Retry dalam " .. retryDelay .. "s...")
+        task.wait(retryDelay)
+    end
+end
+if not WindUI then
+    warn("[ERROR] Gagal load WindUI setelah " .. maxRetries .. " attempt. UI tidak akan muncul.")
+    return  -- Stop script kalau gagal
 end
 ---------------------------------------------------------
 -- STATE & CONFIG
