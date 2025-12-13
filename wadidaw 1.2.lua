@@ -1,35 +1,191 @@
---============================================================--
--- Papi Dimz | HUB (All-in-One, 2025 Final Full Merge Version)
--- Semua fitur: Local Player, Fishing, Farm, BringItem, Teleport,
--- Scrapper, Cook, Lava Sacrifice, Kill/Chop Aura, Webhook DayDisplay,
--- Mini HUD, SplashScreen "Papi Dimz :v", Anti AFK, Godmode,
--- WindUI Full Integration (Information Tab at TOP)
---============================================================--
-
+-- Papi Dimz |HUB (All-in-One: Local Player + XENO GLASS Fishing + Bring Item + Teleport + Original Features)
+-- Versi: Fully Integrated UI + Information Tab + Bring & Teleport
+-- WARNING: Use at your own risk.
 ---------------------------------------------------------
 -- SERVICES
 ---------------------------------------------------------
-local Players                = game:GetService("Players")
-local ReplicatedStorage      = game:GetService("ReplicatedStorage")
-local Workspace              = game:GetService("Workspace")
-local RunService             = game:GetService("RunService")
-local UserInputService       = game:GetService("UserInputService")
-local VirtualUser            = game:GetService("VirtualUser")
-local HttpService            = game:GetService("HttpService")
-local Lighting               = game:GetService("Lighting")
-local VirtualInputManager    = game:GetService("VirtualInputManager")
-
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualUser = game:GetService("VirtualUser")
+local HttpService = game:GetService("HttpService")
+local Lighting = game:GetService("Lighting")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
-local Camera      = Workspace.CurrentCamera
-
+local Camera = Workspace.CurrentCamera
 ---------------------------------------------------------
--- UTILS
+-- UTIL: NON-BLOCKING FIND HELPERS
 ---------------------------------------------------------
+local function findWithTimeout(parent, name, timeout, pollInterval)
+    timeout = timeout or 6
+    pollInterval = pollInterval or 0.25
+    local t0 = tick()
+    while tick() - t0 < timeout do
+        local v = parent:FindFirstChild(name)
+        if v then return v end
+        task.wait(pollInterval)
+    end
+    return nil
+end
+local function backgroundFind(parent, name, callback, pollInterval)
+    pollInterval = pollInterval or 0.5
+    task.spawn(function()
+        while true do
+            local v = parent:FindFirstChild(name)
+            if v then
+                pcall(callback, v)
+                break
+            end
+            task.wait(pollInterval)
+        end
+    end)
+end
+---------------------------------------------------------
+-- LOAD WINDUI
+---------------------------------------------------------
+local WindUI = nil
+local function createFallbackNotify(msg)
+    print("[PapiDimz][FALLBACK NOTIFY] " .. tostring(msg))
+end
+do
+    local ok, res = pcall(function()
+        return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+    end)
+    if ok and res then
+        WindUI = res
+        pcall(function()
+            WindUI:SetTheme("Dark")
+            WindUI.TransparencyValue = 0.2
+        end)
+    else
+        warn("[UI] Gagal load WindUI. Menggunakan fallback minimal.")
+        WindUI = nil
+    end
+end
+---------------------------------------------------------
+-- STATE & CONFIG
+---------------------------------------------------------
+local scriptDisabled = false
+-- Remotes / folders
+local RemoteEvents = ReplicatedStorage:FindFirstChild("RemoteEvents")
+local RequestStartDragging, RequestStopDragging, CollectCoinRemote, ConsumeItemRemote, NightSkipRemote, ToolDamageRemote, EquipHandleRemote
+local ItemsFolder = Workspace:FindFirstChild("Items")
+local Structures = Workspace:FindFirstChild("Structures")
+-- Original features state
+local CookingStations = {}
+local ScrapperTarget = nil
+local MoveMode = "DragPivot"
+local AutoCookEnabled = false
+local CookLoopId = 0
+local CookDelaySeconds = 10
+local CookItemsPerCycle = 5
+local SelectedCookItems = { "Carrot", "Corn" }
+local ScrapEnabled = false
+local ScrapLoopId = 0
+local ScrapScanInterval = 60
+local ScrapItemsPriority = {"Bolt","Sheet Metal","UFO Junk","UFO Component","Broken Fan","Old Radio","Broken Microwave","Tyre","Old Car Engine","Cultist Gem"}
+local LavaCFrame = nil
+local lavaFound = false
+local AutoSacEnabled = false
+local SacrificeList = {"Morsel","Cooked Morsel","Steak","Cooked Steak","Lava Eel","Cooked Lava Eel","Lionfish","Cooked Lionfish","Cultist","Crossbow Cultist","Rifle Ammo","Revolver Ammo","Bunny Foot","Alpha Wolf Pelt","Wolf Pelt"}
+local GodmodeEnabled = false
+local AntiAFKEnabled = true
+local CoinAmmoEnabled = false
+local coinAmmoDescAddedConn = nil
+local CoinAmmoConnection = nil
+local TemporalAccelerometer = Structures and Structures:FindFirstChild("Temporal Accelerometer")
+local autoTemporalEnabled = false
+local lastProcessedDay = nil
+local DayDisplayRemote = nil
+local DayDisplayConnection = nil
+local WebhookURL = "https://discord.com/api/webhooks/1445120874033447068/aHmIofSu6jf7JctLjpRmbGYvwWX0MFtJw4Fnhqd6Hxyo4QQB7a_8UASNZsbpKMH4Jrvz"
+local WebhookEnabled = true
+local WebhookUsername = (LocalPlayer and LocalPlayer.Name) or "Player"
+local currentDayCached = "N/A"
+local previousDayCached = "N/A"
+local KillAuraEnabled = false
+local ChopAuraEnabled = false
+local KillAuraRadius = 100
+local ChopAuraRadius = 100
+local AuraAttackDelay = 0.16
+local AxeIDs = {["Old Axe"] = "3_7367831688",["Good Axe"] = "112_7367831688",["Strong Axe"] = "116_7367831688",Chainsaw = "647_8992824875",Spear = "196_8999010016"}
+local TreeCache = {}
+-- Local Player state
+local defaultFOV = Camera.FieldOfView
+local fovEnabled = false
+local fovValue = 60
+local walkEnabled = false
+local walkSpeedValue = 30
+local defaultWalkSpeed = 16
+local flyEnabled = false
+local flySpeedValue = 50
+local flyConn = nil
+local originalTransparency = {}
+local idleTrack = nil
+local tpWalkEnabled = false
+local tpWalkSpeedValue = 5
+local tpWalkConn = nil
+local noclipManualEnabled = false
+local noclipConn = nil
+local infiniteJumpEnabled = false
+local infiniteJumpConn = nil
+local fullBrightEnabled = false
+local fullBrightConn = nil
+local oldLightingProps = {Brightness = Lighting.Brightness,ClockTime = Lighting.ClockTime,FogEnd = Lighting.FogEnd,GlobalShadows = Lighting.GlobalShadows,Ambient = Lighting.Ambient,OutdoorAmbient = Lighting.OutdoorAmbient}
+local hipEnabled = false
+local hipValue = 35
+local defaultHipHeight = 2
+local instantOpenEnabled = false
+local promptOriginalHold = {}
+local promptConn = nil
+local humanoid = nil
+local rootPart = nil
+-- Fishing state
+local fishingClickDelay = 5.0
+local fishingAutoClickEnabled = false
+local waitingForPosition = false
+local fishingSavedPosition = nil
+local fishingOverlayVisible = false
+local fishingOffsetX, fishingOffsetY = 0, 0
+local zoneEnabled = false
+local zoneDestroyed = false
+local zoneLastVisible = false
+local zoneSpamClicking = false
+local zoneSpamThread = nil
+local zoneSpamInterval = 0.04
+local autoRecastEnabled = false
+local lastTimingBarSeenAt = 0
+local wasTimingBarVisible = false
+local lastRecastAt = 0
+local RECAST_DELAY = 2
+local MAX_RECENT_SECS = 5
+local fishingLoopThread = nil
+-- Bring Item state (from Ambil.lua)
+local BringHeight = 20
+local selectedLocation = "Player"
+-- UI & HUD
+local Window
+local infoTab, mainTab, localTab, bringTab, teleportTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
+local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFpsLabel, miniFeaturesLabel
+local scriptStartTime = os.clock()
+local currentFPS = 0
+local auraHeartbeatConnection = nil
+-- Keybind untuk toggle UI
+local toggleKeybind = Enum.KeyCode.P
+---------------------------------------------------------
+-- GENERIC HELPERS
+---------------------------------------------------------
+local function tableToSet(list)
+    local t = {}
+    for _, v in ipairs(list) do t[v] = true end
+    return t
+end
 local function trim(s)
     if type(s) ~= "string" then return s end
     return s:match("^%s*(.-)%s*$")
 end
-
 local function getGuiParent()
     local parent
     pcall(function()
@@ -40,288 +196,209 @@ local function getGuiParent()
     end
     return parent
 end
-
-local function notifyFallback(msg)
-    print("[PapiDimz][Notify] " .. tostring(msg))
-end
-
----------------------------------------------------------
--- LOAD WINDUI
----------------------------------------------------------
-local WindUI = nil
-do
-    local ok, res = pcall(function()
-        return loadstring(game:HttpGet(
-            "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
-        ))()
-    end)
-    if ok and res then
-        WindUI = res
-        pcall(function()
-            WindUI:SetTheme("Dark")
-            WindUI.TransparencyValue = 0.20
-        end)
-    else
-        warn("[WindUI] Gagal memuat WindUI. Menggunakan fallback.")
-        WindUI = nil
-    end
-end
-
-local function notifyUI(title, content, duration, icon)
-    if WindUI then
-        pcall(function()
-            WindUI:Notify({
-                Title    = title or "Info",
-                Content  = content or "",
-                Duration = duration or 4,
-                Icon     = icon or "info"
-            })
-        end)
-    else
-        notifyFallback(title .. " | " .. content)
-    end
-end
-
----------------------------------------------------------
--- GLOBAL STATE (dipertahankan dari script lama)
----------------------------------------------------------
-local scriptDisabled = false
-
--- Fitur umum
-local GodmodeEnabled      = false
-local AntiAFKEnabled      = true
-local fullBrightEnabled   = false
-local instantOpenEnabled  = false
-
--- Walking / Movement
-local walkEnabled         = false
-local walkSpeedValue      = 30
-local defaultWalkSpeed    = 16
-
-local hipEnabled          = false
-local hipValue            = 35
-local defaultHipHeight    = 2
-
-local fovEnabled          = false
-local fovValue            = 60
-local defaultFOV          = Camera.FieldOfView
-
-local flyEnabled          = false
-local flyConn             = nil
-local flySpeedValue       = 50
-local originalTransparency = {}
-
-local tpWalkEnabled       = false
-local tpWalkSpeedValue    = 5
-local tpWalkConn
-
-local noclipManualEnabled = false
-local noclipConn          = nil
-
-local infiniteJumpEnabled = false
-local infiniteJumpConn    = nil
-
-local oldLightingProps = {
-    Brightness     = Lighting.Brightness,
-    ClockTime      = Lighting.ClockTime,
-    FogEnd         = Lighting.FogEnd,
-    GlobalShadows  = Lighting.GlobalShadows,
-    Ambient        = Lighting.Ambient,
-    OutdoorAmbient = Lighting.OutdoorAmbient,
-}
-
-local humanoid = nil
-local rootPart = nil
-
----------------------------------------------------------
--- ORIGINAL FEATURE STATES
----------------------------------------------------------
-local RemoteEvents          = ReplicatedStorage:FindFirstChild("RemoteEvents")
-local RequestStartDragging  = nil
-local RequestStopDragging   = nil
-local CollectCoinRemote     = nil
-local ConsumeItemRemote     = nil
-local NightSkipRemote       = nil
-local ToolDamageRemote      = nil
-local EquipHandleRemote     = nil
-
-local ItemsFolder           = Workspace:FindFirstChild("Items")
-local Structures            = Workspace:FindFirstChild("Structures")
-
--- Fitur Farm
-local CookingStations       = {}
-local SelectedCookItems     = { "Carrot", "Corn" }
-local AutoCookEnabled       = false
-local CookLoopId            = 0
-local CookDelaySeconds      = 10
-local CookItemsPerCycle     = 5
-
-local ScrapEnabled          = false
-local ScrapLoopId           = 0
-local ScrapScanInterval     = 60
-local ScrapItemsPriority    = {
-    "Bolt","Sheet Metal","UFO Junk","UFO Component","Broken Fan",
-    "Old Radio","Broken Microwave","Tyre","Old Car Engine",
-    "Cultist Gem"
-}
-
-local LavaCFrame            = nil
-local lavaFound             = false
-local AutoSacEnabled        = false
-local SacrificeList         = {
-    "Morsel","Cooked Morsel","Steak","Cooked Steak","Lava Eel",
-    "Cooked Lava Eel","Lionfish","Cooked Lionfish","Cultist",
-    "Crossbow Cultist","Rifle Ammo","Revolver Ammo","Bunny Foot",
-    "Alpha Wolf Pelt","Wolf Pelt"
-}
-
--- Coin & Ammo
-local CoinAmmoEnabled       = false
-local coinAmmoDescAddedConn = nil
-
--- Aura
-local KillAuraEnabled       = false
-local ChopAuraEnabled       = false
-local KillAuraRadius        = 100
-local ChopAuraRadius        = 100
-local AuraAttackDelay       = 0.16
-local TreeCache             = {}
-
-local AxeIDs = {
-    ["Old Axe"]    = "3_7367831688",
-    ["Good Axe"]   = "112_7367831688",
-    ["Strong Axe"] = "116_7367831688",
-    Chainsaw       = "647_8992824875",
-    Spear          = "196_8999010016"
-}
-
--- Temporal / Night
-local TemporalAccelerometer = Structures and Structures:FindFirstChild("Temporal Accelerometer")
-local autoTemporalEnabled   = false
-local lastProcessedDay      = nil
-
--- Webhook system
-local WebhookURL      = "https://discord.com/api/webhooks/xxxxxxxxxxxxxxxx"
-local WebhookEnabled  = true
-local WebhookUsername = LocalPlayer.Name
-local currentDayCached   = "N/A"
-local previousDayCached  = "N/A"
-
-local DayDisplayRemote     = nil
-local DayDisplayConnection = nil
-
--- Fishing system (Xeno Glass)
-local fishingSavedPosition    = nil
-local fishingAutoClickEnabled = false
-local fishingClickDelay       = 5.0
-local waitingForPosition      = false
-
-local zoneEnabled             = false
-local zoneDestroyed           = false
-local autoRecastEnabled       = false
-local wasTimingBarVisible     = false
-local lastTimingBarSeenAt     = 0
-local lastRecastAt            = 0
-local RECAST_DELAY            = 2
-local MAX_RECENT_SECS         = 5
-local fishingOverlayVisible   = false
-local fishingOffsetX          = 0
-local fishingOffsetY          = 0
-
-local fishingLoopThread       = nil
-local zoneSpamThread          = nil
-local zoneSpamClicking        = false
-local zoneSpamInterval        = 0.04
-local zoneLastVisible         = false
-
----------------------------------------------------------
--- MINI HUD
----------------------------------------------------------
-local miniHudGui     = nil
-local miniHudFrame   = nil
-local miniUptimeLabel = nil
-local miniLavaLabel   = nil
-local miniPingFpsLabel = nil
-local miniFeaturesLabel = nil
-
-local scriptStartTime = os.clock()
-local currentFPS      = 0
-
----------------------------------------------------------
--- HELPERS FOR TREE CACHE, TABLE SET, ETC
----------------------------------------------------------
-local function tableToSet(list)
-    local t = {}
-    for _, v in ipairs(list) do t[v] = true end
-    return t
-end
-
 local function getInstancePath(inst)
     if not inst then return "nil" end
     local parts = { inst.Name }
-    local p = inst.Parent
-    while p and p ~= game do
-        table.insert(parts, 1, p.Name)
-        p = p.Parent
+    local parent = inst.Parent
+    while parent and parent ~= game do
+        table.insert(parts, 1, parent.Name)
+        parent = parent.Parent
     end
     return table.concat(parts, ".")
 end
-
+local function notifyUI(title, content, duration, icon)
+    if WindUI then
+        pcall(function()
+            WindUI:Notify({ Title = title or "Info", Content = content or "", Duration = duration or 4, Icon = icon or "info" })
+        end)
+    else
+        createFallbackNotify(string.format("%s - %s", tostring(title), tostring(content)))
+    end
+end
 ---------------------------------------------------------
--- END OF PART 1
+-- MINI HUD & SPLASH
 ---------------------------------------------------------
-print("[PapiDimz] PART 1 Loaded.")
+local function formatTime(seconds)
+    seconds = math.floor(seconds)
+    local h = math.floor(seconds / 3600)
+    local m = math.floor((seconds % 3600) / 60)
+    local s = seconds % 60
+    return string.format("%02d:%02d:%02d", h, m, s)
+end
+local function getFeatureCodes()
+    local t = {}
+    if GodmodeEnabled then table.insert(t, "G") end
+    if AntiAFKEnabled then table.insert(t, "AFK") end
+    if AutoCookEnabled then table.insert(t, "CK") end
+    if ScrapEnabled then table.insert(t, "SC") end
+    if AutoSacEnabled then table.insert(t, "LV") end
+    if CoinAmmoEnabled then table.insert(t, "CA") end
+    if autoTemporalEnabled then table.insert(t, "NT") end
+    if KillAuraEnabled then table.insert(t, "KA") end
+    if ChopAuraEnabled then table.insert(t, "CH") end
+    if flyEnabled then table.insert(t, "FLY") end
+    if fishingAutoClickEnabled then table.insert(t, "FS") end
+    if zoneEnabled then table.insert(t, "ZH") end
+    return (#t > 0) and table.concat(t, " | ") or "None"
+end
+local function splashScreen()
+    local parent = getGuiParent()
+    if not parent then return end
+    local ok, gui = pcall(function()
+        local g = Instance.new("ScreenGui")
+        g.Name = "PapiDimz_Splash"
+        g.IgnoreGuiInset = true
+        g.ResetOnSpawn = false
+        g.Parent = parent
+        local bg = Instance.new("Frame")
+        bg.Size = UDim2.new(1, 0, 1, 0)
+        bg.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+        bg.BackgroundTransparency = 1
+        bg.BorderSizePixel = 0
+        bg.Parent = g
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 42
+        label.TextColor3 = Color3.fromRGB(230, 230, 230)
+        label.Text = ""
+        label.TextXAlignment = Enum.TextXAlignment.Center
+        label.TextYAlignment = Enum.TextYAlignment.Center
+        label.TextStrokeTransparency = 0.75
+        label.TextStrokeColor3 = Color3.fromRGB(10, 10, 10)
+        label.Parent = bg
+        task.spawn(function()
+            local durBg = 0.35
+            local t = 0
+            while t < durBg do
+                t += RunService.Heartbeat:Wait()
+                local alpha = math.clamp(t / durBg, 0, 1)
+                bg.BackgroundTransparency = 1 - (alpha * 0.9)
+            end
+            bg.BackgroundTransparency = 0.1
+        end)
+        local text = "Papi Dimz :v"
+        local speed = 0.05
+        for i = 1, #text do
+            label.Text = string.sub(text, 1, i)
+            task.wait(speed)
+        end
+        local remain = 2 - (#text * speed)
+        if remain > 0 then task.wait(remain) end
+        local durOut = 0.3
+        task.spawn(function()
+            local t = 0
+            while t < durOut do
+                t += RunService.Heartbeat:Wait()
+                local alpha = math.clamp(t / durOut, 0, 1)
+                bg.BackgroundTransparency = 0.1 + alpha
+                label.TextTransparency = alpha
+            end
+            g:Destroy()
+        end)
+        return g
+    end)
+end
+local function createMiniHud()
+    if miniHudGui then return end
+    local parent = getGuiParent()
+    if not parent then return end
+    miniHudGui = Instance.new("ScreenGui")
+    miniHudGui.Name = "PapiDimz_MiniHUD"
+    miniHudGui.ResetOnSpawn = false
+    miniHudGui.Parent = parent
+    miniHudFrame = Instance.new("Frame")
+    miniHudFrame.Size = UDim2.fromOffset(220, 90)
+    miniHudFrame.Position = UDim2.new(0, 20, 0, 100)
+    miniHudFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    miniHudFrame.BackgroundTransparency = 0.3
+    miniHudFrame.BorderSizePixel = 0
+    miniHudFrame.Active = true
+    miniHudFrame.Draggable = true
+    miniHudFrame.Parent = miniHudGui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = miniHudFrame
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1
+    stroke.Transparency = 0.6
+    stroke.Parent = miniHudFrame
+    local function makeLabel(yOffset)
+        local lbl = Instance.new("TextLabel")
+        lbl.BackgroundTransparency = 1
+        lbl.Size = UDim2.new(1, -10, 0, 18)
+        lbl.Position = UDim2.new(0, 5, 0, yOffset)
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 12
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+        lbl.Text = ""
+        lbl.Parent = miniHudFrame
+        return lbl
+    end
+    miniUptimeLabel = makeLabel(4)
+    miniLavaLabel = makeLabel(24)
+    miniPingFpsLabel = makeLabel(44)
+    miniFeaturesLabel = makeLabel(64)
+end
+local function startMiniHudLoop()
+    scriptStartTime = os.clock()
+    task.spawn(function()
+        local last = tick()
+        while not scriptDisabled do
+            local now = tick()
+            local dt = now - last
+            last = now
+            if dt > 0 then currentFPS = math.floor(1 / dt + 0.5) end
+            RunService.Heartbeat:Wait()
+        end
+    end)
+    task.spawn(function()
+        while not scriptDisabled do
+            local uptimeStr = formatTime(os.clock() - scriptStartTime)
+            local pingMs = math.floor((LocalPlayer:GetNetworkPing() or 0) * 1000 + 0.5)
+            local lavaStr = lavaFound and "Ready" or "Scan"
+            local featStr = getFeatureCodes()
+            if miniUptimeLabel then miniUptimeLabel.Text = "UP : " .. uptimeStr end
+            if miniLavaLabel then miniLavaLabel.Text = "LV : " .. lavaStr end
+            if miniPingFpsLabel then miniPingFpsLabel.Text = string.format("PG : %d ms | FP : %d", pingMs, currentFPS) end
+            if miniFeaturesLabel then miniFeaturesLabel.Text = "FT : " .. featStr end
+            task.wait(1)
+        end
+    end)
+end
 ---------------------------------------------------------
--- CHARACTER HELPERS
+-- LOCAL PLAYER FUNCTIONS
 ---------------------------------------------------------
 local function getCharacter()
     return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 end
-
 local function getHumanoid()
     local char = getCharacter()
     return char and char:FindFirstChild("Humanoid")
 end
-
 local function getRoot()
     local char = getCharacter()
     return char and char:FindFirstChild("HumanoidRootPart")
 end
-
-local function zeroVelocity(part)
-    if not part then return end
-    pcall(function()
-        part.AssemblyLinearVelocity  = Vector3.new(0,0,0)
-        part.AssemblyAngularVelocity = Vector3.new(0,0,0)
-    end)
+local function zeroVelocities(part)
+    if part and part:IsA("BasePart") then
+        pcall(function()
+            part.AssemblyLinearVelocity = Vector3.new(0,0,0)
+            part.AssemblyAngularVelocity = Vector3.new(0,0,0)
+        end)
+    end
 end
-
----------------------------------------------------------
--- APPLY FOV / Walk / Hip
----------------------------------------------------------
 local function applyFOV()
     if fovEnabled then Camera.FieldOfView = fovValue else Camera.FieldOfView = defaultFOV end
 end
-
 local function applyWalkspeed()
-    if humanoid and walkEnabled then
-        humanoid.WalkSpeed = math.clamp(walkSpeedValue, 16, 200)
-    elseif humanoid then
-        humanoid.WalkSpeed = defaultWalkSpeed
-    end
+    if humanoid and walkEnabled then humanoid.WalkSpeed = math.clamp(walkSpeedValue, 16, 200) else if humanoid then humanoid.WalkSpeed = defaultWalkSpeed end end
 end
-
 local function applyHipHeight()
-    if humanoid and hipEnabled then
-        humanoid.HipHeight = hipValue
-    elseif humanoid then
-        humanoid.HipHeight = defaultHipHeight
-    end
+    if humanoid and hipEnabled then humanoid.HipHeight = hipValue else if humanoid then humanoid.HipHeight = defaultHipHeight end end
 end
-
----------------------------------------------------------
--- NOCLIP MANAGEMENT
----------------------------------------------------------
 local function updateNoclipConnection()
     local should = (noclipManualEnabled or flyEnabled)
     if should and not noclipConn then
@@ -338,57 +415,36 @@ local function updateNoclipConnection()
         noclipConn = nil
     end
 end
-
----------------------------------------------------------
--- STEALTH FLY (VERSI KAMU — TIDAK DIUBAH)
----------------------------------------------------------
-local idleTrack = nil
-
-local function playIdleAnimation()
-    if idleTrack then idleTrack:Stop() end
-    if not humanoid then return end
-
-    local anim = Instance.new("Animation")
-    anim.AnimationId = "rbxassetid://180435571"
-
-    idleTrack = humanoid:LoadAnimation(anim)
-    idleTrack.Priority = Enum.AnimationPriority.Core
-    idleTrack.Looped = true
-    idleTrack:Play()
-end
-
-local function setVisibility(invisible)
+local function setVisibility(on)
     local char = getCharacter()
     if not char then return end
-    
     for _, part in ipairs(char:GetDescendants()) do
         if part:IsA("BasePart") or (part:IsA("MeshPart") and part.Name == "Handle") then
-            if invisible then
-                if originalTransparency[part] == nil then
-                    originalTransparency[part] = part.Transparency
-                end
+            if on then
                 part.Transparency = 1
                 part.LocalTransparencyModifier = 0
             else
-                if originalTransparency[part] ~= nil then
-                    part.Transparency = originalTransparency[part]
-                end
+                part.Transparency = originalTransparency[part] or 0
                 part.LocalTransparencyModifier = 0
             end
         end
     end
 end
-
-function startFly()
+local function playIdleAnimation()
+    if idleTrack then idleTrack:Stop() end
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "rbxassetid://180435571"
+    idleTrack = humanoid:LoadAnimation(anim)
+    idleTrack.Priority = Enum.AnimationPriority.Core
+    idleTrack.Looped = true
+    idleTrack:Play()
+end
+local function startFly()
     if flyEnabled or scriptDisabled then return end
     local char = getCharacter()
-    humanoid = getHumanoid()
     rootPart = getRoot()
     if not char or not rootPart then return end
-
     flyEnabled = true
-
-    -- save original transparency first time only
     if next(originalTransparency) == nil then
         for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") or (part:IsA("MeshPart") and part.Name == "Handle") then
@@ -396,92 +452,59 @@ function startFly()
             end
         end
     end
-
-    -- invisible ON
-    setVisibility(true)
-
+    setVisibility(false)
     rootPart.Anchored = true
     humanoid.PlatformStand = true
-
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then part.CanCollide = false end
-    end
-
+    for _, part in ipairs(char:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = false end end
     playIdleAnimation()
     updateNoclipConnection()
-
     flyConn = RunService.RenderStepped:Connect(function(dt)
-        if not flyEnabled or not rootPart then return end
-
-        local move = Vector3.new()
+        if not flyEnabled or not rootPart then stopFly(); return end
+        local move = Vector3.new(0,0,0)
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then move += Camera.CFrame.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.S) then move -= Camera.CFrame.LookVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.A) then move -= Camera.CFrame.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.D) then move += Camera.CFrame.RightVector end
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then move -= Vector3.new(0,1,0) end
-
         if move.Magnitude > 0 then
-            move = move.Unit * flySpeedValue * dt
+            move = move.Unit * math.clamp(flySpeedValue, 16, 200) * dt
             rootPart.CFrame += move
         end
-
         rootPart.CFrame = CFrame.new(rootPart.Position) * Camera.CFrame.Rotation
-        zeroVelocity(rootPart)
+        zeroVelocities(rootPart)
     end)
-
     notifyUI("Fly ON", "Ultimate Stealth Fly aktif!", 3, "plane")
 end
-
-function stopFly()
+local function stopFly()
     if not flyEnabled then return end
     flyEnabled = false
-
-    if flyConn then flyConn:Disconnect() flyConn = nil end
+    if flyConn then flyConn:Disconnect(); flyConn = nil end
     local char = getCharacter()
-    humanoid = getHumanoid()
     rootPart = getRoot()
-
-    if idleTrack then idleTrack:Stop() idleTrack = nil end
-
+    if idleTrack then idleTrack:Stop(); idleTrack = nil end
     humanoid.PlatformStand = false
     setVisibility(false)
-
-    local target = rootPart.CFrame
+    local targetCFrame = rootPart.CFrame
     local bp = Instance.new("BodyPosition")
     bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bp.P = 30000
-    bp.Position = target.Position
+    bp.Position = targetCFrame.Position
     bp.Parent = rootPart
-
     local bg = Instance.new("BodyGyro")
     bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
     bg.P = 30000
-    bg.CFrame = target
+    bg.CFrame = targetCFrame
     bg.Parent = rootPart
-
     rootPart.Anchored = false
-
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then part.CanCollide = true end
-    end
-
-    task.delay(0.1, function()
-        if bp then bp:Destroy() end
-        if bg then bg:Destroy() end
-    end)
-
+    for _, part in ipairs(char:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = true end end
+    task.delay(0.1, function() if bp and bp.Parent then bp:Destroy() end if bg and bg.Parent then bg:Destroy() end end)
     updateNoclipConnection()
     notifyUI("Fly OFF", "Fly dimatikan.", 3, "plane")
 end
-
----------------------------------------------------------
--- TP WALK
----------------------------------------------------------
 local function startTPWalk()
-    if tpWalkEnabled then return end
+    if tpWalkEnabled or scriptDisabled then return end
     tpWalkEnabled = true
-
     tpWalkConn = RunService.RenderStepped:Connect(function(dt)
         if not tpWalkEnabled then return end
         local h = getHumanoid()
@@ -492,315 +515,832 @@ local function startTPWalk()
         end
     end)
 end
-
 local function stopTPWalk()
     tpWalkEnabled = false
-    if tpWalkConn then tpWalkConn:Disconnect() tpWalkConn = nil end
+    if tpWalkConn then tpWalkConn:Disconnect(); tpWalkConn = nil end
 end
-
----------------------------------------------------------
--- INFINITE JUMP
----------------------------------------------------------
 local function startInfiniteJump()
-    if infiniteJumpEnabled then return end
+    if infiniteJumpEnabled or scriptDisabled then return end
     infiniteJumpEnabled = true
-
     infiniteJumpConn = UserInputService.JumpRequest:Connect(function()
-        if infiniteJumpEnabled then
-            getHumanoid():ChangeState(Enum.HumanoidStateType.Jumping)
-        end
+        if infiniteJumpEnabled then getHumanoid():ChangeState(Enum.HumanoidStateType.Jumping) end
     end)
 end
-
 local function stopInfiniteJump()
     infiniteJumpEnabled = false
-    if infiniteJumpConn then infiniteJumpConn:Disconnect() infiniteJumpConn = nil end
+    if infiniteJumpConn then infiniteJumpConn:Disconnect(); infiniteJumpConn = nil end
 end
-
----------------------------------------------------------
--- FULLBRIGHT / REMOVE FOG / REMOVE SKY
----------------------------------------------------------
 local function enableFullBright()
     fullBrightEnabled = true
-
-    for k,v in pairs(oldLightingProps) do
-        oldLightingProps[k] = Lighting[k]
-    end
-
+    for k, v in pairs(oldLightingProps) do oldLightingProps[k] = Lighting[k] end
     local function apply()
         if not fullBrightEnabled then return end
         Lighting.Brightness = 2
         Lighting.ClockTime = 14
-        Lighting.FogEnd = 1e9
+        Lighting.FogEnd = 1e4
         Lighting.GlobalShadows = false
         Lighting.Ambient = Color3.new(1,1,1)
         Lighting.OutdoorAmbient = Color3.new(1,1,1)
     end
-
     apply()
-    RunService:BindToRenderStep("FULLBRIGHT_LOOP", 1000, apply)
+    fullBrightConn = RunService.RenderStepped:Connect(apply)
 end
-
 local function disableFullBright()
     fullBrightEnabled = false
-    RunService:UnbindFromRenderStep("FULLBRIGHT_LOOP")
-
-    for k,v in pairs(oldLightingProps) do
-        Lighting[k] = v
-    end
+    if fullBrightConn then fullBrightConn:Disconnect(); fullBrightConn = nil end
+    for k, v in pairs(oldLightingProps) do Lighting[k] = v end
 end
-
 local function removeFog()
     Lighting.FogEnd = 1e9
     local atmo = Lighting:FindFirstChildOfClass("Atmosphere")
-    if atmo then
-        atmo.Density = 0
-        atmo.Haze    = 0
-    end
-    notifyUI("Fog Removed", "Fog dihapus.", 3, "wind")
+    if atmo then atmo.Density = 0; atmo.Haze = 0 end
+    notifyUI("Remove Fog", "Fog dihapus.", 3, "wind")
 end
-
 local function removeSky()
-    for _, obj in ipairs(Lighting:GetChildren()) do
-        if obj:IsA("Sky") then obj:Destroy() end
-    end
-    notifyUI("Sky Removed", "Skybox dihapus.", 3, "cloud-off")
+    for _, obj in ipairs(Lighting:GetChildren()) do if obj:IsA("Sky") then obj:Destroy() end end
+    notifyUI("Remove Sky", "Skybox dihapus.", 3, "cloud-off")
 end
-
----------------------------------------------------------
--- INSTANT OPEN (ProximityPrompt)
----------------------------------------------------------
-local promptOriginalHold = {}
-local promptConn = nil
-
 local function applyInstantOpenToPrompt(prompt)
     if prompt and prompt:IsA("ProximityPrompt") then
-        if promptOriginalHold[prompt] == nil then
-            promptOriginalHold[prompt] = prompt.HoldDuration
-        end
+        if promptOriginalHold[prompt] == nil then promptOriginalHold[prompt] = prompt.HoldDuration end
         prompt.HoldDuration = 0
     end
 end
-
 local function enableInstantOpen()
     instantOpenEnabled = true
-
-    for _, inst in ipairs(Workspace:GetDescendants()) do
-        if inst:IsA("ProximityPrompt") then applyInstantOpenToPrompt(inst) end
-    end
-
+    for _, v in ipairs(Workspace:GetDescendants()) do if v:IsA("ProximityPrompt") then applyInstantOpenToPrompt(v) end end
     if promptConn then promptConn:Disconnect() end
     promptConn = Workspace.DescendantAdded:Connect(function(inst)
-        if instantOpenEnabled and inst:IsA("ProximityPrompt") then
-            applyInstantOpenToPrompt(inst)
-        end
+        if instantOpenEnabled and inst:IsA("ProximityPrompt") then applyInstantOpenToPrompt(inst) end
     end)
-
-    notifyUI("Instant Open", "Semua ProximityPrompt menjadi instant.", 3, "bolt")
+    notifyUI("Instant Open", "Semua ProximityPrompt jadi instant.", 3, "bolt")
 end
-
 local function disableInstantOpen()
     instantOpenEnabled = false
-
-    if promptConn then promptConn:Disconnect() promptConn = nil end
+    if promptConn then promptConn:Disconnect(); promptConn = nil end
     for prompt, orig in pairs(promptOriginalHold) do
-        pcall(function()
-            if prompt and prompt.Parent then prompt.HoldDuration = orig end
-        end)
+        if prompt and prompt.Parent then pcall(function() prompt.HoldDuration = orig end) end
     end
     promptOriginalHold = {}
-
     notifyUI("Instant Open", "Durasi dikembalikan.", 3, "refresh-ccw")
 end
-
 ---------------------------------------------------------
--- SPLASH SCREEN "Papi Dimz :v"
+-- BRING ITEM FUNCTIONS (full dari Ambil.lua)
 ---------------------------------------------------------
-local function splashScreen()
-    local parent = getGuiParent()
-    if not parent then return end
-
-    local ok, gui = pcall(function()
-        local g = Instance.new("ScreenGui")
-        g.Name = "PapiDimz_Splash"
-        g.IgnoreGuiInset = true
-        g.ResetOnSpawn = false
-        g.Parent = parent
-
-        local bg = Instance.new("Frame")
-        bg.Size = UDim2.new(1,0,1,0)
-        bg.BackgroundColor3 = Color3.fromRGB(10,10,10)
-        bg.BackgroundTransparency = 1
-        bg.BorderSizePixel = 0
-        bg.Parent = g
-
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.new(1,0,1,0)
-        label.BackgroundTransparency = 1
-        label.Font = Enum.Font.GothamBold
-        label.TextSize = 42
-        label.TextColor3 = Color3.fromRGB(230,230,230)
-        label.Text = ""
-        label.TextStrokeTransparency = 0.75
-        label.Parent = bg
-
-        task.spawn(function()
-            local dur = 0.35
-            local t = 0
-            while t < dur do
-                t += RunService.Heartbeat:Wait()
-                bg.BackgroundTransparency = 1 - (t / dur * 0.9)
-            end
-            bg.BackgroundTransparency = 0.1
-        end)
-
-        local text = "Papi Dimz :v"
-        for i = 1, #text do
-            label.Text = text:sub(1,i)
-            task.wait(0.05)
-        end
-
-        task.wait(1.2)
-        local durOut = 0.3
-        local t = 0
-        while t < durOut do
-            t += RunService.Heartbeat:Wait()
-            label.TextTransparency = t / durOut
-            bg.BackgroundTransparency = 0.1 + (t / durOut)
-        end
-
-        g:Destroy()
-    end)
-end
-
----------------------------------------------------------
--- MINI HUD
----------------------------------------------------------
-local function formatTime(seconds)
-    seconds = math.floor(seconds)
-    local h = math.floor(seconds / 3600)
-    local m = math.floor((seconds % 3600) / 60)
-    local s = seconds % 60
-    return string.format("%02d:%02d:%02d", h, m, s)
-end
-
-local function getFeatureCodes()
-    local t = {}
-    if GodmodeEnabled then table.insert(t, "G") end
-    if AntiAFKEnabled then table.insert(t, "AFK") end
-    if AutoCookEnabled then table.insert(t, "CK") end
-    if ScrapEnabled then table.insert(t, "SC") end
-    if AutoSacEnabled then table.insert(t, "LV") end
-    if CoinAmmoEnabled then table.insert(t, "CA") end
-    if autoTemporalEnabled then table.insert(t, "NT") end
-    if KillAuraEnabled then table.insert(t, "KA") end
-    if ChopAuraEnabled then table.insert(t, "CH") end
-    if flyEnabled then table.insert(t, "FLY") end
-    if fishingAutoClickEnabled then table.insert(t, "FS") end
-    if zoneEnabled then table.insert(t, "ZH") end
-
-    return #t > 0 and table.concat(t, " | ") or "None"
-end
-
-local function createMiniHud()
-    if miniHudGui then return end
-    local parent = getGuiParent()
-    if not parent then return end
-
-    miniHudGui = Instance.new("ScreenGui")
-    miniHudGui.Name = "PapiDimz_MiniHUD"
-    miniHudGui.ResetOnSpawn = false
-    miniHudGui.Parent = parent
-
-    miniHudFrame = Instance.new("Frame")
-    miniHudFrame.Size = UDim2.fromOffset(220, 95)
-    miniHudFrame.Position = UDim2.new(0,20,0,100)
-    miniHudFrame.BackgroundColor3 = Color3.fromRGB(10,10,10)
-    miniHudFrame.BackgroundTransparency = 0.3
-    miniHudFrame.Active = true
-    miniHudFrame.Draggable = true
-    miniHudFrame.Parent = miniHudGui
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0,10)
-    corner.Parent = miniHudFrame
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Thickness = 1
-    stroke.Transparency = 0.6
-    stroke.Parent = miniHudFrame
-
-    local function makeLabel(y)
-        local lbl = Instance.new("TextLabel")
-        lbl.BackgroundTransparency = 1
-        lbl.Size = UDim2.new(1,-10,0,18)
-        lbl.Position = UDim2.new(0,5,0,y)
-        lbl.Font = Enum.Font.Gotham
-        lbl.TextSize = 12
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
-        lbl.TextColor3 = Color3.fromRGB(220,220,220)
-        lbl.Text = ""
-        lbl.Parent = miniHudFrame
-        return lbl
+local function getScrapperTarget()
+    if ScrapperTarget and ScrapperTarget.Parent then
+        return ScrapperTarget
     end
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return nil end
+    local camp = map:FindFirstChild("Campground")
+    if not camp then return nil end
+    local scrapper = camp:FindFirstChild("Scrapper")
+    if not scrapper then return nil end
+    local movers = scrapper:FindFirstChild("Movers")
+    if not movers then return nil end
+    local right = movers:FindFirstChild("Right")
+    if not right then return nil end
+    local grindersRight = right:FindFirstChild("GrindersRight")
+    if not grindersRight or not grindersRight:IsA("BasePart") then return nil end
+    ScrapperTarget = grindersRight
+    return ScrapperTarget
+end
+local function getTargetPosition(location)
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if location == "Player" then
+        return (hrp and hrp.Position or Vector3.new(0,0,0)) + Vector3.new(0, BringHeight + 3, 0)
+    elseif location == "Workbench" then
+        local scrapperPart = getScrapperTarget()
+        if scrapperPart then
+            return scrapperPart.Position + Vector3.new(0, BringHeight, 0)
+        else
+            notifyUI("Warning", "Scrapper tidak ditemukan! Default ke Player", 6, "alert-circle")
+            return (hrp and hrp.Position or Vector3.new(0,0,0)) + Vector3.new(0, BringHeight + 3, 0)
+        end
+    elseif location == "Fire" then
+        local firePath = Workspace:FindFirstChild("Map")
+            and Workspace.Map:FindFirstChild("Campground")
+            and Workspace.Map.Campground:FindFirstChild("MainFire")
+            and Workspace.Map.Campground.MainFire:FindFirstChild("OuterTouchZone")
+        if firePath then
+            return firePath.Position + Vector3.new(0, BringHeight, 0)
+        else
+            notifyUI("Warning", "Fire tidak ditemukan! Default ke Player", 6, "alert-circle")
+            return (hrp and hrp.Position or Vector3.new(0,0,0)) + Vector3.new(0, BringHeight + 3, 0)
+        end
+    end
+    return (hrp and hrp.Position or Vector3.new(0,0,0)) + Vector3.new(0, BringHeight + 3, 0)
+end
+local function getDropCFrame(basePos, index)
+    local angle = (index - 1) * (math.pi * 2 / 12)
+    local radius = 3
+    local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+    return CFrame.new(basePos + offset)
+end
+local function bringItems(sectionItemList, selectedItems, location)
+    if not ItemsFolder then notifyUI("Error", "Items folder belum ready!", 5, "alert-triangle"); return end
+    if not RequestStartDragging or not RequestStopDragging then notifyUI("Error", "Remote dragging belum ready!", 5, "alert-triangle"); return end
+    local targetPos = getTargetPosition(location)
+    local wantedNames = {}
+    if table.find(selectedItems, "All") then
+        for _, name in ipairs(sectionItemList) do
+            if name ~= "All" then table.insert(wantedNames, name) end
+        end
+    else
+        wantedNames = selectedItems
+    end
+    local candidates = {}
+    for _, item in ipairs(ItemsFolder:GetChildren()) do
+        if item:IsA("Model") and item.PrimaryPart and table.find(wantedNames, item.Name) then
+            table.insert(candidates, item)
+        end
+    end
+    if #candidates == 0 then
+        notifyUI("Info", "Item tidak ditemukan", 4, "search")
+        return
+    end
+    notifyUI("Bringing", #candidates.." item → "..location, 5, "zap")
+    for i, item in ipairs(candidates) do
+        local cf = getDropCFrame(targetPos, i)
+        pcall(function() RequestStartDragging:FireServer(item) end)
+        task.wait(0.03)
+        pcall(function() item:PivotTo(cf) end)
+        task.wait(0.03)
+        pcall(function() RequestStopDragging:FireServer(item) end)
+        task.wait(0.02)
+    end
+    notifyUI("Selesai!", #candidates.." item berhasil dibawa!", 4, "check-circle")
+end
+local function teleportToCFrame(targetCF)
+    if not targetCF then
+        notifyUI("Error", "Lokasi tidak ditemukan!", 5, "alert-triangle")
+        return
+    end
+    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        hrp.CFrame = targetCF + Vector3.new(0, 4, 0)
+        notifyUI("Teleport!", "Berhasil teleport!", 4, "navigation")
+    end
+end
+---------------------------------------------------------
+-- RESET / CLEANUP
+---------------------------------------------------------
+function resetAll()
+    scriptDisabled = true
+    AutoCookEnabled = false
+    ScrapEnabled = false
+    AutoSacEnabled = false
+    GodmodeEnabled = false
+    AntiAFKEnabled = false
+    CoinAmmoEnabled = false
+    autoTemporalEnabled = false
+    KillAuraEnabled = false
+    ChopAuraEnabled = false
+    TreeCache = {}
+    CookLoopId += 1
+    ScrapLoopId += 1
+    stopCoinAmmo()
+    stopFly()
+    stopTPWalk()
+    stopInfiniteJump()
+    disableFullBright()
+    disableInstantOpen()
+    stopZone()
+    fishingAutoClickEnabled = false
+    if DayDisplayConnection then DayDisplayConnection:Disconnect(); DayDisplayConnection = nil end
+    if auraHeartbeatConnection then auraHeartbeatConnection:Disconnect(); auraHeartbeatConnection = nil end
+    if coinAmmoDescAddedConn then coinAmmoDescAddedConn:Disconnect(); coinAmmoDescAddedConn = nil end
+    if miniHudGui then pcall(function() miniHudGui:Destroy() end); miniHudGui = nil end
+    if Window then pcall(function() Window:Destroy() end); Window = nil end
+    print("[PapiDimz] Semua fitur dimatikan & UI dibersihkan.")
+    notifyUI("Force Close", "Semua fitur OFF & UI diunload!", 6, "power")
+end
+---------------------------------------------------------
+-- MAIN UI
+---------------------------------------------------------
+local function createMainUI()
+    if Window then return end
+    if not WindUI then return end
+    Window = WindUI:CreateWindow({
+        Title = "Papi Dimz |HUB",
+        Icon = "gamepad-2",
+        Author = "Bang Dimz",
+        Folder = "PapiDimz_HUB_Config",
+        Size = UDim2.fromOffset(660, 480),
+        Theme = "Dark",
+        Transparent = true,
+        Acrylic = true,
+        SideBarWidth = 180,
+        HasOutline = true,
+    })
+    Window:EditOpenButton({
+        Title = "Papi Dimz |HUB",
+        Icon = "sparkles",
+        CornerRadius = UDim.new(0, 16),
+        StrokeThickness = 2
+        , Color = ColorSequence.new(Color3.fromRGB(255, 15, 123), Color3.fromRGB(248, 155, 41)),
+        OnlyMobile = true,
+        Enabled = true,
+        Draggable = true,
+    })
+    -- TAB ORDER
+    infoTab = Window:Tab({ Title = "Information", Icon = "info" })
+    mainTab = Window:Tab({ Title = "Main", Icon = "settings-2" })
+    localTab = Window:Tab({ Title = "Local Player", Icon = "user" })
+    bringTab = Window:Tab({ Title = "Bring Item", Icon = "package" })
+    teleportTab = Window:Tab({ Title = "Teleport", Icon = "navigation" })
+    fishingTab = Window:Tab({ Title = "Fishing", Icon = "fish" })
+    farmTab = Window:Tab({ Title = "Farm", Icon = "chef-hat" })
+    utilTab = Window:Tab({ Title = "Tools", Icon = "wrench" })
+    nightTab = Window:Tab({ Title = "Night", Icon = "moon" })
+    webhookTab = Window:Tab({ Title = "Webhook", Icon = "radio" })
+    healthTab = Window:Tab({ Title = "Cek Health", Icon = "activity" })
 
-    miniUptimeLabel    = makeLabel(4)
-    miniLavaLabel      = makeLabel(24)
-    miniPingFpsLabel   = makeLabel(44)
-    miniFeaturesLabel  = makeLabel(64)
+    -- INFORMATION TAB
+    infoTab:Paragraph({ Title = "Welcome To Papi Dimz Hub Official", Desc = "Script all-in-one premium dengan fitur lengkap: Local Player, Fishing 100%, Bring Item, Teleport, Auto Farm, Aura, Webhook, dan banyak lagi.\nGunakan dengan bijak & enjoy the game!", Color = "Grey" })
+    infoTab:Button({ Title = "Copy Discord Link", Icon = "copy", Callback = function()
+        if setclipboard then
+            setclipboard("discord.gg/PapiDimz")
+            notifyUI("Copied!", "discord.gg/PapiDimz telah dicopy ke clipboard!", 4, "check-circle")
+        else
+            notifyUI("Error", "setclipboard tidak tersedia", 4, "alert-triangle")
+        end
+    end })
+    infoTab:Keybind({ Title = "Papi Dimz Keybind (Toggle UI)", Default = toggleKeybind, Callback = function(key)
+        toggleKeybind = key
+        notifyUI("Keybind Updated", "Keybind toggle UI sekarang: "..tostring(key.Name), 3, "keyboard")
+    end })
+    infoTab:Button({ Title = "Force Close", Icon = "power", Variant = "Destructive", Callback = resetAll })
+
+    -- MAIN TAB (original)
+    mainTab:Paragraph({ Title = "Papi Dimz HUB", Desc = "Godmode, AntiAFK, Auto Sacrifice Lava, Auto Farm, Aura, Webhook DayDisplay.\nHotkey PC: P untuk toggle UI.", Color = "Grey" })
+    mainTab:Toggle({ Title = "GodMode (Damage -∞)", Icon = "shield", Default = false, Callback = function(state) GodmodeEnabled = state end })
+    mainTab:Toggle({ Title = "Anti AFK", Icon = "mouse-pointer-2", Default = true, Callback = function(state) AntiAFKEnabled = state end })
+    mainTab:Button({ Title = "Tutup UI & Matikan Script", Icon = "power", Variant = "Destructive", Callback = resetAll })
+
+    -- LOCAL PLAYER TAB (original - contoh beberapa)
+    localTab:Paragraph({ Title = "Self", Desc = "Atur FOV kamera.", Color = "Grey" })
+    localTab:Toggle({ Title = "FOV", Icon = "zoom-in", Default = false, Callback = function(state) fovEnabled = state; applyFOV() end })
+    localTab:Slider({ Title = "FOV", Description = "40 - 120", Step = 1, Value = { Min = 40, Max = 120, Default = 60 }, Callback = function(v) fovValue = v; applyFOV() end })
+    localTab:Paragraph({ Title = "Movement", Desc = "WalkSpeed, Fly, TP Walk, Noclip, Infinite Jump, Hip Height.", Color = "Grey" })
+    localTab:Toggle({ Title = "Speed", Icon = "rabbit", Default = false, Callback = function(state) walkEnabled = state; applyWalkspeed() end })
+    localTab:Slider({ Title = "Walk Speed", Description = "16 - 200", Step = 1, Value = { Min = 16, Max = 200, Default = 30 }, Callback = function(v) walkSpeedValue = v; applyWalkspeed() end })
+    localTab:Toggle({ Title = "Fly", Icon = "plane", Default = false, Callback = function(state) if state then startFly() else stopFly() end end })
+    localTab:Slider({ Title = "Fly Speed", Description = "16 - 200", Step = 1, Value = { Min = 16, Max = 200, Default = 50 }, Callback = function(v) flySpeedValue = v end })
+    localTab:Toggle({ Title = "TP Walk", Icon = "mouse-pointer-2", Default = false, Callback = function(state) if state then startTPWalk() else stopTPWalk() end end })
+    localTab:Slider({ Title = "TP Walk Speed", Description = "1 - 30", Step = 1, Value = { Min = 1, Max = 30, Default = 5 }, Callback = function(v) tpWalkSpeedValue = v end })
+    localTab:Toggle({ Title = "Noclip", Icon = "ghost", Default = false, Callback = function(state) noclipManualEnabled = state; updateNoclipConnection() end })
+    localTab:Toggle({ Title = "Infinite Jump", Icon = "chevron-up", Default = false, Callback = function(state) if state then startInfiniteJump() else stopInfiniteJump() end end })
+    localTab:Toggle({ Title = "Hip Height", Icon = "align-vertical-justify-center", Default = false, Callback = function(state) hipEnabled = state; applyHipHeight() end })
+    localTab:Slider({ Title = "Hip Height Value", Description = "0 - 60", Step = 1, Value = { Min = 0, Max = 60, Default = 35 }, Callback = function(v) hipValue = v; applyHipHeight() end })
+    localTab:Paragraph({ Title = "Visual", Desc = "Fullbright, Remove Fog/Sky.", Color = "Grey" })
+    localTab:Toggle({ Title = "Fullbright", Icon = "sun", Default = false, Callback = function(state) if state then enableFullBright() else disableFullBright() end end })
+    localTab:Button({ Title = "Remove Fog", Icon = "wind", Callback = removeFog })
+    localTab:Button({ Title = "Remove Sky", Icon = "cloud-off", Callback = removeSky })
+    localTab:Paragraph({ Title = "Misc", Desc = "Instant Open, Reset.", Color = "Grey" })
+    localTab:Toggle({ Title = "Instant Open (ProximityPrompt)", Icon = "bolt", Default = false, Callback = function(state) if state then enableInstantOpen() else disableInstantOpen() end end })
+
+    -- BRING ITEM TAB (full dari Ambil.lua)
+    local settingSec = bringTab:Section({Title = "Bring Setting", Icon = "settings", Collapsible = true, DefaultOpen = true})
+    settingSec:Dropdown({Title = "Location", Desc = "Player / Workbench (Scrapper) / Fire", Values = {"Player", "Workbench", "Fire"}, Value = "Player", Callback = function(v) selectedLocation = v end})
+    settingSec:Input({Title = "Bring Height", Placeholder = "20", Default = "20", Numeric = true, Callback = function(v) BringHeight = tonumber(v) or 20 end})
+
+    local cultistSec = bringTab:Section({Title = "Bring Cultist", Icon = "skull", Collapsible = true})
+    local cultistList = {"All", "Crossbow Cultist", "Cultist"}
+    local selCultist = {"All"}
+    cultistSec:Dropdown({Title="Pilih Cultist", Values=cultistList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selCultist=o or {"All"} end})
+    cultistSec:Button({Title="Bring Cultist", Callback=function() bringItems(cultistList, selCultist, selectedLocation) end})
+
+    local meteorSec = bringTab:Section({Title = "Bring Meteor Items", Icon = "zap", Collapsible = true})
+    local meteorList = {"All", "Raw Obsidiron Ore", "Gold Shard", "Meteor Shard", "Scalding Obsidiron Ingot"}
+    local selMeteor = {"All"}
+    meteorSec:Dropdown({Title="Pilih Item", Values=meteorList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selMeteor=o or {"All"} end})
+    meteorSec:Button({Title="Bring Meteor", Callback=function() bringItems(meteorList, selMeteor, selectedLocation) end})
+    local fuelSec = bringTab:Section({Title = "Fuels", Icon = "flame", Collapsible = true})
+    local fuelList = {"All", "Log", "Coal", "Chair", "Fuel Canister", "Oil Barrel"}
+    local selFuel = {"All"}
+    fuelSec:Dropdown({Title="Pilih Fuel", Values=fuelList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selFuel=o or {"All"} end})
+    fuelSec:Button({Title="Bring Fuels", Callback=function() bringItems(fuelList, selFuel, selectedLocation) end})
+    fuelSec:Button({Title="Bring Logs Only", Callback=function() bringItems(fuelList, {"Log"}, selectedLocation) end})
+
+    local foodSec = bringTab:Section({Title = "Food", Icon = "drumstick", Collapsible = true})
+    local foodList = {"All", "Sweet Potato", "Stuffing", "Turkey Leg", "Carrot", "Pumkin", "Mackerel", "Salmon", "Swordfish", "Berry", "Ribs", "Stew", "Steak Dinner", "Morsel", "Steak", "Corn", "Cooked Morsel", "Cooked Steak", "Chilli", "Apple", "Cake"}
+    local selFood = {"All"}
+    foodSec:Dropdown({Title="Pilih Food", Values=foodList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selFood=o or {"All"} end})
+    foodSec:Button({Title="Bring Food", Callback=function() bringItems(foodList, selFood, selectedLocation) end})
+
+    local healSec = bringTab:Section({Title = "Healing", Icon = "heart", Collapsible = true})
+    local healList = {"All", "Medkit", "Bandage"}
+    local selHeal = {"All"}
+    healSec:Dropdown({Title="Pilih Healing", Values=healList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selHeal=o or {"All"} end})
+    healSec:Button({Title="Bring Healing", Callback=function() bringItems(healList, selHeal, selectedLocation) end})
+
+    local gearSec = bringTab:Section({Title = "Gears (Scrap)", Icon = "wrench", Collapsible = true})
+    local gearList = {"All", "Bolt", "Tyre", "Sheet Metal", "Old Radio", "Broken Fan", "Broken Microwave", "Washing Machine", "Old Car Engine", "UFO Scrap", "UFO Component", "UFO Junk", "Cultist Gem", "Gem of the Forest"}
+    local selGear = {"All"}
+    gearSec:Dropdown({Title="Pilih Gear", Values=gearList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selGear=o or {"All"} end})
+    gearSec:Button({Title="Bring Gears", Callback=function() bringItems(gearList, selGear, selectedLocation) end})
+
+    local gunSec = bringTab:Section({Title = "Guns & Ammo", Icon = "swords", Collapsible = true})
+    local gunList = {"All", "Infernal Sword", "Morningstar", "Crossbow", "Infernal Crossbow", "Laser Sword", "Raygun", "Ice Axe", "Ice Sword", "Chainsaw", "Strong Axe", "Axe Trim Kit", "Spear", "Good Axe", "Revolver", "Rifle", "Tactical Shotgun", "Revolver Ammo", "Rifle Ammo", "Alien Armour", "Frog Boots", "Leather Body", "Iron Body", "Thorn Body", "Riot Shield", "Armour Trim Kit", "Obsidiron Boots"}
+    local selGun = {"All"}
+    gunSec:Dropdown({Title="Pilih Weapon", Values=gunList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selGun=o or {"All"} end})
+    gunSec:Button({Title="Bring Guns & Ammo", Callback=function() bringItems(gunList, selGun, selectedLocation) end})
+
+    local otherSec = bringTab:Section({Title = "Bring Other", Icon = "package", Collapsible = true})
+    local otherList = {"All", "Purple Fur Tuft", "Halloween Candle", "Candy", "Frog Key", "Feather", "Wildfire", "Sacrifice Totem", "Old Rod", "Flower", "Coin Stack", "Infernal Sack", "Giant Sack", "Good Sack", "Seed Box", "Chainsaw", "Old Flashlight", "Strong Flashlight", "Bunny Foot", "Wolf Pelt", "Bear Pelt", "Mammoth Tusk", "Alpha Wolf Pelt", "Bear Corpse", "Meteor Shard", "Gold Shard", "Raw Obsidiron Ore", "Gem of the Forest", "Diamond", "Defense Blueprint"}
+    local selOther = {"All"}
+    otherSec:Dropdown({Title="Pilih Item", Values=otherList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selOther=o or {"All"} end})
+    otherSec:Button({Title="Bring Other", Callback=function() bringItems(otherList, selOther, selectedLocation) end})
+
+    -- TELEPORT TAB (full dari Ambil.lua)
+    local lostChildSec = teleportTab:Section({Title = "Teleport Lost Child", Icon = "baby", Collapsible = true, DefaultOpen = true})
+    local childOptions = {"DinoKid", "KoalaKid", "KrakenKid", "SquidKid"}
+    local selectedChild = "DinoKid"
+    lostChildSec:Dropdown({Title = "Select Child", Values = childOptions, Value = "DinoKid", Callback = function(v) selectedChild = v end})
+    lostChildSec:Button({Title = "Teleport To Child", Callback = function()
+        local hrp = nil
+        if selectedChild == "DinoKid" then
+            hrp = Workspace.Characters:FindFirstChild("Lost Child") and Workspace.Characters["Lost Child"]:FindFirstChild("HumanoidRootPart")
+        elseif selectedChild == "KoalaKid" then
+            hrp = Workspace.Characters:FindFirstChild("Lost Child4") and Workspace.Characters["Lost Child4"]:FindFirstChild("HumanoidRootPart")
+        elseif selectedChild == "KrakenKid" then
+            hrp = Workspace.Characters:FindFirstChild("Lost Child2") and Workspace.Characters["Lost Child2"]:FindFirstChild("HumanoidRootPart")
+        elseif selectedChild == "SquidKid" then
+            hrp = Workspace.Characters:FindFirstChild("Lost Child3") and Workspace.Characters["Lost Child3"]:FindFirstChild("HumanoidRootPart")
+        end
+        if hrp then
+            teleportToCFrame(hrp.CFrame)
+        else
+            WindUI:Notify({Title="Error", Content=selectedChild.." tidak ditemukan!", Icon="alert-triangle"})
+        end
+    end
+})
+
+    local structureSec = teleportTab:Section({Title = "Structure Teleport", Icon = "castle", Collapsible = true, DefaultOpen = false})
+    structureSec:Button({Title = "Teleport to Camp", Callback = function()
+        local firePath = Workspace:FindFirstChild("Map") and Workspace.Map:FindFirstChild("Campground") and Workspace.Map.Campground:FindFirstChild("MainFire") and Workspace.Map.Campground.MainFire:FindFirstChild("OuterTouchZone")
+        if firePath then teleportToCFrame(firePath.CFrame) end
+    end})
+    
+    -- Teleport to Cultist Generator Base (asumsi path dari game, sesuaikan kalau ada info lebih)
+    structureSec:Button({
+        Title = "Teleport to Cultist Generator Base",
+        Callback = function()
+            -- Contoh path umum, sesuaikan kalau tahu exact
+            local cultistBase = Workspace:FindFirstChild("Map")
+                and Workspace.Map:FindFirstChild("Landmarks")
+                and Workspace.Map.Landmarks:FindFirstChild("CultistGenerator")
+            if cultistBase and cultistBase.PrimaryPart then
+                teleportToCFrame(cultistBase.PrimaryPart.CFrame)
+            else
+                WindUI:Notify({Title="Error", Content="Cultist Generator Base tidak ditemukan!", Icon="alert-triangle"})
+            end
+        end
+    })
+
+    -- Teleport to Stronghold (prioritas Diamond Chest kalau ada)
+    structureSec:Button({
+        Title = "Teleport to Stronghold",
+        Callback = function()
+            local diamondChest = Workspace:FindFirstChild("Items")
+                and Workspace.Items:FindFirstChild("Stronghold Diamond Chest")
+                and Workspace.Items["Stronghold Diamond Chest"]:FindFirstChild("ChestLid")
+                and Workspace.Items["Stronghold Diamond Chest"].ChestLid:FindFirstChild("Meshes/diamondchest_Cube.005")
+            if diamondChest then
+                teleportToCFrame(diamondChest.CFrame)
+                return
+            end
+
+            local sign = Workspace:FindFirstChild("Map")
+                and Workspace.Map:FindFirstChild("Landmarks")
+                and Workspace.Map.Landmarks:FindFirstChild("Stronghold")
+                and Workspace.Map.Landmarks.Stronghold:FindFirstChild("Building")
+                and Workspace.Map.Landmarks.Stronghold.Building:FindFirstChild("Sign")
+                and Workspace.Map.Landmarks.Stronghold.Building.Sign:FindFirstChild("Main")
+            if sign then
+                teleportToCFrame(sign.CFrame)
+            else
+                WindUI:Notify({Title="Error", Content="Stronghold tidak ditemukan!", Icon="alert-triangle"})
+            end
+        end
+    })
+
+    -- Teleport to Stronghold Diamond Chest (pisah button)
+    structureSec:Button({
+        Title = "Teleport to Stronghold Diamond Chest",
+        Callback = function()
+            local diamondChest = Workspace:FindFirstChild("Items")
+                and Workspace.Items:FindFirstChild("Stronghold Diamond Chest")
+                and Workspace.Items["Stronghold Diamond Chest"]:FindFirstChild("ChestLid")
+                and Workspace.Items["Stronghold Diamond Chest"].ChestLid:FindFirstChild("Meshes/diamondchest_Cube.005")
+            if diamondChest then
+                teleportToCFrame(diamondChest.CFrame)
+            else
+                WindUI:Notify({Title="Error", Content="Stronghold Diamond Chest tidak ditemukan!", Icon="alert-triangle"})
+            end
+        end
+    })
+
+    -- Teleport to Caravan
+    structureSec:Button({
+        Title = "Teleport to Caravan",
+        Callback = function()
+            local caravan = Workspace:FindFirstChild("Map")
+                and Workspace.Map:FindFirstChild("Landmarks")
+                and Workspace.Map.Landmarks:FindFirstChild("Caravan")
+            if caravan and caravan.PrimaryPart then
+                teleportToCFrame(caravan.PrimaryPart.CFrame)
+            else
+                WindUI:Notify({Title="Error", Content="Caravan tidak ditemukan!", Icon="alert-triangle"})
+            end
+        end
+    })
+
+    -- Teleport to Fairy
+    structureSec:Button({
+        Title = "Teleport to Fairy",
+        Callback = function()
+            local fairyHRP = Workspace:FindFirstChild("Map")
+                and Workspace.Map:FindFirstChild("Landmarks")
+                and Workspace.Map.Landmarks:FindFirstChild("Fairy House")
+                and Workspace.Map.Landmarks["Fairy House"]:FindFirstChild("Fairy")
+                and Workspace.Map.Landmarks["Fairy House"].Fairy:FindFirstChild("HumanoidRootPart")
+            if fairyHRP then
+                teleportToCFrame(fairyHRP.CFrame)
+            else
+                WindUI:Notify({Title="Error", Content="Fairy tidak ditemukan!", Icon="alert-triangle"})
+            end
+        end
+    })
+
+    -- Teleport to Anvil
+    structureSec:Button({
+        Title = "Teleport to Anvil",
+        Callback = function()
+            local anvil = Workspace:FindFirstChild("Map")
+                and Workspace.Map:FindFirstChild("Landmarks")
+                and Workspace.Map.Landmarks:FindFirstChild("ToolWorkshop")
+                and Workspace.Map.Landmarks.ToolWorkshop:FindFirstChild("Functional")
+                and Workspace.Map.Landmarks.ToolWorkshop.Functional:FindFirstChild("ToolBench")
+                and Workspace.Map.Landmarks.ToolWorkshop.Functional.ToolBench:FindFirstChild("Hammer")
+            if anvil then
+                teleportToCFrame(anvil.CFrame)
+            else
+                WindUI:Notify({Title="Error", Content="Anvil tidak ditemukan!", Icon="alert-triangle"})
+            end
+        end
+    })
+
+-- FISHING TAB
+        fishingTab:Paragraph({ Title = "Fishing & Macro", Desc = "Sistem fishing otomatis dengan 100% success rate (zona hijau), auto recast, dan auto clicker.", Color = "Grey" })
+        fishingTab:Toggle({ Title = "100% Success Rate", Default = false, Callback = function(state) if state then startZone() else stopZone() end end })
+        fishingTab:Toggle({ Title = "Auto Recast", Default = false, Callback = function(state) autoRecastEnabled = state end })
+        fishingTab:Input({ Title = "Recast Delay (s)", Placeholder = "2", Default = "2", Callback = function(text) local n = tonumber(text) if n and n >= 0.01 and n <= 60 then RECAST_DELAY = n end end })
+        fishingTab:Toggle({ Title = "View Position Overlay", Default = false, Callback = function(state) fishingOverlayVisible = state if state and fishingSavedPosition then fishingShowOverlay(fishingSavedPosition.x, fishingSavedPosition.y) else fishingHideOverlay() end end })
+        fishingTab:Button({ Title = "Set Position", Callback = function() waitingForPosition = not waitingForPosition notifyUI("Set Position", waitingForPosition and "Klik layar untuk set posisi." or "Dibatalkan.", 3) end })
+        fishingTab:Toggle({ Title = "Auto Clicker", Default = false, Callback = function(state) fishingAutoClickEnabled = state end })
+        fishingTab:Input({ Title = "Delay (s)", Placeholder = "5", Default = "5", Callback = function(text) local n = tonumber(text) if n and n >= 0.01 and n <= 600 then fishingClickDelay = n end end })
+        fishingTab:Button({ Title = "Calibrate", Callback = function()
+            local cam = Workspace.CurrentCamera
+            local cx = cam.ViewportSize.X / 2
+            local cy = cam.ViewportSize.Y / 2
+            notifyUI("Calibrate", "Klik titik merah di tengah layar.", 4)
+            local gui = Instance.new("ScreenGui")
+            gui.Name = "Xeno_Calib"
+            gui.Parent = LocalPlayer.PlayerGui
+            local marker = Instance.new("Frame", gui)
+            marker.Size = UDim2.new(0,24,0,24)
+            marker.Position = UDim2.new(0,cx-12,0,cy-12)
+            marker.AnchorPoint = Vector2.new(0.5,0.5)
+            marker.BackgroundColor3 = Color3.fromRGB(255,0,0)
+            Instance.new("UICorner", marker).CornerRadius = UDim.new(1,0)
+            local conn
+            conn = UserInputService.InputBegan:Connect(function(inp,gp)
+                if gp then return end
+                if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                    local loc = UserInputService:GetMouseLocation()
+                    fishingOffsetX = cx - loc.X
+                    fishingOffsetY = cy - loc.Y
+                    notifyUI("Calibrate Done", ("Offset X=%.1f Y=%.1f"):format(fishingOffsetX, fishingOffsetY), 4)
+                    conn:Disconnect()
+                    gui:Destroy()
+                    if fishingOverlayVisible and fishingSavedPosition then fishingShowOverlay(fishingSavedPosition.x, fishingSavedPosition.y) end
+                end
+            end)
+        end })
+        fishingTab:Button({ Title = "Clean Fishing", Variant = "Destructive", Callback = function()
+            fishingAutoClickEnabled = false
+            waitingForPosition = false
+            fishingSavedPosition = nil
+            stopZone()
+            fishingHideOverlay()
+            pcall(function() LocalPlayer.PlayerGui.XenoPositionOverlay:Destroy() end)
+            notifyUI("Fishing Clean", "Fishing features dibersihkan.", 3)
+        end })
+
+                -- FARM TAB (original)
+        farmTab:Toggle({ Title = "Auto Crockpot (Carrot + Corn)", Icon = "flame", Default = false, Callback = function(state)
+            if scriptDisabled then return end
+            if state then
+                local ok = ensureCookingStations()
+                if not ok then AutoCookEnabled = false; notifyUI("Auto Crockpot", "Crock Pot / Chefs Station tidak ditemukan.", 4, "alert-triangle"); return end
+                AutoCookEnabled = true; startCookLoop()
+            else AutoCookEnabled = false end
+        end })
+        farmTab:Toggle({ Title = "Auto Scrapper → Grinder", Icon = "recycle", Default = false, Callback = function(state)
+            if scriptDisabled then return end
+            if state then
+                local ok = ensureScrapperTarget()
+                if not ok then ScrapEnabled = false; notifyUI("Auto Scrapper", "Scrapper target tidak ditemukan.", 4, "alert-triangle"); return end
+                ScrapEnabled = true; startScrapLoop()
+            else ScrapEnabled = false end
+        end })
+        farmTab:Toggle({ Title = "Auto Sacrifice Lava (Ikan & Loot)", Icon = "flame-kindling", Default = false, Callback = function(state)
+            if scriptDisabled then return end
+            if state and not lavaFound then notifyUI("Auto Sacrifice", "Lava belum ditemukan, script akan aktif begitu lava ready.", 4, "alert-triangle") end
+            AutoSacEnabled = state
+        end })
+        farmTab:Toggle({ Title = "Ultra Fast Coin & Ammo", Icon = "zap", Default = false, Callback = function(state) if scriptDisabled then return end; if state then startCoinAmmo() else stopCoinAmmo() end end })
+        farmTab:Paragraph({ Title = "Scrap Priority", Desc = table.concat(ScrapItemsPriority, ", "), Color = "Grey" })
+        farmTab:Paragraph({ Title = "Combat Aura", Desc = "Kill Aura & Chop Aura untuk clear musuh dan tebang pohon otomatis.\nRadius bisa diatur dari 50 sampai 200.", Color = "Grey" })
+        farmTab:Toggle({ Title = "Kill Aura (Radius-based)", Icon = "swords", Default = false, Callback = function(state) if scriptDisabled then return end; KillAuraEnabled = state end })
+        farmTab:Slider({ Title = "Kill Aura Radius", Description = "Jarak Kill Aura (50 - 200).", Step = 1, Value = { Min = 50, Max = 200, Default = KillAuraRadius }, Callback = function(value) KillAuraRadius = tonumber(value) or KillAuraRadius end })
+        farmTab:Toggle({ Title = "Chop Aura (Small Tree)", Icon = "axe", Default = false, Callback = function(state) if scriptDisabled then return end; ChopAuraEnabled = state; if state then buildTreeCache() else TreeCache = {} end end })
+        farmTab:Slider({ Title = "Chop Aura Radius", Description = "Jarak tebang otomatis (50 - 200).", Step = 1, Value = { Min = 50, Max = 200, Default = ChopAuraRadius }, Callback = function(value) ChopAuraRadius = tonumber(value) or ChopAuraRadius end })
+
+        -- TOOLS TAB (original)
+        utilTab:Button({ Title = "Scan Map.Campground (Copy List)", Icon = "scan-line", Callback = function() if scriptDisabled then return end; notifyUI("Scanner", "Scan mulai... cek console / clipboard.", 4, "radar"); scanCampground() end })
+
+        -- NIGHT TAB (original)
+        nightTab:Toggle({ Title = "Auto Skip Malam (Temporal)", Icon = "moon-star", Default = false, Callback = function(state)
+            if scriptDisabled then return end
+            autoTemporalEnabled = state
+            notifyUI("Auto Skip Malam", state and "Aktif: auto trigger saat Day naik." or "Dimatikan.", 4, state and "moon" or "toggle-left")
+        end })
+        nightTab:Button({ Title = "Trigger Temporal Sekali (Manual)", Icon = "zap", Callback = function() if scriptDisabled then return end; activateTemporal() end })
+
+        -- WEBHOOK TAB (original)
+        webhookTab:Input({ Title = "Discord Webhook URL", Icon = "link", Placeholder = WebhookURL, Numeric = false, Finished = false, Callback = function(txt) local t = trim(txt or "") if t ~= "" then WebhookURL = t; notifyUI("Webhook", "URL disimpan.", 3, "link"); print("WebhookURL set:", WebhookURL) end end })
+        webhookTab:Input({ Title = "Webhook Username (opsional)", Icon = "user", Placeholder = WebhookUsername, Numeric = false, Finished = false, Callback = function(txt) local t = trim(txt or "") if t ~= "" then WebhookUsername = t end; notifyUI("Webhook", "Username disimpan: " .. tostring(WebhookUsername), 3, "user") end })
+        webhookTab:Toggle({ Title = "Enable Webhook DayDisplay", Icon = "radio", Default = WebhookEnabled, Callback = function(state) WebhookEnabled = state; notifyUI("Webhook", state and "Webhook diaktifkan." or "Webhook dimatikan.", 3, state and "check-circle-2" or "x-circle") end })
+        webhookTab:Button({ Title = "Test Send Webhook", Icon = "flask-conical", Callback = function()
+            if scriptDisabled then return end
+            local players = Players:GetPlayers(); local names = {}
+            for _, p in ipairs(players) do table.insert(names, p.Name) end
+            local payload = { username = WebhookUsername, embeds = {{ title = "🧪 TEST - Webhook Aktif " .. tostring(WebhookUsername), description = ("**Webhook Aktif %s**\n\n**Progress:** `%s`\n\n**Pemain Aktif:**\n%s"):format(tostring(WebhookUsername), tostring(currentDayCached), namesToVerticalList(names)), color = 0x2ECC71, footer = { text = "Test sent: " .. os.date("%Y-%m-%d %H:%M:%S") }}}}
+            local ok, msg = sendWebhookPayload(payload)
+            if ok then notifyUI("Webhook Test", "Terkirim: " .. tostring(msg), 5, "check-circle-2"); print("Webhook Test success:", msg)
+            else notifyUI("Webhook Test Failed", tostring(msg), 8, "alert-triangle"); warn("Webhook Test failed:", msg) end
+        end})
+
+        -- HEALTH TAB (original)
+        healthTab:Paragraph({ Title = "Cek Health Script", Desc = "Klik tombol di bawah buat lihat status terbaru:\n- Uptime\n- Lava Ready / Scanning\n- Ping\n- FPS\n- Fitur aktif (Godmode, AFK, Farm, Aura, dll)\n\nMini panel di kiri layar juga selalu update realtime.", Color = "Grey" })
+        healthTab:Button({ Title = "Refresh Status Sekarang", Icon = "activity", Callback = function() if scriptDisabled then return end; local msg = getStatusSummary(); notifyUI("Status Script", msg, 7, "activity"); print("[PapiDimz] Status:\n" .. msg) end })
+        Window:OnDestroy(resetAll)
+    end
 end
 
-local function startMiniHudLoop()
-    scriptStartTime = os.clock()
-
-    task.spawn(function()
-        local last = tick()
-        while not scriptDisabled do
-            local now = tick()
-            local dt  = now - last
-            last = now
-            if dt > 0 then currentFPS = math.floor(1/dt + 0.5) end
-            RunService.Heartbeat:Wait()
+---------------------------------------------------------
+-- FISHING FUNCTIONS (XENO GLASS)
+---------------------------------------------------------
+local function fishingEnsureOverlay()
+    local pg = LocalPlayer.PlayerGui
+    if pg:FindFirstChild("XenoPositionOverlay") then return pg.XenoPositionOverlay end
+    local g = Instance.new("ScreenGui")
+    g.Name = "XenoPositionOverlay"
+    g.ResetOnSpawn = false
+    g.IgnoreGuiInset = true
+    g.DisplayOrder = 9999
+    g.Parent = pg
+    local dot = Instance.new("Frame", g)
+    dot.Name = "RedDot"
+    dot.Size = UDim2.new(0, 14, 0, 14)
+    dot.AnchorPoint = Vector2.new(0.5, 0.5)
+    dot.BackgroundColor3 = Color3.fromRGB(220,50,50)
+    dot.BorderSizePixel = 0
+    dot.ZIndex = 9999
+    dot.Visible = false
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1,0)
+    g.Enabled = false
+    return g
+end
+local function fishingShowOverlay(x,y)
+    local g = fishingEnsureOverlay()
+    g.Enabled = true
+    local dot = g.RedDot
+    if dot then
+        dot.Visible = true
+        dot.Position = UDim2.new(0, math.floor(x + fishingOffsetX), 0, math.floor(y + fishingOffsetY))
+    end
+end
+local function fishingHideOverlay()
+    local g = LocalPlayer.PlayerGui:FindFirstChild("XenoPositionOverlay")
+    if g then g.Enabled = false; if g.RedDot then g.RedDot.Visible = false end end
+end
+local function fishingDoClick()
+    if not fishingSavedPosition then return end
+    local x = math.floor(fishingSavedPosition.x + fishingOffsetX)
+    local y = math.floor(fishingSavedPosition.y + fishingOffsetY)
+    pcall(function()
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+        task.wait(0.01)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+    end)
+end
+local function zone_getTimingBar()
+    local iface = LocalPlayer.PlayerGui:FindFirstChild("Interface")
+    if not iface then return nil end
+    local fcf = iface:FindFirstChild("FishingCatchFrame")
+    if not fcf then return nil end
+    return fcf:FindFirstChild("TimingBar")
+end
+local function zone_makeGreenFull()
+    if not zoneEnabled or zoneDestroyed then return end
+    pcall(function()
+        local tb = zone_getTimingBar()
+        if tb and tb:FindFirstChild("SuccessArea") then
+            local sa = tb.SuccessArea
+            sa.Size = UDim2.new(0,120,0,330)
+            sa.Position = UDim2.new(0,52,0,-5)
+            sa.BackgroundTransparency = 0
+            if not sa:FindFirstChild("UICorner") then Instance.new("UICorner", sa).CornerRadius = UDim.new(0,12) end
         end
     end)
-
-    task.spawn(function()
-        while not scriptDisabled do
-            local uptime = formatTime(os.clock() - scriptStartTime)
-            local pingMs = math.floor((LocalPlayer:GetNetworkPing() or 0) * 1000 + 0.5)
-            local lavaStr = lavaFound and "Ready" or "Scan"
-
-            if miniUptimeLabel then miniUptimeLabel.Text = "UP : " .. uptime end
-            if miniLavaLabel then miniLavaLabel.Text = "LV : " .. lavaStr end
-            if miniPingFpsLabel then
-                miniPingFpsLabel.Text = string.format("PG : %d ms | FP : %d", pingMs, currentFPS)
-            end
-            if miniFeaturesLabel then
-                miniFeaturesLabel.Text = "FT : " .. getFeatureCodes()
-            end
-
-            task.wait(1)
+end
+local function zone_isTimingBarVisible()
+    if zoneDestroyed then return false end
+    local tb = zone_getTimingBar()
+    if not tb then return false end
+    local cur = tb
+    while cur and cur ~= LocalPlayer.PlayerGui do
+        if cur:IsA("ScreenGui") and not cur.Enabled then return false end
+        if cur:IsA("GuiObject") and not cur.Visible then return false end
+        cur = cur.Parent
+    end
+    return true
+end
+local function zone_doSpamClick()
+    pcall(function()
+        local cam = Workspace.CurrentCamera
+        local pt = cam and Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2) or Vector2.new(300,300)
+        VirtualUser:Button1Down(pt); task.wait(0.02); VirtualUser:Button1Up(pt)
+    end)
+end
+local function zone_startSpam()
+    if zoneSpamClicking or zoneDestroyed or not zoneEnabled then return end
+    zoneSpamClicking = true
+    zoneSpamThread = task.spawn(function()
+        while zoneSpamClicking and not zoneDestroyed and zoneEnabled do
+            if not zone_isTimingBarVisible() then zoneSpamClicking = false; break end
+            zone_doSpamClick()
+            task.wait(zoneSpamInterval)
         end
     end)
 end
-
----------------------------------------------------------
--- ANTI AFK
----------------------------------------------------------
-local function initAntiAFK()
-    LocalPlayer.Idled:Connect(function()
-        if not AntiAFKEnabled or scriptDisabled then return end
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
+local function zone_stopSpam()
+    zoneSpamClicking = false
+end
+local function startZone()
+    zoneDestroyed = false
+    zoneEnabled = true
+    task.spawn(function()
+        while not zoneDestroyed do
+            task.wait(0.15)
+            if zoneEnabled then pcall(zone_makeGreenFull) end
+        end
+    end)
+    task.spawn(function()
+        zoneLastVisible = zone_isTimingBarVisible()
+        wasTimingBarVisible = zoneLastVisible
+        if zoneLastVisible then lastTimingBarSeenAt = tick() end
+        while not zoneDestroyed do
+            task.wait(0.06)
+            local nowVisible = zone_isTimingBarVisible()
+            if nowVisible then lastTimingBarSeenAt = tick() end
+            if nowVisible ~= zoneLastVisible then
+                zoneLastVisible = nowVisible
+                if nowVisible then
+                    wasTimingBarVisible = true
+                    lastTimingBarSeenAt = tick()
+                    if zoneEnabled then pcall(zone_makeGreenFull); zone_startSpam() end
+                else
+                    zone_stopSpam()
+                    if autoRecastEnabled and fishingSavedPosition then
+                        local sinceSeen = tick() - lastTimingBarSeenAt
+                        local sinceRecast = tick() - lastRecastAt
+                        if wasTimingBarVisible and sinceSeen <= MAX_RECENT_SECS and sinceRecast >= RECAST_DELAY then
+                            task.spawn(function()
+                                task.wait(RECAST_DELAY)
+                                fishingDoClick()
+                                lastRecastAt = tick()
+                                notifyUI("Auto Recast", "Recast dilakukan.", 2)
+                            end)
+                        end
+                    end
+                    wasTimingBarVisible = false
+                end
+            end
+        end
+    end)
+    task.spawn(function()
+        task.wait(0.15)
+        if zoneEnabled and zone_isTimingBarVisible() then zone_startSpam() end
     end)
 end
+local function stopZone()
+    zoneEnabled = false
+    zone_stopSpam()
+    zoneDestroyed = true
+end
+-- Fishing auto click loop
+fishingLoopThread = task.spawn(function()
+    while true do
+        if fishingAutoClickEnabled and fishingSavedPosition and not scriptDisabled then
+            fishingDoClick()
+        end
+        task.wait(fishingClickDelay)
+    end
+end)
+-- Position set handler
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp or not waitingForPosition or scriptDisabled then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        local loc = UserInputService:GetMouseLocation()
+        local vp = Camera.ViewportSize
+        local px = math.clamp(math.floor(loc.X), 0, vp.X)
+        local py = math.clamp(math.floor(loc.Y), 0, vp.Y)
+        fishingSavedPosition = {x = px, y = py}
+        waitingForPosition = false
+        notifyUI("Position Set", ("X=%d Y=%d"):format(px, py), 3)
+        if fishingOverlayVisible then fishingShowOverlay(px, py) end
+    end
+end)
 
 ---------------------------------------------------------
--- END OF PART 2
+-- ORIGINAL FEATURES (Lava, Cook, Scrap, Aura, etc) - omitted for space but fully included in actual execution
 ---------------------------------------------------------
-print("[PapiDimz] PART 2 Loaded.")
 ---------------------------------------------------------
--- FARM SYSTEM — CROCKPOT / SCRAPPER / SACRIFICE / COIN
+-- LAVA FINDER
+---------------------------------------------------------
+local function findLava()
+    if lavaFound then return end
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return end
+    local landmarks = map:FindFirstChild("Landmarks")
+    if not landmarks then return end
+    local volcano = landmarks:FindFirstChild("Volcano")
+    if not volcano then return end
+    local functional = volcano:FindFirstChild("Functional")
+    if not functional then return end
+    local lava = functional:FindFirstChild("Lava")
+    if lava and lava:IsA("BasePart") then
+        LavaCFrame = lava.CFrame * CFrame.new(0, 4, 0)
+        lavaFound = true
+        print("[Lava] Volcano lava ditemukan.")
+        notifyUI("Lava", "Volcano lava ditemukan. Auto-sacrifice siap.", 4, "flame")
+    end
+end
+task.spawn(function()
+    while not lavaFound and not scriptDisabled do
+        findLava()
+        task.wait(1.5)
+    end
+end)
+
+---------------------------------------------------------
+-- AUTO SACRIFICE LAVA
+---------------------------------------------------------
+local function sacrificeItemToLava(item)
+    if not AutoSacEnabled then return end
+    if not item or not item.Parent or not item:IsA("Model") or not item.PrimaryPart then return end
+    if not lavaFound or not LavaCFrame then return end
+    if not table.find(SacrificeList, item.Name) then return end
+    pcall(function()
+        if RequestStartDragging then RequestStartDragging:FireServer(item) end
+        task.wait(0.1)
+        local offset = CFrame.new(math.random(-6, 6), 0, math.random(-6, 6))
+        item:PivotTo(LavaCFrame * offset)
+        task.wait(0.2)
+        if RequestStopDragging then RequestStopDragging:FireServer(item) end
+    end)
+end
+task.spawn(function()
+    while not scriptDisabled do
+        if AutoSacEnabled and lavaFound and ItemsFolder then
+            for _, obj in ipairs(ItemsFolder:GetChildren()) do
+                sacrificeItemToLava(obj)
+            end
+        end
+        task.wait(0.7)
+    end
+end)
+
+---------------------------------------------------------
+-- AUTO CROCKPOT
 ---------------------------------------------------------
 local function ensureCookingStations()
     local structures = Workspace:FindFirstChild("Structures")
@@ -809,48 +1349,40 @@ local function ensureCookingStations()
         warn("[Cook] workspace.Structures tidak ditemukan.")
         return false
     end
-
     local stations = {}
     local crock = structures:FindFirstChild("Crock Pot")
-    local chef  = structures:FindFirstChild("Chefs Station")
-
+    local chef = structures:FindFirstChild("Chefs Station")
     if crock then table.insert(stations, crock) end
-    if chef  then table.insert(stations, chef) end
-
+    if chef then table.insert(stations, chef) end
     if #stations == 0 then
         CookingStations = {}
         warn("[Cook] Tidak ada Crock Pot / Chefs Station.")
         return false
     end
-
     CookingStations = stations
+    local names = {}
+    for _, s in ipairs(stations) do table.insert(names, s.Name) end
+    print("[Cook] Cooking Stations:", table.concat(names, ", "))
     return true
 end
-
 local function getStationBase(station)
     if not station then return nil end
-    return station.PrimaryPart or station:FindFirstChildOfClass("BasePart")
+    local base = station.PrimaryPart or station:FindFirstChildOfClass("BasePart")
+    if not base then warn("[Cook] Station tanpa PrimaryPart/BasePart:", station.Name) end
+    return base
 end
-
-local function getCookDropCFrame(base, index)
+local function getCookDropCFrame(basePart, index)
     local radius = 2
     local height = 3
     local angle = (index - 1) * (math.pi / 4)
-
-    return CFrame.new(
-        base.Position + Vector3.new(
-            math.cos(angle) * radius,
-            height,
-            math.sin(angle) * radius
-        )
-    )
+    local basePos = basePart.Position
+    local offsetX = math.cos(angle) * radius
+    local offsetZ = math.sin(angle) * radius
+    return CFrame.new(basePos + Vector3.new(offsetX, height, offsetZ))
 end
-
 local function collectCookCandidates(basePart, targetSet, maxCount)
     local best = {}
-
     if not ItemsFolder then return {} end
-
     for _, item in ipairs(ItemsFolder:GetChildren()) do
         if item:IsA("Model")
             and item.PrimaryPart
@@ -858,238 +1390,192 @@ local function collectCookCandidates(basePart, targetSet, maxCount)
             and not string.find(item.Name, "Item Chest")
         then
             local dist = (item.PrimaryPart.Position - basePart.Position).Magnitude
-            table.insert(best, {instance = item, distance = dist})
+            if #best < maxCount then
+                table.insert(best, { instance = item, distance = dist })
+            else
+                local worstIndex, worstDist = 1, best[1].distance
+                for i = 2, #best do
+                    if best[i].distance > worstDist then
+                        worstDist = best[i].distance
+                        worstIndex = i
+                    end
+                end
+                if dist < worstDist then best[worstIndex] = { instance = item, distance = dist } end
+            end
         end
     end
-
-    table.sort(best, function(a,b) return a.distance < b.distance end)
-    local result = {}
-    for i = 1, math.min(maxCount, #best) do
-        table.insert(result, best[i])
-    end
-    return result
+    table.sort(best, function(a, b) return a.distance < b.distance end)
+    return best
 end
-
 local function cookOnce()
     if not AutoCookEnabled then return end
-
-    if not SelectedCookItems or #SelectedCookItems == 0 then return end
-    if not CookingStations or #CookingStations == 0 then return end
-
-    local targetSet = {}
-    for _, v in ipairs(SelectedCookItems) do targetSet[v] = true end
-
+    if not SelectedCookItems or #SelectedCookItems == 0 then print("[Cook] No items selected."); return end
+    if not CookingStations or #CookingStations == 0 then print("[Cook] CookingStations kosong."); return end
+    local targetSet = tableToSet(SelectedCookItems)
+    print(string.format("[Cook] Mode: %s | Stations: %d", MoveMode or "unknown", #CookingStations))
     for _, station in ipairs(CookingStations) do
         if station and station.Parent then
             local base = getStationBase(station)
             if base then
                 local candidates = collectCookCandidates(base, targetSet, CookItemsPerCycle)
-
-                for i, entry in ipairs(candidates) do
-                    local item = entry.instance
-                    if item and item.Parent then
-                        local drop = getCookDropCFrame(base, i)
-
-                        pcall(function() RequestStartDragging:FireServer(item) end)
-                        task.wait(0.03)
-
-                        pcall(function() item:PivotTo(drop) end)
-                        task.wait(0.03)
-
-                        pcall(function() RequestStopDragging:FireServer(item) end)
-                        task.wait(0.03)
+                if #candidates == 0 then
+                    print("[Cook] No candidates:", station.Name)
+                else
+                    local maxCount = math.min(CookItemsPerCycle, #candidates)
+                    print(string.format("[Cook] %s | Use: %d candidates", station.Name, maxCount))
+                    for i = 1, maxCount do
+                        local entry = candidates[i]
+                        local item = entry.instance
+                        if item and item.Parent then
+                            local dropCF = getCookDropCFrame(base, i)
+                            pcall(function() if RequestStartDragging then RequestStartDragging:FireServer(item) end end)
+                            task.wait(0.03)
+                            pcall(function() item:PivotTo(dropCF) end)
+                            task.wait(0.03)
+                            pcall(function() if RequestStopDragging then RequestStopDragging:FireServer(item) end end)
+                            print(string.format("[Cook] %s → %s (dist=%.1f)", item.Name, station.Name, entry.distance))
+                            task.wait(0.03)
+                        end
                     end
+                end
+            end
+        else
+            print("[Cook] Station invalid:", station and station.Name or "unknown")
+        end
+    end
+end
+local function startCookLoop()
+    CookLoopId += 1
+    local current = CookLoopId
+    task.spawn(function()
+        print("[Cook] Auto Crockpot start.")
+        while AutoCookEnabled and current == CookLoopId and not scriptDisabled do
+            cookOnce()
+            task.wait(math.clamp(CookDelaySeconds, 5, 20))
+        end
+        print("[Cook] Auto Crockpot stop.")
+    end)
+end
+
+---------------------------------------------------------
+-- SCRAPPER (GRINDER)
+---------------------------------------------------------
+local function ensureScrapperTarget()
+    if ScrapperTarget and ScrapperTarget.Parent then return true end
+    local map = Workspace:FindFirstChild("Map")
+    if not map then warn("[Scrap] workspace.Map tidak ditemukan."); ScrapperTarget = nil; return false end
+    local camp = map:FindFirstChild("Campground")
+    if not camp then warn("[Scrap] Map.Campground tidak ditemukan."); ScrapperTarget = nil; return false end
+    local scrapper = camp:FindFirstChild("Scrapper")
+    if not scrapper then warn("[Scrap] Campground.Scrapper tidak ditemukan."); ScrapperTarget = nil; return false end
+    local movers = scrapper:FindFirstChild("Movers")
+    if not movers then warn("[Scrap] Scrapper.Movers tidak ditemukan."); ScrapperTarget = nil; return false end
+    local right = movers:FindFirstChild("Right")
+    if not right then warn("[Scrap] Scrapper.Movers.Right tidak ditemukan."); ScrapperTarget = nil; return false end
+    local grindersRight = right:FindFirstChild("GrindersRight")
+    if not grindersRight or not grindersRight:IsA("BasePart") then warn("[Scrap] GrindersRight tidak ditemukan / bukan BasePart."); ScrapperTarget = nil; return false end
+    ScrapperTarget = grindersRight
+    print("[Scrap] Scrapper target:", getInstancePath(ScrapperTarget))
+    return true
+end
+local function getScrapDropCFrame(scrapBase, index)
+    local radius = 1.5
+    local height = 6
+    local angle = (index - 1) * (math.pi / 6)
+    local basePos = scrapBase.Position
+    local offsetX = math.cos(angle) * radius
+    local offsetZ = math.sin(angle) * radius
+    return CFrame.new(basePos + Vector3.new(offsetX, height, offsetZ))
+end
+local function scrapOnceFullPass()
+    if not ScrapEnabled then return end
+    if not ensureScrapperTarget() then print("[Scrap] Scrapper target belum siap."); return end
+    local scrapBase = ScrapperTarget
+    for _, name in ipairs(ScrapItemsPriority) do
+        if not ScrapEnabled or scriptDisabled then return end
+        local batch = {}
+        if ItemsFolder then
+            for _, item in ipairs(ItemsFolder:GetChildren()) do
+                if item:IsA("Model") and item.PrimaryPart and item.Name == name then
+                    local dist = (item.PrimaryPart.Position - scrapBase.Position).Magnitude
+                    table.insert(batch, { instance = item, distance = dist })
+                end
+            end
+        end
+        if #batch > 0 then
+            table.sort(batch, function(a, b) return a.distance < b.distance end)
+            print(string.format("[Scrap] %s | jumlah=%d", name, #batch))
+            for i, entry in ipairs(batch) do
+                if not ScrapEnabled or scriptDisabled then return end
+                local item = entry.instance
+                if item and item.Parent then
+                    local dropCF = getScrapDropCFrame(scrapBase, i)
+                    pcall(function() if RequestStartDragging then RequestStartDragging:FireServer(item) end end)
+                    task.wait(0.02)
+                    pcall(function() item:PivotTo(dropCF) end)
+                    task.wait(0.02)
+                    pcall(function() if RequestStopDragging then RequestStopDragging:FireServer(item) end end)
+                    print(string.format("[Scrap] %s → Grinder (dist=%.1f)", item.Name, entry.distance or -1))
+                    task.wait(0.02)
                 end
             end
         end
     end
 end
-
-local function startCookLoop()
-    CookLoopId += 1
-    local id = CookLoopId
-
-    task.spawn(function()
-        while AutoCookEnabled and id == CookLoopId and not scriptDisabled do
-            cookOnce()
-            task.wait(math.clamp(CookDelaySeconds, 5, 20))
-        end
-    end)
-end
-
----------------------------------------------------------
--- SCRAPPER (AUTO GRINDER)
----------------------------------------------------------
-local function ensureScrapperTarget()
-    if ScrapperTarget and ScrapperTarget.Parent then return true end
-
-    local map = Workspace:FindFirstChild("Map")
-    if not map then ScrapperTarget = nil return false end
-
-    local camp = map:FindFirstChild("Campground")
-    if not camp then ScrapperTarget = nil return false end
-
-    local scr = camp:FindFirstChild("Scrapper")
-    if not scr then ScrapperTarget = nil return false end
-
-    local movers = scr:FindFirstChild("Movers")
-    if not movers then ScrapperTarget = nil return false end
-
-    local right = movers:FindFirstChild("Right")
-    if not right then ScrapperTarget = nil return false end
-
-    local grind = right:FindFirstChild("GrindersRight")
-    if not grind or not grind:IsA("BasePart") then
-        ScrapperTarget = nil
-        return false
-    end
-
-    ScrapperTarget = grind
-    return true
-end
-
-local function getScrapDropCFrame(base, index)
-    local radius = 1.5
-    local height = 6
-    local angle = (index - 1) * (math.pi / 6)
-    return CFrame.new(
-        base.Position + Vector3.new(
-            math.cos(angle) * radius,
-            height,
-            math.sin(angle) * radius
-        )
-    )
-end
-
-local function scrapOnceFullPass()
-    if not ScrapEnabled then return end
-    if not ensureScrapperTarget() then return end
-
-    local base = ScrapperTarget
-    if not base then return end
-
-    for _, name in ipairs(ScrapItemsPriority) do
-        if not ScrapEnabled then return end
-
-        local batch = {}
-        for _, item in ipairs(ItemsFolder:GetChildren()) do
-            if item:IsA("Model") and item.PrimaryPart and item.Name == name then
-                table.insert(batch, item)
-            end
-        end
-
-        table.sort(batch, function(a,b)
-            return (a.PrimaryPart.Position - base.Position).Magnitude <
-                   (b.PrimaryPart.Position - base.Position).Magnitude
-        end)
-
-        for i, item in ipairs(batch) do
-            if not ScrapEnabled then return end
-
-            local drop = getScrapDropCFrame(base, i)
-
-            pcall(function() RequestStartDragging:FireServer(item) end)
-            task.wait(0.02)
-
-            pcall(function() item:PivotTo(drop) end)
-            task.wait(0.02)
-
-            pcall(function() RequestStopDragging:FireServer(item) end)
-            task.wait(0.02)
-        end
-    end
-end
-
 local function startScrapLoop()
     ScrapLoopId += 1
-    local id = ScrapLoopId
-
+    local current = ScrapLoopId
     task.spawn(function()
-        while ScrapEnabled and id == ScrapLoopId and not scriptDisabled do
+        print("[Scrap] Auto Scrapper start.")
+        while ScrapEnabled and current == ScrapLoopId and not scriptDisabled do
             scrapOnceFullPass()
             task.wait(math.clamp(ScrapScanInterval, 10, 300))
         end
+        print("[Scrap] Auto Scrapper stop.")
     end)
 end
 
 ---------------------------------------------------------
--- LAVA SACRIFICE
+-- GODMODE & ANTI AFK
 ---------------------------------------------------------
-local function findLava()
-    if lavaFound then return end
-
-    local map = Workspace:FindFirstChild("Map")
-    if not map then return end
-
-    local land = map:FindFirstChild("Landmarks")
-    if not land then return end
-
-    local vol = land:FindFirstChild("Volcano")
-    if not vol then return end
-
-    local func = vol:FindFirstChild("Functional")
-    if not func then return end
-
-    local lava = func:FindFirstChild("Lava")
-    if lava and lava:IsA("BasePart") then
-        LavaCFrame = lava.CFrame * CFrame.new(0, 4, 0)
-        lavaFound = true
-        notifyUI("Lava Ready", "Lava ditemukan!", 4, "flame")
-    end
-end
-
-task.spawn(function()
-    while not lavaFound and not scriptDisabled do
-        findLava()
-        task.wait(1.5)
-    end
-end)
-
-local function sacrificeItemToLava(item)
-    if not AutoSacEnabled then return end
-    if not item or not item.Parent or not item:IsA("Model") or not item.PrimaryPart then return end
-    if not lavaFound or not LavaCFrame then return end
-
-    if not table.find(SacrificeList, item.Name) then return end
-
-    pcall(function() RequestStartDragging:FireServer(item) end)
-    task.wait(0.1)
-
-    local offset = CFrame.new(math.random(-6, 6), 0, math.random(-6, 6))
-    pcall(function() item:PivotTo(LavaCFrame * offset) end)
-
-    task.wait(0.2)
-    pcall(function() RequestStopDragging:FireServer(item) end)
-end
-
-task.spawn(function()
-    while not scriptDisabled do
-        if AutoSacEnabled and lavaFound and ItemsFolder then
-            for _, itm in ipairs(ItemsFolder:GetChildren()) do
-                sacrificeItemToLava(itm)
+local function startGodmodeLoop()
+    task.spawn(function()
+        while not scriptDisabled do
+            if GodmodeEnabled then
+                pcall(function()
+                    if RemoteEvents then
+                        local dmg = RemoteEvents:FindFirstChild("DamagePlayer")
+                        if dmg then dmg:FireServer(-math.huge) end
+                    end
+                end)
             end
+            task.wait(8)
         end
-        task.wait(0.7)
-    end
-end)
+    end)
+end
+local function initAntiAFK()
+    LocalPlayer.Idled:Connect(function()
+        if scriptDisabled then return end
+        if not AntiAFKEnabled then return end
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end
 
 ---------------------------------------------------------
--- ULTRA COIN / AMMO
+-- ULTRA COIN & AMMO
 ---------------------------------------------------------
 local function stopCoinAmmo()
     CoinAmmoEnabled = false
-    if coinAmmoDescAddedConn then coinAmmoDescAddedConn:Disconnect() end
-    if CoinAmmoConnection then CoinAmmoConnection:Disconnect() end
+    if coinAmmoDescAddedConn then coinAmmoDescAddedConn:Disconnect(); coinAmmoDescAddedConn = nil end
+    if CoinAmmoConnection then CoinAmmoConnection:Disconnect(); CoinAmmoConnection = nil end
 end
-
 local function startCoinAmmo()
     stopCoinAmmo()
     CoinAmmoEnabled = true
-
     task.spawn(function()
         for _, v in ipairs(Workspace:GetDescendants()) do
-            if not CoinAmmoEnabled then break end
-            
+            if not CoinAmmoEnabled or scriptDisabled then break end
             pcall(function()
                 if v.Name == "Coin Stack" and CollectCoinRemote then
                     CollectCoinRemote:InvokeServer(v)
@@ -1098,13 +1584,10 @@ local function startCoinAmmo()
                 end
             end)
         end
-
-        notifyUI("Ultra Coin", "Mendengarkan spawn coin baru...", 4, "zap")
-
+        notifyUI("Ultra Coin & Ammo", "Initial collect selesai. Listening spawn baru...", 4, "zap")
         coinAmmoDescAddedConn = Workspace.DescendantAdded:Connect(function(desc)
-            if not CoinAmmoEnabled then return end
-            task.wait(0.02)
-
+            if not CoinAmmoEnabled or scriptDisabled then return end
+            task.wait(0.01)
             pcall(function()
                 if desc.Name == "Coin Stack" and CollectCoinRemote then
                     CollectCoinRemote:InvokeServer(desc)
@@ -1113,31 +1596,16 @@ local function startCoinAmmo()
                 end
             end)
         end)
+        while CoinAmmoEnabled and not scriptDisabled do task.wait(0.5) end
+        stopCoinAmmo()
+        print("[CoinAmmo] Dimatikan.")
     end)
 end
 
 ---------------------------------------------------------
--- COMBAT — KILL AURA & CHOP AURA
+-- KILL AURA + CHOP AURA (Heartbeat)
 ---------------------------------------------------------
-local function buildTreeCache()
-    TreeCache = {}
-
-    local map = Workspace:FindFirstChild("Map")
-    if not map then return end
-
-    local function scan(folder)
-        if not folder then return end
-        for _, obj in ipairs(folder:GetDescendants()) do
-            if obj.Name == "Small Tree" and obj:FindFirstChild("Trunk") then
-                table.insert(TreeCache, obj)
-            end
-        end
-    end
-
-    scan(map:FindFirstChild("Foliage"))
-    scan(map:FindFirstChild("Landmarks"))
-end
-
+local nextAuraTick = 0
 local function GetBestAxe(forTree)
     for name, id in pairs(AxeIDs) do
         if (not forTree) or (name ~= "Chainsaw" and name ~= "Spear") then
@@ -1150,49 +1618,50 @@ local function GetBestAxe(forTree)
     end
     return nil, nil
 end
-
 local function EquipAxe(tool)
     if tool and EquipHandleRemote then
-        pcall(function()
-            EquipHandleRemote:FireServer("FireAllClients", tool)
-        end)
+        pcall(function() EquipHandleRemote:FireServer("FireAllClients", tool) end)
     end
 end
-
--- HEARTBEAT AURA ENGINE
+local function buildTreeCache()
+    TreeCache = {}
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return end
+    local function scan(folder)
+        if not folder then return end
+        for _, obj in ipairs(folder:GetDescendants()) do
+            if obj.Name == "Small Tree" and obj:FindFirstChild("Trunk") then
+                table.insert(TreeCache, obj)
+            end
+        end
+    end
+    scan(map:FindFirstChild("Foliage"))
+    scan(map:FindFirstChild("Landmarks"))
+    print(string.format("[ChopAura] Tree cache built, total %d trees.", #TreeCache))
+end
 auraHeartbeatConnection = RunService.Heartbeat:Connect(function()
     if scriptDisabled then return end
-    if not KillAuraEnabled and not ChopAuraEnabled then return end
-
+    if (not KillAuraEnabled) and (not ChopAuraEnabled) then return end
     local now = tick()
-    if now < (nextAuraTick or 0) then return end
+    if now < nextAuraTick then return end
     nextAuraTick = now + AuraAttackDelay
-
     local char = LocalPlayer.Character
     if not char then return end
-
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-
-    -------------------------------------------------
     -- KILL AURA
-    -------------------------------------------------
     if KillAuraEnabled then
         local axe, axeId = GetBestAxe(false)
         if axe and axeId and ToolDamageRemote then
             EquipAxe(axe)
-
-            local folder = Workspace:FindFirstChild("Characters")
-            if folder then
-                for _, target in ipairs(folder:GetChildren()) do
+            local charsFolder = Workspace:FindFirstChild("Characters")
+            if charsFolder then
+                for _, target in ipairs(charsFolder:GetChildren()) do
                     if target ~= char and target:IsA("Model") then
                         local root = target:FindFirstChildWhichIsA("BasePart")
                         if root and (root.Position - hrp.Position).Magnitude <= KillAuraRadius then
                             pcall(function()
-                                ToolDamageRemote:InvokeServer(
-                                    target, axe, axeId,
-                                    CFrame.new(root.Position)
-                                )
+                                ToolDamageRemote:InvokeServer(target, axe, axeId, CFrame.new(root.Position))
                             end)
                         end
                     end
@@ -1200,31 +1669,25 @@ auraHeartbeatConnection = RunService.Heartbeat:Connect(function()
             end
         end
     end
-
-    -------------------------------------------------
     -- CHOP AURA
-    -------------------------------------------------
     if ChopAuraEnabled then
         if #TreeCache == 0 then buildTreeCache() end
-
         local axe = GetBestAxe(true)
         if axe and ToolDamageRemote then
             EquipAxe(axe)
-
             for i = #TreeCache, 1, -1 do
                 local tree = TreeCache[i]
                 if tree and tree.Parent and tree:FindFirstChild("Trunk") then
                     local trunk = tree.Trunk
-
                     if (trunk.Position - hrp.Position).Magnitude <= ChopAuraRadius then
                         pcall(function()
-                            ToolDamageRemote:InvokeServer(
-                                tree, axe, "999_7367831688",
-                                CFrame.new(-2.96, 4.55, -75.95)
-                            )
+                            ToolDamageRemote:InvokeServer(tree, axe, "999_7367831688",
+                                CFrame.new(-2.962610244751,4.5547881126404,-75.950843811035,
+                                           0.89621275663376,-1.3894891459643e-8,0.44362446665764,
+                                           -7.994568895775e-10,1,3.293635941759e-8,
+                                           -0.44362446665764,-2.9872644802253e-8,0.89621275663376))
                         end)
                     end
-
                 else
                     table.remove(TreeCache, i)
                 end
@@ -1234,985 +1697,242 @@ auraHeartbeatConnection = RunService.Heartbeat:Connect(function()
 end)
 
 ---------------------------------------------------------
--- TEMPORAL ACCELEROMETER (Manual + Auto Skip)
+-- TEMPORAL / NIGHT SKIP
 ---------------------------------------------------------
 local function activateTemporal()
     if scriptDisabled then return end
-
     if not TemporalAccelerometer or not TemporalAccelerometer.Parent then
-        local structures = Workspace:FindFirstChild("Structures")
-        if structures then
-            TemporalAccelerometer = structures:FindFirstChild("Temporal Accelerometer")
-        end
+        Structures = Workspace:FindFirstChild("Structures") or Structures
+        TemporalAccelerometer = Structures and Structures:FindFirstChild("Temporal Accelerometer") or TemporalAccelerometer
     end
-
     if not TemporalAccelerometer then
-        notifyUI("Temporal", "Tidak ditemukan!", 4, "alert-triangle")
+        warn("[Temporal] Temporal Accelerometer tidak ditemukan.")
+        notifyUI("Temporal", "Temporal Accelerometer belum tersedia.", 4, "alert-triangle")
         return
     end
-
     if NightSkipRemote then
         NightSkipRemote:FireServer(TemporalAccelerometer)
+        print("[Temporal] RequestActivate dikirim.")
     end
 end
 
 ---------------------------------------------------------
--- DAYDISPLAY WEBHOOK SYSTEM (Original)
+-- WEBHOOK HELPERS
 ---------------------------------------------------------
 local function namesToVerticalList(names)
-    local t = {}
-    for _, n in ipairs(names) do
-        table.insert(t, "- " .. tostring(n))
-    end
-    return table.concat(t, "\n")
+    if type(names) ~= "table" or #names == 0 then return "_Tidak ada pemain aktif_" end
+    local lines = {}
+    for _, n in ipairs(names) do table.insert(lines, "- " .. tostring(n)) end
+    return table.concat(lines, "\n")
 end
-
-local function try_http(url, body)
-    if syn and syn.request then
-        return pcall(function()
-            return syn.request({
-                Url = url,
-                Method = "POST",
-                Headers = {["Content-Type"]="application/json"},
-                Body = body
-            })
-        end)
-    elseif request then
-        return pcall(function()
-            return request({
-                Url = url,
-                Method = "POST",
-                Headers = {["Content-Type"]="application/json"},
-                Body = body
-            })
-        end)
-    else
-        return pcall(function()
-            return HttpService:PostAsync(url, body, Enum.HttpContentType.ApplicationJson)
-        end)
-    end
+local function try_syn_request(url, body)
+    if not syn or not syn.request then return false, "syn.request not available" end
+    local ok, res = pcall(function()
+        return syn.request({ Url = url, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = body })
+    end)
+    if not ok then return false, res end
+    return true, res
 end
-
-local function buildDayEmbed(cur, prev, beds, kids, list, isTest)
+local function try_request(url, body)
+    if not request then return false, "request not available" end
+    local ok, res = pcall(function()
+        return request({ Url = url, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = body })
+    end)
+    if not ok then return false, res end
+    return true, res
+end
+local function try_httpservice_post(url, body)
+    local ok, res = pcall(function()
+        return HttpService:PostAsync(url, body, Enum.HttpContentType.ApplicationJson)
+    end)
+    return ok, res
+end
+local function buildDayEmbed(currentDay, previousDay, bedCount, kidCount, itemsList, isTest)
     local players = Players:GetPlayers()
     local names = {}
     for _, p in ipairs(players) do table.insert(names, p.Name) end
-
+    local prev = tostring(previousDay or "N/A")
+    local cur = tostring(currentDay or "N/A")
+    local delta = "N/A"
+    if tonumber(cur) and tonumber(prev) then delta = tostring(tonumber(cur) - tonumber(prev)) end
+    local sampleItems = ""
+    if type(itemsList) == "table" and #itemsList > 0 then
+        local limit = math.min(#itemsList, 6)
+        for i = 1, limit do sampleItems = sampleItems .. "• `" .. tostring(itemsList[i]) .. "`\n" end
+        if #itemsList > limit then sampleItems = sampleItems .. "• `...and more`" end
+    else
+        sampleItems = "_No items recorded_"
+    end
+    local titlePrefix = isTest and "🧪 TEST - " or ""
+    local title = string.format("%s🌅 DAY PROGRESSION UPDATE %s", titlePrefix, cur)
+    local subtitle = "Ringkasan hari, pemain aktif, dan item penting."
+    local playerListValue = namesToVerticalList(names)
+    if #playerListValue > 1024 then
+        local sample = {}
+        for i = 1, math.min(#names, 15) do table.insert(sample, names[i]) end
+        playerListValue = namesToVerticalList(sample) .. "\n- ...and more"
+    end
     local embed = {
-        title = (isTest and "🧪 TEST - " or "") .. "🌅 DAY UPDATE " .. tostring(cur),
+        title = title,
         description = table.concat({
-            "✨ **Ringkasan Hari**",
+            "✨ **" .. subtitle .. "**",
             "",
-            string.format("📆 **%s → %s** (Δ %s)", tostring(prev), tostring(cur), tostring((cur-prev))),
-            string.format("🛏️ Beds: %s | 👶 Kids: %s", beds, kids),
+            string.format("📆 **Progress:** `%s → %s` • **Δ**: `%s` hari", prev, cur, delta),
+            string.format("🛏️ **Beds:** `%s` 👶 **Kids:** `%s`", tostring(bedCount or 0), tostring(kidCount or 0)),
+            string.format("🎮 **Players Online:** `%s`", tostring(#names)),
             "",
-            "🎮 **Players Online:** " .. tostring(#names),
-            namesToVerticalList(names),
-            "",
-            "📦 **Items**:",
-            (type(list)=="table" and table.concat(list, "\n") or "_No data_")
-        },"\n"),
-        color = 0xFAA61A
+            "🎒 **Item Highlights:**",
+            sampleItems
+        }, "\n"),
+        color = 0xFAA61A,
+        fields = {
+            { name = "📈 Perubahan Hari", value = string.format("`%s` → `%s` (Δ %s)", prev, cur, tostring(delta)), inline = true },
+            { name = "🎮 Jumlah Pemain", value = "`" .. tostring(#names) .. "`", inline = true },
+            { name = "🧍 Pemain Aktif (list)", value = playerListValue, inline = false },
+        },
+        footer = { text = "🕒 Update generated at " .. os.date("%Y-%m-%d %H:%M:%S") }
     }
-
-    return {
-        username = WebhookUsername,
-        embeds = { embed }
-    }
-end
-
-local function sendWebhook(payload)
-    if not WebhookURL or WebhookURL == "" then return end
-    local body = HttpService:JSONEncode(payload)
-    local ok,result = try_http(WebhookURL, body)
+    local payload = { username = WebhookUsername or "Day Monitor", embeds = { embed } }
+    return payload
 end
 
 local function tryHookDayDisplay()
-    if DayDisplayConnection then DayDisplayConnection:Disconnect() end
-
+    if DayDisplayConnection then DayDisplayConnection:Disconnect(); DayDisplayConnection = nil end
     local function attach(remote)
+        if not remote or not remote.OnClientEvent then return end
         DayDisplayRemote = remote
-        DayDisplayConnection = remote.OnClientEvent:Connect(function(...)
+        DayDisplayConnection = DayDisplayRemote.OnClientEvent:Connect(function(...)
             if scriptDisabled then return end
-
-            local args = {...}
-            if #args == 1 then
-                local day = args[1]
-                if autoTemporalEnabled and day ~= lastProcessedDay then
-                    lastProcessedDay = day
-                    task.delay(5, function()
-                        if autoTemporalEnabled then activateTemporal() end
-                    end)
-                end
-                return
-            end
-
-            local cur  = tonumber(args[1]) or args[1]
-            local prev = tonumber(args[2]) or args[2]
-            local items = args[3]
-
-            if cur > prev then
-                local beds,kids = 0,0
-                if type(items)=="table" then
-                    for _,v in ipairs(items) do
-                        local s = v:lower()
-                        if s:find("bed") then beds=beds+1 end
-                        if s:find("kid") then kids=kids+1 end
+            local args = { ... }
+            if #args >= 2 then
+                local currentDay = tonumber(args[1]) or args[1]
+                local previousDay = tonumber(args[2]) or args[2] or 0
+                local itemsList = args[3]
+                currentDayCached = currentDay
+                previousDayCached = previousDay
+                if type(currentDay) == "number" and type(previousDay) == "number" and currentDay > previousDay then
+                    local bedCount, kidCount = 0, 0
+                    if type(itemsList) == "table" then
+                        for _, v in ipairs(itemsList) do
+                            if type(v) == "string" then
+                                local s = v:lower()
+                                if s:find("bed") then bedCount = bedCount + 1 end
+                                if s:find("child") or s:find("kid") then kidCount = kidCount + 1 end
+                            end
+                        end
+                    end
+                    local payload = buildDayEmbed(currentDay, previousDay, bedCount, kidCount, itemsList, false)
+                    if WebhookEnabled then
+                        local ok, msg = sendWebhookPayload(payload)
+                        if ok then notifyUI("Webhook Sent", "Day " .. previousDay .. " → " .. currentDay, 6, "radio")
+                        else notifyUI("Webhook Failed", tostring(msg), 6, "alert-triangle") end
+                    else
+                        notifyUI("Day Increased", "Day " .. previousDay .. " → " .. currentDay, 5, "calendar")
                     end
                 end
-
-                local payload = buildDayEmbed(cur, prev, beds, kids, items, false)
-                if WebhookEnabled then
-                    sendWebhook(payload)
-                    notifyUI("Webhook Sent", "Day "..prev.." → "..cur, 4, "radio")
-                end
             end
         end)
+        notifyUI("DayDisplay", "Listener terpasang.", 4, "radio")
     end
-
-    local found = RemoteEvents and RemoteEvents:FindFirstChild("DayDisplay")
-    if found then attach(found) return end
-
-    local found2 = ReplicatedStorage:FindFirstChild("DayDisplay")
-    if found2 then attach(found2) return end
-
-    task.spawn(function()
-        for i=1,80 do
-            if scriptDisabled then return end
-            local re = RemoteEvents and RemoteEvents:FindFirstChild("DayDisplay")
-            if re then attach(re) return end
-
-            local rr = ReplicatedStorage:FindFirstChild("DayDisplay")
-            if rr then attach(rr) return end
-
-            task.wait(0.25)
-        end
-    end)
+    if RemoteEvents and RemoteEvents:FindFirstChild("DayDisplay") then
+        attach(RemoteEvents:FindFirstChild("DayDisplay"))
+    elseif ReplicatedStorage:FindFirstChild("DayDisplay") then
+        attach(ReplicatedStorage:FindFirstChild("DayDisplay"))
+    end
 end
 
-task.spawn(function()
+local function sendWebhookPayload(payloadTable)
+    if not WebhookURL or trim(WebhookURL) == "" then return false, "Webhook URL kosong" end
+    local body = HttpService:JSONEncode(payloadTable)
+    local ok1, res1 = try_syn_request(WebhookURL, body)
+    if ok1 then
+        if type(res1) == "table" and res1.StatusCode then
+            if res1.StatusCode >= 200 and res1.StatusCode < 300 then return true, ("syn.request: HTTP %d"):format(res1.StatusCode) end
+            return false, ("syn.request: HTTP %d"):format(res1.StatusCode)
+        end
+        return true, "syn.request: success"
+    end
+    local ok2, res2 = try_request(WebhookURL, body)
+    if ok2 then
+        if type(res2) == "table" and res2.StatusCode then
+            if res2.StatusCode >= 200 and res2.StatusCode < 300 then return true, ("request: HTTP %d"):format(res2.StatusCode) end
+            return false, ("request: HTTP %d"):format(res2.StatusCode)
+        end
+        return true, "request: success"
+    end
+    local ok3, res3 = try_httpservice_post(WebhookURL, body)
+    if ok3 then return true, "HttpService:PostAsync success" end
+    local errmsg = ("syn_err=%s | request_err=%s | http_err=%s"):format(tostring(res1), tostring(res2), tostring(res3))
+    return false, errmsg
+end
+_G.SendManualDay = function(cur, prev, items)
+    local curN, prevN = tonumber(cur) or cur, tonumber(prev) or prev
+    local beds, kids = 0, 0
+    if type(items) == "table" then
+        for _, v in ipairs(items) do
+            if type(v) == "string" then
+                local s = v:lower()
+                if s:find("bed") then beds = beds + 1 end
+                if s:find("child") or s:find("kid") then kids = kids + 1 end
+            end
+        end
+    end
+    local payload = buildDayEmbed(curN, prevN, beds, kids, items, false)
+    local ok, msg = sendWebhookPayload(payload)
+    print("Manual send result:", ok, msg)
+    return ok, msg
+end
+    Window:OnDestroy(resetAll)
+end
+
+-- INITIAL NON-BLOCKING RESOURCE WATCHERS
+backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
+    RemoteEvents = re
+    notifyUI("Init", "RemoteEvents ditemukan.", 3, "radio")
+    RequestStartDragging = re:FindFirstChild("RequestStartDraggingItem")
+    RequestStopDragging = re:FindFirstChild("StopDraggingItem")
+    CollectCoinRemote = re:FindFirstChild("RequestCollectCoints")
+    ConsumeItemRemote = re:FindFirstChild("RequestConsumeItem")
+    NightSkipRemote = re:FindFirstChild("RequestActivateNightSkipMachine")
+    ToolDamageRemote = re:FindFirstChild("ToolDamageObject")
+    EquipHandleRemote = re:FindFirstChild("EquipItemHandle")
     tryHookDayDisplay()
 end)
-
-print("[PapiDimz] PART 3 Loaded.")
----------------------------------------------------------
--- PART 4 — UI SYSTEM (WindUI All Tabs)
----------------------------------------------------------
-
----------------------------------------------------------
--- WINDOW CREATION
----------------------------------------------------------
-local Window = WindUI:CreateWindow({
-    Title = "Papi Dimz |HUB",
-    Icon = "gamepad-2",
-    Author = "Bang Dimz",
-    Folder = "PapiDimzHub_Config",
-    Size = UDim2.fromOffset(620, 560),
-    Theme = "Dark",
-    Acrylic = true,
-    SideBarWidth = 175,
-})
-
-Window:EditOpenButton({
-    Title = "Papi Dimz | HUB",
-    Icon = "sparkles",
-    CornerRadius = UDim.new(0, 14),
-    StrokeThickness = 2,
-    Color = ColorSequence.new(Color3.fromRGB(255,180,95), Color3.fromRGB(255,120,85)),
-    OnlyMobile = false,
-    Enabled = true,
-    Draggable = true,
-})
-
----------------------------------------------------------
--- GLOBAL TOGGLE STATE
----------------------------------------------------------
-local currentKeybind = Enum.KeyCode.P
-local scriptEnabled = true
-
----------------------------------------------------------
--- TAB 1: INFORMATION (PALING ATAS)
----------------------------------------------------------
-local infoTab = Window:Tab({
-    Title = "Information",
-    Icon = "info"
-})
-
-infoTab:Paragraph({
-    Title = "Welcome To Papi Dimz Hub Official",
-    Desc = "Powerful all-in-one utility + automation hub for all Survival: 99 Nights content. Explore every feature with stable performance!",
-    Color = "Blue"
-})
-
--- Copy Discord Link
-infoTab:Button({
-    Title = "Copy Discord Link",
-    Icon = "clipboard",
-    Callback = function()
-        setclipboard("discord.gg/PapiDimz")
-        notifyUI("Copied!", "Discord link copied to clipboard", 3, "check")
-    end
-})
-
--- Keybind
-infoTab:Keybind({
-    Title = "Papi Dimz Keybind",
-    Default = Enum.KeyCode.P,
-    Callback = function(k)
-        currentKeybind = k
-        notifyUI("Keybind Updated", "Open/Close UI = ".. tostring(k), 3, "keyboard")
-    end
-})
-
--- Listen for keybind
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == currentKeybind then
-        Window:Toggle()
-    end
+backgroundFind(Workspace, "Items", function(it)
+    ItemsFolder = it
+    notifyUI("Init", "Items folder ditemukan.", 3, "archive")
 end)
+backgroundFind(Workspace, "Structures", function(st)
+    Structures = st
+    notifyUI("Init", "Structures ditemukan.", 3, "layers")
+    TemporalAccelerometer = st:FindFirstChild("Temporal Accelerometer")
+end)
+task.spawn(function() tryHookDayDisplay() end)
+startGodmodeLoop()
 
--- Force Close
-infoTab:Button({
-    Title = "Force Close Hub",
-    Icon = "power",
-    Variant = "Destructive",
-    Callback = function()
-        scriptDisabled = true
-        resetAll()
-        Window:Unload()
-    end
-})
-
----------------------------------------------------------
--- TAB 2: MAIN
----------------------------------------------------------
-local mainTab = Window:Tab({
-    Title = "Main",
-    Icon = "home"
-})
-
-mainTab:Paragraph({
-    Title = "Hub Status",
-    Desc = "All main modules are active. Explore the tabs to enable features.",
-    Color = "Grey"
-})
-
--- Toggle Godmode
-mainTab:Toggle({
-    Title = "Godmode",
-    Default = false,
-    Callback = function(v)
-        GodmodeEnabled = v
-        notifyUI("Godmode", v and "Enabled" or "Disabled", 3, "shield")
-    end
-})
-
--- Anti AFK
-mainTab:Toggle({
-    Title = "Anti AFK",
-    Default = true,
-    Callback = function(v)
-        AntiAFKEnabled = v
-        notifyUI("Anti AFK", v and "Enabled" or "Disabled", 3, "wifi")
-    end
-})
-
--- Mini HUD
-mainTab:Toggle({
-    Title = "Mini HUD",
-    Default = false,
-    Callback = function(v)
-        if v then
-            createMiniHud()
-            startMiniHudLoop()
-        else
-            if miniHudGui then miniHudGui:Destroy() miniHudGui = nil end
-        end
-    end
-})
-
----------------------------------------------------------
--- TAB 3: LOCAL PLAYER
----------------------------------------------------------
-local localTab = Window:Tab({
-    Title = "Local Player",
-    Icon = "user"
-})
-
----------------- Movement Section ----------------
-local moveSec = localTab:Section({
-    Title = "Movement",
-    Icon = "move"
-})
-
-moveSec:Toggle({
-    Title = "Walkspeed",
-    Default = false,
-    Callback = function(v)
-        walkEnabled = v
-        applyWalkspeed()
-    end
-})
-
-moveSec:Slider({
-    Title = "Walk Speed",
-    Min = 16,
-    Max = 200,
-    Default = 30,
-    Callback = function(v)
-        walkSpeedValue = v
-        applyWalkspeed()
-    end
-})
-
-moveSec:Toggle({
-    Title = "Hip Height",
-    Default = false,
-    Callback = function(v)
-        hipEnabled = v
-        applyHipHeight()
-    end
-})
-
-moveSec:Slider({
-    Title = "Hip Height Value",
-    Min = 2,
-    Max = 60,
-    Default = 35,
-    Callback = function(v)
-        hipValue = v
-        applyHipHeight()
-    end
-})
-
-moveSec:Toggle({
-    Title = "Fly (Stealth Mode)",
-    Default = false,
-    Callback = function(v)
-        if v then startFly() else stopFly() end
-        updateNoclipConnection()
-    end
-})
-
-moveSec:Slider({
-    Title = "Fly Speed",
-    Min = 5,
-    Max = 200,
-    Default = 50,
-    Callback = function(v)
-        flySpeedValue = v
-    end
-})
-
-moveSec:Toggle({
-    Title = "TP Walk",
-    Default = false,
-    Callback = function(v)
-        if v then startTPWalk() else stopTPWalk() end
-    end
-})
-
-moveSec:Slider({
-    Title = "TP Walk Speed",
-    Min = 1,
-    Max = 50,
-    Default = 5,
-    Callback = function(v)
-        tpWalkSpeedValue = v
-    end
-})
-
-moveSec:Toggle({
-    Title = "Noclip",
-    Default = false,
-    Callback = function(v)
-        noclipManualEnabled = v
-        updateNoclipConnection()
-    end
-})
-
-moveSec:Toggle({
-    Title = "Infinite Jump",
-    Default = false,
-    Callback = function(v)
-        if v then startInfiniteJump() else stopInfiniteJump() end
-    end
-})
-
-
----------------- Visual Section ----------------
-local visualSec = localTab:Section({
-    Title = "Visual",
-    Icon = "eye"
-})
-
-visualSec:Toggle({
-    Title = "Full Bright",
-    Default = false,
-    Callback = function(v)
-        if v then enableFullBright() else disableFullBright() end
-    end
-})
-
-visualSec:Toggle({
-    Title = "Remove Fog",
-    Default = false,
-    Callback = function(v)
-        if v then removeFog() end
-    end
-})
-
-visualSec:Toggle({
-    Title = "Remove Sky",
-    Default = false,
-    Callback = function(v)
-        if v then removeSky() end
-    end
-})
-
-
----------------- Utility Section ----------------
-local utilLocal = localTab:Section({
-    Title = "Utility",
-    Icon = "wrench"
-})
-
-utilLocal:Toggle({
-    Title = "Instant Open (Prompt)",
-    Default = false,
-    Callback = function(v)
-        if v then enableInstantOpen() else disableInstantOpen() end
-    end
-})
-
-utilLocal:Slider({
-    Title = "Camera FOV",
-    Min = 50,
-    Max = 120,
-    Default = 60,
-    Callback = function(v)
-        fovValue = v
-        applyFOV()
-    end
-})
-
-utilLocal:Toggle({
-    Title = "Enable FOV Effect",
-    Default = false,
-    Callback = function(v)
-        fovEnabled = v
-        applyFOV()
-    end
-})
-
----------------------------------------------------------
--- TAB 4: FISHING
----------------------------------------------------------
-local fishingTab = Window:Tab({
-    Title = "Fishing",
-    Icon = "fish"
-})
-
-local fsMain = fishingTab:Section({
-    Title = "Fishing System",
-    Icon = "fishing-hook",
-    DefaultOpen = true
-})
-
-fsMain:Toggle({
-    Title = "Auto Fishing (Spam Click)",
-    Default = false,
-    Callback = function(v)
-        fishingAutoClickEnabled = v
-        wasTimingBarVisible = false
-        lastTimingBarSeenAt = 0
-    end
-})
-
-fsMain:Slider({
-    Title = "Click Delay (s)",
-    Min = 1,
-    Max = 10,
-    Default = 5,
-    Callback = function(v)
-        fishingClickDelay = v
-    end
-})
-
-local recastSec = fishingTab:Section({
-    Title = "Auto Recast",
-    Icon = "rotate-ccw"
-})
-
-recastSec:Toggle({
-    Title = "Enable Auto Recast",
-    Default = false,
-    Callback = function(v)
-        autoRecastEnabled = v
-    end
-})
-
-recastSec:Slider({
-    Title = "Recast Delay (s)",
-    Min = 1,
-    Max = 10,
-    Default = 2,
-    Callback = function(v)
-        RECAST_DELAY = v
-    end
-})
-
-local zoneSec = fishingTab:Section({
-    Title = "Green Zone",
-    Icon = "target"
-})
-
-zoneSec:Toggle({
-    Title = "Enable Green Zone",
-    Default = false,
-    Callback = function(v)
-        zoneEnabled = v
-    end
-})
-
-zoneSec:Slider({
-    Title = "Spam Interval",
-    Min = 0.02,
-    Max = 0.2,
-    Default = 0.04,
-    Callback = function(v)
-        zoneSpamInterval = v
-    end
-})
-
-zoneSec:Toggle({
-    Title = "Overlay Visible",
-    Default = false,
-    Callback = function(v)
-        fishingOverlayVisible = v
-    end
-})
-
----------------------------------------------------------
--- PART 4A END
----------------------------------------------------------
-
-print("[PapiDimz] PART 4A Loaded.")
----------------------------------------------------------
--- TAB 5: BRING ITEM  (VERSI ASLI KAMU — TIDAK DIUBAH)
----------------------------------------------------------
-local bringTab = Window:Tab({
-    Title = "Bring Item",
-    Icon = "package-search"
-})
-
-bringTab:Paragraph({
-    Title = "Bring Item System",
-    Desc = "Tarik item tertentu ke posisi kamu. Menggunakan list item asli dari script kamu.",
-    Color = "Grey"
-})
-
--- Input Item
-bringTab:Input({
-    Title = "Nama Item",
-    Placeholder = "Contoh: Carrot",
-    Numeric = false,
-    TextDisappear = false,
-    Callback = function(txt)
-        _G.BringItemName = txt
-    end
-})
-
--- Button Bring Item
-bringTab:Button({
-    Title = "Bring Item",
-    Icon = "box",
-    Callback = function()
-        if not _G.BringItemName or _G.BringItemName == "" then
-            notifyUI("Bring Item", "Nama item belum diisi!", 3, "alert-triangle")
-            return
-        end
-        pcall(function()
-            BringItem(_G.BringItemName)
-        end)
-    end
-})
-
--- List item dari script kamu yang lama
-bringTab:Paragraph({
-    Title = "Item List",
-    Desc = table.concat(BringItemList, ", "),
-    Color = "Blue"
-})
-
-
----------------------------------------------------------
--- TAB 6: TELEPORT  (VERSI ASLI KAMU — TIDAK DIUBAH)
----------------------------------------------------------
-local teleTab = Window:Tab({
-    Title = "Teleport",
-    Icon = "navigation"
-})
-
-teleTab:Paragraph({
-    Title = "Teleport Area",
-    Desc = "Teleport cepat ke berbagai lokasi penting.",
-    Color = "Grey"
-})
-
-for name, cframe in pairs(TeleportLocations) do
-    teleTab:Button({
-        Title = name,
-        Icon = "map-pin",
-        Callback = function()
-            TeleportTo(cframe)
-        end
-    })
+-- INIT CHARACTER
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    humanoid = char:WaitForChild("Humanoid")
+    rootPart = char:WaitForChild("HumanoidRootPart")
+    defaultWalkSpeed = humanoid.WalkSpeed
+    defaultHipHeight = humanoid.HipHeight
+    applyWalkspeed()
+    applyHipHeight()
+    applyFOV()
+    if flyEnabled then task.delay(0.2, startFly) end
+end)
+if LocalPlayer.Character then
+    humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
+    rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if humanoid then defaultWalkSpeed = humanoid.WalkSpeed; defaultHipHeight = humanoid.HipHeight end
 end
 
-
----------------------------------------------------------
--- TAB 7: FARM (Auto Cook / Scrap / Lava)
----------------------------------------------------------
-local farmTab = Window:Tab({
-    Title = "Farm",
-    Icon = "chef-hat"
-})
-
----------------- AUTO COOK ----------------
-local cookSec = farmTab:Section({
-    Title = "Auto Crockpot",
-    Icon = "cooking-pot"
-})
-
-cookSec:Toggle({
-    Title = "Enable Auto Cook",
-    Default = false,
-    Callback = function(v)
-        AutoCookEnabled = v
-        if v then
-            ensureCookingStations()
-            startCookLoop()
-            notifyUI("Auto Cook", "Cooking started", 3, "flame")
-        else
-            notifyUI("Auto Cook", "Stopped", 3, "circle-off")
-        end
-    end
-})
-
-cookSec:Slider({
-    Title = "Delay per cycle (sec)",
-    Min = 5,
-    Max = 20,
-    Default = 10,
-    Callback = function(v)
-        CookDelaySeconds = v
-    end
-})
-
-cookSec:Slider({
-    Title = "Items per batch",
-    Min = 1,
-    Max = 10,
-    Default = 5,
-    Callback = function(v)
-        CookItemsPerCycle = v
-    end
-})
-
-cookSec:Paragraph({
-    Title = "Selected Items",
-    Desc = table.concat(SelectedCookItems, ", "),
-    Color = "Grey"
-})
-
-
----------------- AUTO SCRAP ----------------
-local scrapSec = farmTab:Section({
-    Title = "Auto Scrapper",
-    Icon = "recycle"
-})
-
-scrapSec:Toggle({
-    Title = "Enable Auto Scrap",
-    Default = false,
-    Callback = function(v)
-        ScrapEnabled = v
-        if v then
-            ensureScrapperTarget()
-            startScrapLoop()
-            notifyUI("Auto Scrap", "Scrapping items...", 3, "recycle")
-        else
-            notifyUI("Auto Scrap", "Scrapper stopped", 3, "circle-off")
-        end
-    end
-})
-
-scrapSec:Paragraph({
-    Title = "Scrap Order",
-    Desc = table.concat(ScrapItemsPriority, ", "),
-    Color = "Grey"
-})
-
-
----------------- AUTO SACRIFICE LAVA ----------------
-local lavaSec = farmTab:Section({
-    Title = "Auto Sacrifice Lava",
-    Icon = "flame-kindling"
-})
-
-lavaSec:Toggle({
-    Title = "Sacrifice Enabled",
-    Default = false,
-    Callback = function(v)
-        AutoSacEnabled = v
-        if v then
-            notifyUI("Lava Sacrifice", "Waiting for lava...", 3, "flame")
-        end
-    end
-})
-
-
----------------- COIN + AMMO ----------------
-local coinSec = farmTab:Section({
-    Title = "Coin & Ammo",
-    Icon = "zap"
-})
-
-coinSec:Toggle({
-    Title = "Ultra Coin & Ammo",
-    Default = false,
-    Callback = function(v)
-        if v then
-            startCoinAmmo()
-        else
-            stopCoinAmmo()
-        end
-    end
-})
-
----------------- AURA SYSTEM ----------------
-local auraSec = farmTab:Section({
-    Title = "Combat Aura",
-    Icon = "swords"
-})
-
-auraSec:Toggle({
-    Title = "Kill Aura",
-    Default = false,
-    Callback = function(v)
-        KillAuraEnabled = v
-    end
-})
-
-auraSec:Slider({
-    Title = "Kill Radius",
-    Min = 50,
-    Max = 200,
-    Default = 100,
-    Callback = function(v)
-        KillAuraRadius = v
-    end
-})
-
-auraSec:Toggle({
-    Title = "Chop Aura",
-    Default = false,
-    Callback = function(v)
-        ChopAuraEnabled = v
-        if v then buildTreeCache() end
-    end
-})
-
-auraSec:Slider({
-    Title = "Chop Radius",
-    Min = 50,
-    Max = 200,
-    Default = 100,
-    Callback = function(v)
-        ChopAuraRadius = v
-    end
-})
-
-
----------------------------------------------------------
--- TAB 8: TOOLS
----------------------------------------------------------
-local toolsTab = Window:Tab({
-    Title = "Tools",
-    Icon = "wrench"
-})
-
-toolsTab:Button({
-    Title = "Scan Campground (Copy)",
-    Icon = "scan-line",
-    Callback = function()
-        scanCampground()
-        notifyUI("Scanner", "Scan copied to clipboard", 3, "copy")
-    end
-})
-
-
----------------------------------------------------------
--- TAB 9: NIGHT
----------------------------------------------------------
-local nightTab = Window:Tab({
-    Title = "Night",
-    Icon = "moon"
-})
-
-nightTab:Toggle({
-    Title = "Auto Skip Night",
-    Default = false,
-    Callback = function(v)
-        autoTemporalEnabled = v
-        notifyUI("Temporal", v and "Auto enabled" or "Disabled", 3, "moon")
-    end
-})
-
-nightTab:Button({
-    Title = "Trigger Temporal NOW",
-    Icon = "zap",
-    Callback = function()
-        activateTemporal()
-    end
-})
-
-print("[PapiDimz] PART 4B Loaded.")
----------------------------------------------------------
--- TAB 10: WEBHOOK (FULL ORIGINAL)
----------------------------------------------------------
-local webhookTab = Window:Tab({
-    Title = "Webhook",
-    Icon = "radio"
-})
-
-webhookTab:Paragraph({
-    Title = "Discord Webhook Sender",
-    Desc = "Pakai Webhook untuk mengirim update DayDisplay dan status game.",
-    Color = "Grey"
-})
-
--- INPUT: WEBHOOK URL
-webhookTab:Input({
-    Title = "Webhook URL",
-    Placeholder = WebhookURL,
-    Numeric = false,
-    Finished = false,
-    Callback = function(txt)
-        local t = trim(txt or "")
-        if t ~= "" then
-            WebhookURL = t
-            notifyUI("Webhook", "URL updated!", 3, "link")
-        end
-    end
-})
-
--- INPUT: USERNAME
-webhookTab:Input({
-    Title = "Webhook Username",
-    Placeholder = WebhookUsername,
-    Numeric = false,
-    TextDisappear = false,
-    Callback = function(txt)
-        local t = trim(txt or "")
-        if t ~= "" then
-            WebhookUsername = t
-            notifyUI("Webhook", "Username updated!", 3, "user")
-        end
-    end
-})
-
-webhookTab:Toggle({
-    Title = "Enable Webhook DayDisplay",
-    Default = WebhookEnabled,
-    Callback = function(state)
-        WebhookEnabled = state
-        notifyUI("Webhook", state and "Enabled" or "Disabled", 3, state and "check" or "x")
-    end
-})
-
--- TEST SEND
-webhookTab:Button({
-    Title = "Test Send Webhook",
-    Icon = "flask-conical",
-    Callback = function()
-        local players = Players:GetPlayers()
-        local names = {}
-        for _, p in ipairs(players) do table.insert(names, p.Name) end
-
-        local payload = {
-            username = WebhookUsername,
-            embeds = {{
-                title = "🧪 TEST — Webhook Online",
-                description = "**Players Online:**\n" .. namesToVerticalList(names),
-                color = 0x2ECC71,
-                footer = { text = os.date("Sent at %Y-%m-%d %H:%M:%S") }
-            }}
-        }
-
-        local ok, msg = sendWebhookPayload(payload)
-        if ok then
-            notifyUI("Webhook Test", "Success: "..tostring(msg), 4, "check")
-        else
-            notifyUI("Webhook Failed", tostring(msg), 6, "alert-triangle")
-        end
-    end
-})
-
-
----------------------------------------------------------
--- TAB 11: HEALTH CHECK
----------------------------------------------------------
-local healthTab = Window:Tab({
-    Title = "Cek Health",
-    Icon = "activity"
-})
-
-healthTab:Paragraph({
-    Title = "Status Script Realtime",
-    Desc = "Cek uptime, ping, FPS, lava status, fitur aktif dan lain-lain.",
-    Color = "Grey"
-})
-
-healthTab:Button({
-    Title = "Refresh Now",
-    Icon = "refresh-cw",
-    Callback = function()
-        local msg = getStatusSummary()
-        notifyUI("Script Status", msg, 6, "activity")
-        print("[PapiDimz] Status:\n"..msg)
-    end
-})
-
----------------------------------------------------------
--- CLEANUP & DESTROY HANDLING
----------------------------------------------------------
-Window:OnDestroy(function()
-    if not scriptDisabled then
-        resetAll()
-    end
-end)
-
-
----------------------------------------------------------
--- KEYBIND TOGGLE (DEFAULT: P)
----------------------------------------------------------
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp or scriptDisabled then return end
-    if input.KeyCode == currentKeybind then
-        Window:Toggle()
-    end
-end)
-
-
----------------------------------------------------------
--- SPLASH SCREEN + UI STARTUP
----------------------------------------------------------
-task.wait(0.25)
+print("[PapiDimz] HUB Loaded - All-in-One")
 splashScreen()
+createMainUI()
+createMiniHud()
+startMiniHudLoop()
+initAntiAFK()
 
-notifyUI("Papi Dimz | HUB", "Semua fitur loaded sukses!", 5, "sparkles")
-
-print("[PapiDimz] UI Build Complete — All Tabs Active.")
+notifyUI("Papi Dimz |HUB", "Fully loaded dengan Bring Item & Teleport + Information Tab!", 8, "sparkles")
