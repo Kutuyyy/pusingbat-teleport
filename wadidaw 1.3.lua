@@ -22,6 +22,11 @@ local RemoteEvents = ReplicatedStorage:WaitForChild("RemoteEvents")
 local RequestStartDragging = RemoteEvents:WaitForChild("RequestStartDraggingItem")
 local RequestStopDragging = RemoteEvents:WaitForChild("StopDraggingItem")
 local Camera = Workspace.CurrentCamera
+
+print("LocalPlayer:", LocalPlayer)
+print("Character:", LocalPlayer.Character)
+print("Humanoid RootPart:", LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart"))
+
 ---------------------------------------------------------
 -- UTIL: NON-BLOCKING FIND HELPERS
 ---------------------------------------------------------
