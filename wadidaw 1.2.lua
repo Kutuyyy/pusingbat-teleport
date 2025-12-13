@@ -54,7 +54,7 @@ local retryDelay = 2
 for i = 1, maxRetries do
     print("[DEBUG] Attempt load WindUI ke-" .. i)
     local ok, res = pcall(function()
-        local url = "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
+        local url = "https://raw.githubusercontent.com/Footagesus/WindUI/main/main.lua"
         local code = game:HttpGet(url)
         print("[DEBUG] HttpGet sukses, panjang kode: " .. #code)  -- Debug kalau get jalan
         return loadstring(code)()
@@ -887,7 +887,7 @@ local function createMainUI()
         if hrp then
             teleportToCFrame(hrp.CFrame)
         else
-            WindUI:Notify({Title="Error", Content=selectedChild.." tidak ditemukan!", Icon="alert-triangle"})
+            notifyUI("Error", selectedChild.." tidak ditemukan!", nil, "alert-triangle")
         end
     end
 })
