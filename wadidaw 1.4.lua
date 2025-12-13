@@ -1633,7 +1633,6 @@ end
 -- MAIN UI
 ---------------------------------------------------------
 local function createMainUI()
-    if Window then return end
     if not WindUI then
         warn("[UI] WindUI tidak tersedia. UI dibatalkan.")
         return
