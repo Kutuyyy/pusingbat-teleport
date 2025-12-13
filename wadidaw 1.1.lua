@@ -162,10 +162,30 @@ infoTab:Button({
 ---------------------------------------------------------
 --// TAB 2 : MAIN
 ---------------------------------------------------------
-local mainTab = Window:Tab({
-    Title = "Main",
-    Icon = "home"
-})
+mainTab = Window:Tab({ Title = "Main", Icon = "settings-2" })
+local function startGodmodeLoop()
+    task.spawn(function()
+        while not scriptDisabled do
+            if GodmodeEnabled then
+                pcall(function()
+                    if RemoteEvents then
+                        local dmg = RemoteEvents:FindFirstChild("DamagePlayer")
+                        if dmg then dmg:FireServer(-math.huge) end
+                    end
+                end)
+            end
+            task.wait(8)
+        end
+    end)
+end
+local function initAntiAFK()
+    LocalPlayer.Idled:Connect(function()
+        if scriptDisabled then return end
+        if not AntiAFKEnabled then return end
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end
 
 mainTab:Paragraph({
     Title = "Papi Dimz Hub Loaded",
@@ -173,6 +193,8 @@ mainTab:Paragraph({
     Color = "Grey"
 })
 
+mainTab:Toggle({ Title = "GodMode (Damage -∞)", Icon = "shield", Default = false, Callback = function(state) GodmodeEnabled = state end })
+mainTab:Toggle({ Title = "Anti AFK", Icon = "mouse-pointer-2", Default = true, Callback = function(state) AntiAFKEnabled = state end })
 ---------------------------------------------------------
 -- PART 1 END
 ---------------------------------------------------------
