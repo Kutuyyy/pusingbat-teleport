@@ -625,92 +625,6 @@ local function startGodmodeLoop()
 end
 
 -- Taruh setelah block startGodmodeLoop()
-local function tryHookDayDisplay()
-    if DayDisplayConnection then DayDisplayConnection:Disconnect(); DayDisplayConnection = nil end
-    local function attach(remote)
-        if not remote or not remote.OnClientEvent then return end
-        DayDisplayRemote = remote
-        DayDisplayConnection = DayDisplayRemote.OnClientEvent:Connect(function(...)
-            if scriptDisabled then return end
-            local args = { ... }
-            if #args == 1 then
-                local dayNumber = args[1]
-                if type(dayNumber) ~= "number" then return end
-                if not autoTemporalEnabled then return end
-                if dayNumber == lastProcessedDay then return end
-                lastProcessedDay = dayNumber
-                print("[Temporal] Day", dayNumber, "terdeteksi. Auto skip 5 detik...")
-                task.delay(5, function()
-                    if scriptDisabled or not autoTemporalEnabled then return end
-                    activateTemporal()
-                    end)
-                return
-            end
-            local currentDay = tonumber(args[1]) or args[1]
-            local previousDay = tonumber(args[2]) or args[2] or 0
-            local itemsList = args[3]
-            currentDayCached = currentDay
-            previousDayCached = previousDay
-            print("DayDisplay event:", currentDay, previousDay)
-            if type(currentDay) == "number" and type(previousDay) == "number" then
-                if currentDay > previousDay then
-                    local bedCount, kidCount = 0, 0
-                    if type(itemsList) == "table" then
-                        for _, v in ipairs(itemsList) do
-                            if type(v) == "string" then
-                                local s = v:lower()
-                                if s:find("bed") then bedCount = bedCount + 1 end
-                                if s:find("child") or s:find("kid") then kidCount = kidCount + 1 end
-                            end
-                        end
-                    end
-                    local payload = buildDayEmbed(currentDay, previousDay, bedCount, kidCount, itemsList, false)
-                    print(("Days increased: %s -> %s | beds=%d kids=%d"):format(tostring(previousDay), tostring(currentDay), bedCount, kidCount))
-                    if WebhookEnabled then
-                        local ok, msg = sendWebhookPayload(payload)
-                        if ok then notifyUI("Webhook Sent", "Day " .. tostring(previousDay) .. " → " .. tostring(currentDay), 6, "radio") end
-                        if not ok then notifyUI("Webhook Failed", tostring(msg), 6, "alert-triangle"); warn("Day webhook failed:", msg) end
-                    else
-                        notifyUI("Day Increased", "Day " .. tostring(previousDay) .. " → " .. tostring(currentDay) .. " (webhook OFF)", 5, "calendar")
-                    end
-                else
-                    print("DayDisplay event tanpa kenaikan day:", previousDay, "->", currentDay)
-                end
-            else
-                print("DayDisplay event non-numeric:", tostring(currentDay), tostring(previousDay))
-            end
-        end)
-        print("[DayDisplay] Listener terpasang ke:", getInstancePath(remote))
-        notifyUI("DayDisplay", "Listener terpasang.", 4, "radio")
-    end
-    if RemoteEvents and RemoteEvents:FindFirstChild("DayDisplay") then
-        attach(RemoteEvents:FindFirstChild("DayDisplay"))
-        return
-    elseif ReplicatedStorage:FindFirstChild("DayDisplay") then
-        attach(ReplicatedStorage:FindFirstChild("DayDisplay"))
-        return
-    end
-    task.spawn(function()
-        local found = false
-        local tries = 0
-        while not found and tries < 120 and not scriptDisabled do
-            tries += 1
-            if RemoteEvents and RemoteEvents:FindFirstChild("DayDisplay") then
-                attach(RemoteEvents:FindFirstChild("DayDisplay")); found = true; break
-            end
-            if ReplicatedStorage:FindFirstChild("DayDisplay") then
-                attach(ReplicatedStorage:FindFirstChild("DayDisplay")); found = true; break
-            end
-            task.wait(0.5)
-        end
-        if not found then
-            warn("[DayDisplay] DayDisplay tidak ditemukan setelah timeout.")
-            notifyUI("DayDisplay", "DayDisplay remote tidak ditemukan (timeout). Fitur DayDisplay/Webhook menunggu.", 6, "alert-triangle")
-        end
-    end)
-end
-
--- Taruh setelah block tryHookDayDisplay()
 local function initAntiAFK()
     LocalPlayer.Idled:Connect(function()
         if scriptDisabled then return end
@@ -1431,7 +1345,6 @@ UserInputService.InputBegan:Connect(function(input, gp)
         if fishingOverlayVisible then fishingShowOverlay(px, py) end
     end
 end)
-
 ---------------------------------------------------------
 -- BRING ITEM FUNCTIONS (full dari Ambil.lua)
 ---------------------------------------------------------
@@ -1606,7 +1519,6 @@ local function createMainUI()
     nightTab = Window:Tab({ Title = "Night", Icon = "moon" })
     webhookTab = Window:Tab({ Title = "Webhook", Icon = "radio" })
     healthTab = Window:Tab({ Title = "Cek Health", Icon = "activity" })
-
     -- INFORMATION TAB
     infoTab:Paragraph({ Title = "Welcome To Papi Dimz Hub Official", Desc = "Script all-in-one premium dengan fitur lengkap: Local Player, Fishing 100%, Bring Item, Teleport, Auto Farm, Aura, Webhook, dan banyak lagi.\nGunakan dengan bijak & enjoy the game!", Color = "Grey" })
     infoTab:Button({ Title = "Copy Discord Link", Icon = "copy", Callback = function()
@@ -1622,13 +1534,11 @@ local function createMainUI()
         notifyUI("Keybind Updated", "Keybind toggle UI sekarang: "..tostring(key.Name), 3, "keyboard")
     end })
     infoTab:Button({ Title = "Force Close", Icon = "power", Variant = "Destructive", Callback = resetAll })
-
     -- MAIN TAB (original)
     mainTab:Paragraph({ Title = "Papi Dimz HUB", Desc = "Godmode, AntiAFK, Auto Sacrifice Lava, Auto Farm, Aura, Webhook DayDisplay.\nHotkey PC: P untuk toggle UI.", Color = "Grey" })
     mainTab:Toggle({ Title = "GodMode (Damage -∞)", Icon = "shield", Default = false, Callback = function(state) GodmodeEnabled = state end })
     mainTab:Toggle({ Title = "Anti AFK", Icon = "mouse-pointer-2", Default = true, Callback = function(state) AntiAFKEnabled = state end })
     mainTab:Button({ Title = "Tutup UI & Matikan Script", Icon = "power", Variant = "Destructive", Callback = resetAll })
-
     -- LOCAL PLAYER TAB
     localTab:Paragraph({ Title = "Self", Desc = "Atur FOV kamera.", Color = "Grey" })
     localTab:Toggle({ Title = "FOV", Icon = "zoom-in", Default = false, Callback = function(state) fovEnabled = state; applyFOV() end })
@@ -1650,25 +1560,21 @@ local function createMainUI()
     localTab:Button({ Title = "Remove Sky", Icon = "cloud-off", Callback = removeSky })
     localTab:Paragraph({ Title = "Misc", Desc = "Instant Open, Reset.", Color = "Grey" })
     localTab:Toggle({ Title = "Instant Open (ProximityPrompt)", Icon = "bolt", Default = false, Callback = function(state) if state then enableInstantOpen() else disableInstantOpen() end end })
-
     -- BRING ITEM TAB (full dari Ambil.lua)
     local settingSec = bringTab:Section({Title = "Bring Setting", Icon = "settings", Collapsible = true, DefaultOpen = true})
     settingSec:Dropdown({Title = "Location", Desc = "Player / Workbench (Scrapper) / Fire", Values = {"Player", "Workbench", "Fire"}, Value = "Player", Callback = function(v) selectedLocation = v end})
     settingSec:Input({Title = "Bring Height", Placeholder = "20", Default = "20", Numeric = true, Callback = function(v) BringHeight = tonumber(v) or 20 end})
-
     local cultistSec = bringTab:Section({Title = "Bring Cultist", Icon = "skull", Collapsible = true})
     local cultistList = {"All", "Crossbow Cultist", "Cultist"}
     local selCultist = {"All"}
     cultistSec:Dropdown({Title="Pilih Cultist", Values=cultistList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selCultist=o or {"All"} end})
     cultistSec:Button({Title="Bring Cultist", Callback=function() bringItems(cultistList, selCultist, selectedLocation) end})
-
     -- METEOR SECTION (sudah ada, tapi untuk kelengkapan)
     local meteorSec = bringTab:Section({Title = "Bring Meteor Items", Icon = "zap", Collapsible = true})
     local meteorList = {"All", "Raw Obsidiron Ore", "Gold Shard", "Meteor Shard", "Scalding Obsidiron Ingot"}
     local selMeteor = {"All"}
     meteorSec:Dropdown({Title="Pilih Item", Values=meteorList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selMeteor=o or {"All"} end})
     meteorSec:Button({Title="Bring Meteor", Callback=function() bringItems(meteorList, selMeteor, selectedLocation) end})
-
     -- FUEL SECTION
     local fuelSec = bringTab:Section({Title = "Fuels", Icon = "flame", Collapsible = true})
     local fuelList = {"All", "Log", "Coal", "Chair", "Fuel Canister", "Oil Barrel"}
@@ -1676,42 +1582,36 @@ local function createMainUI()
     fuelSec:Dropdown({Title="Pilih Fuel", Values=fuelList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selFuel=o or {"All"} end})
     fuelSec:Button({Title="Bring Fuels", Callback=function() bringItems(fuelList, selFuel, selectedLocation) end})
     fuelSec:Button({Title="Bring Logs Only", Callback=function() bringItems(fuelList, {"Log"}, selectedLocation) end})
-
     -- FOOD SECTION
     local foodSec = bringTab:Section({Title = "Food", Icon = "drumstick", Collapsible = true})
     local foodList = {"All", "Sweet Potato", "Stuffing", "Turkey Leg", "Carrot", "Pumkin", "Mackerel", "Salmon", "Swordfish", "Berry", "Ribs", "Stew", "Steak Dinner", "Morsel", "Steak", "Corn", "Cooked Morsel", "Cooked Steak", "Chilli", "Apple", "Cake"}
     local selFood = {"All"}
     foodSec:Dropdown({Title="Pilih Food", Values=foodList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selFood=o or {"All"} end})
     foodSec:Button({Title="Bring Food", Callback=function() bringItems(foodList, selFood, selectedLocation) end})
-
     -- HEALING SECTION
     local healSec = bringTab:Section({Title = "Healing", Icon = "heart", Collapsible = true})
     local healList = {"All", "Medkit", "Bandage"}
     local selHeal = {"All"}
     healSec:Dropdown({Title="Pilih Healing", Values=healList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selHeal=o or {"All"} end})
     healSec:Button({Title="Bring Healing", Callback=function() bringItems(healList, selHeal, selectedLocation) end})
-
     -- GEARS SECTION
     local gearSec = bringTab:Section({Title = "Gears (Scrap)", Icon = "wrench", Collapsible = true})
     local gearList = {"All", "Bolt", "Tyre", "Sheet Metal", "Old Radio", "Broken Fan", "Broken Microwave", "Washing Machine", "Old Car Engine", "UFO Scrap", "UFO Component", "UFO Junk", "Cultist Gem", "Gem of the Forest"}
     local selGear = {"All"}
     gearSec:Dropdown({Title="Pilih Gear", Values=gearList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selGear=o or {"All"} end})
     gearSec:Button({Title="Bring Gears", Callback=function() bringItems(gearList, selGear, selectedLocation) end})
-
     -- GUNS SECTION
     local gunSec = bringTab:Section({Title = "Guns & Ammo", Icon = "swords", Collapsible = true})
     local gunList = {"All", "Infernal Sword", "Morningstar", "Crossbow", "Infernal Crossbow", "Laser Sword", "Raygun", "Ice Axe", "Ice Sword", "Chainsaw", "Strong Axe", "Axe Trim Kit", "Spear", "Good Axe", "Revolver", "Rifle", "Tactical Shotgun", "Revolver Ammo", "Rifle Ammo", "Alien Armour", "Frog Boots", "Leather Body", "Iron Body", "Thorn Body", "Riot Shield", "Armour Trim Kit", "Obsidiron Boots"}
     local selGun = {"All"}
     gunSec:Dropdown({Title="Pilih Weapon", Values=gunList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selGun=o or {"All"} end})
     gunSec:Button({Title="Bring Guns & Ammo", Callback=function() bringItems(gunList, selGun, selectedLocation) end})
-
     -- OTHER SECTION
     local otherSec = bringTab:Section({Title = "Bring Other", Icon = "package", Collapsible = true})
     local otherList = {"All", "Purple Fur Tuft", "Halloween Candle", "Candy", "Frog Key", "Feather", "Wildfire", "Sacrifice Totem", "Old Rod", "Flower", "Coin Stack", "Infernal Sack", "Giant Sack", "Good Sack", "Seed Box", "Chainsaw", "Old Flashlight", "Strong Flashlight", "Bunny Foot", "Wolf Pelt", "Bear Pelt", "Mammoth Tusk", "Alpha Wolf Pelt", "Bear Corpse", "Meteor Shard", "Gold Shard", "Raw Obsidiron Ore", "Gem of the Forest", "Diamond", "Defense Blueprint"}
     local selOther = {"All"}
     otherSec:Dropdown({Title="Pilih Item", Values=otherList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selOther=o or {"All"} end})
     otherSec:Button({Title="Bring Other", Callback=function() bringItems(otherList, selOther, selectedLocation) end})
-
     -- TELEPORT TAB
     local lostChildSec = teleportTab:Section({Title = "Teleport Lost Child", Icon = "baby", Collapsible = true, DefaultOpen = true})
     local childOptions = {"DinoKid", "KoalaKid", "KrakenKid", "SquidKid"}
@@ -1852,7 +1752,6 @@ local function createMainUI()
             end
         end
     })
-
     -- FISHING TAB
     fishingTab:Paragraph({ Title = "Fishing & Macro", Desc = "Sistem fishing otomatis dengan 100% success rate (zona hijau), auto recast, dan auto clicker.", Color = "Grey" })
     fishingTab:Toggle({ Title = "100% Success Rate", Default = false, Callback = function(state) if state then startZone() else stopZone() end end })
@@ -1899,7 +1798,6 @@ local function createMainUI()
         pcall(function() LocalPlayer.PlayerGui.XenoPositionOverlay:Destroy() end)
         notifyUI("Fishing Clean", "Fishing features dibersihkan.", 3)
     end })
-
     -- FARM TAB
     farmTab:Toggle({ Title = "Auto Crockpot (Carrot + Corn)", Icon = "flame", Default = false, Callback = function(state)
         if scriptDisabled then return end
@@ -1929,10 +1827,8 @@ local function createMainUI()
     farmTab:Slider({ Title = "Kill Aura Radius", Description = "Jarak Kill Aura (50 - 200).", Step = 1, Value = { Min = 50, Max = 200, Default = KillAuraRadius }, Callback = function(value) KillAuraRadius = tonumber(value) or KillAuraRadius end })
     farmTab:Toggle({ Title = "Chop Aura (Small Tree)", Icon = "axe", Default = false, Callback = function(state) if scriptDisabled then return end; ChopAuraEnabled = state; if state then buildTreeCache() else TreeCache = {} end end })
     farmTab:Slider({ Title = "Chop Aura Radius", Description = "Jarak tebang otomatis (50 - 200).", Step = 1, Value = { Min = 50, Max = 200, Default = ChopAuraRadius }, Callback = function(value) ChopAuraRadius = tonumber(value) or ChopAuraRadius end })
-
     -- TOOLS TAB
     utilTab:Button({ Title = "Scan Map.Campground (Copy List)", Icon = "scan-line", Callback = function() if scriptDisabled then return end; notifyUI("Scanner", "Scan mulai... cek console / clipboard.", 4, "radar"); scanCampground() end })
-
     -- NIGHT TAB
     nightTab:Toggle({ Title = "Auto Skip Malam (Temporal)", Icon = "moon-star", Default = false, Callback = function(state)
         if scriptDisabled then return end
@@ -1940,7 +1836,6 @@ local function createMainUI()
         notifyUI("Auto Skip Malam", state and "Aktif: auto trigger saat Day naik." or "Dimatikan.", 4, state and "moon" or "toggle-left")
     end })
     nightTab:Button({ Title = "Trigger Temporal Sekali (Manual)", Icon = "zap", Callback = function() if scriptDisabled then return end; activateTemporal() end })
-
     -- WEBHOOK TAB
     webhookTab:Input({ Title = "Discord Webhook URL", Icon = "link", Placeholder = WebhookURL, Numeric = false, Finished = false, Callback = function(txt) local t = trim(txt or "") if t ~= "" then WebhookURL = t; notifyUI("Webhook", "URL disimpan.", 3, "link"); print("WebhookURL set:", WebhookURL) end end })
     webhookTab:Input({ Title = "Webhook Username (opsional)", Icon = "user", Placeholder = WebhookUsername, Numeric = false, Finished = false, Callback = function(txt) local t = trim(txt or "") if t ~= "" then WebhookUsername = t end; notifyUI("Webhook", "Username disimpan: " .. tostring(WebhookUsername), 3, "user") end })
@@ -1954,11 +1849,9 @@ local function createMainUI()
         if ok then notifyUI("Webhook Test", "Terkirim: " .. tostring(msg), 5, "check-circle-2"); print("Webhook Test success:", msg)
         else notifyUI("Webhook Test Failed", tostring(msg), 8, "alert-triangle"); warn("Webhook Test failed:", msg) end
     end})
-
     -- HEALTH TAB
     healthTab:Paragraph({ Title = "Cek Health Script", Desc = "Klik tombol di bawah buat lihat status terbaru:\n- Uptime\n- Lava Ready / Scanning\n- Ping\n- FPS\n- Fitur aktif (Godmode, AFK, Farm, Aura, dll)\n\nMini panel di kiri layar juga selalu update realtime.", Color = "Grey" })
     healthTab:Button({ Title = "Refresh Status Sekarang", Icon = "activity", Callback = function() if scriptDisabled then return end; local msg = getStatusSummary(); notifyUI("Status Script", msg, 7, "activity"); print("[PapiDimz] Status:\n" .. msg) end })
-
     -- Hotkey toggle UI
     UserInputService.InputBegan:Connect(function(input, gp)
         if gp or scriptDisabled then return end
@@ -1968,7 +1861,6 @@ local function createMainUI()
     end)
     Window:OnDestroy(resetAll)
 end
-
 -- INITIAL NON-BLOCKING RESOURCE WATCHERS
 backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
     RemoteEvents = re
@@ -1993,7 +1885,6 @@ backgroundFind(Workspace, "Structures", function(st)
 end)
 task.spawn(function() tryHookDayDisplay() end)
 startGodmodeLoop()
-
 -- INIT CHARACTER
 LocalPlayer.CharacterAdded:Connect(function(char)
     task.wait(0.5)
@@ -2011,12 +1902,10 @@ if LocalPlayer.Character then
     rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if humanoid then defaultWalkSpeed = humanoid.WalkSpeed; defaultHipHeight = humanoid.HipHeight end
 end
-
 print("[PapiDimz] HUB Loaded - All-in-One")
 splashScreen()
 createMainUI()
 createMiniHud()
 startMiniHudLoop()
 initAntiAFK()
-
 notifyUI("Papi Dimz |HUB", "Fully loaded dengan Bring Item & Teleport + Information Tab!", 8, "sparkles")
