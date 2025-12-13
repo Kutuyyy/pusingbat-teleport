@@ -119,7 +119,7 @@ infoTab:Keybind({
     Title = "Papi Dimz Keybind",
     Default = Enum.KeyCode.P,
     Callback = function(key)
-        currentKeybind = "p"
+        currentKeybind = key
         WindUI:Notify({
             Title = "Keybind Changed",
             Content = "New keybind: " .. tostring(key),
@@ -172,7 +172,7 @@ mainTab = Window:Tab({
 mainTab:Paragraph({
     Title = "Papi Dimz Hub Loaded",
     Desc  = "All main modules are active. Navigate tabs on the left to access features.",
-    Color = "Grey"
+    Color = "Blue"
 })
 
 mainTab:Toggle({ 
