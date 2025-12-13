@@ -63,7 +63,7 @@ end)
 
 if ok and WindUI then
     pcall(function()
-        WindUI:SetTheme("Dark")       -- valid API
+        WindUI.Theme = "Dark"
         WindUI.TransparencyValue = 0.2
     end)
 else
