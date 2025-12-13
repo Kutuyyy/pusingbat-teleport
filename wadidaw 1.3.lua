@@ -7,9 +7,7 @@
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-Character = char
-HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
-humanoid = char:WaitForChild("Humanoid")
+
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
@@ -180,7 +178,8 @@ local MAX_RECENT_SECS = 5
 local fishingLoopThread = nil
 -- UI & HUD
 local Window
-local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
+--local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
+local mainTab, localTab, bringTab, teleportTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
 local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFps
 
 local scriptStartTime = os.clock()
@@ -1650,8 +1649,8 @@ local function createMainUI()
         })
         mainTab = Window:Tab({ Title = "Main", Icon = "settings-2" })
         localTab = Window:Tab({ Title = "Local Player", Icon = "user" })
-        local bringTab = Window:Tab({ Title = "Bring Item", Icon = "hand" })
-        local teleportTab = Window:Tab({ Title = "Teleport", Icon = "navigation" })
+        bringTab = Window:Tab({ Title = "Bring Item", Icon = "hand" })
+        teleportTab = Window:Tab({ Title = "Teleport", Icon = "navigation" })
         fishingTab = Window:Tab({ Title = "Fishing", Icon = "fish" })
         farmTab = Window:Tab({ Title = "Farm", Icon = "chef-hat" })
         utilTab = Window:Tab({ Title = "Tools", Icon = "wrench" })
