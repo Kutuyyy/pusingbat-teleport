@@ -1008,112 +1008,120 @@ local function createMainUI()
     })
 
 -- FISHING TAB
-        fishingTab:Paragraph({ Title = "Fishing & Macro", Desc = "Sistem fishing otomatis dengan 100% success rate (zona hijau), auto recast, dan auto clicker.", Color = "Grey" })
-        fishingTab:Toggle({ Title = "100% Success Rate", Default = false, Callback = function(state) if state then startZone() else stopZone() end end })
-        fishingTab:Toggle({ Title = "Auto Recast", Default = false, Callback = function(state) autoRecastEnabled = state end })
-        fishingTab:Input({ Title = "Recast Delay (s)", Placeholder = "2", Default = "2", Callback = function(text) local n = tonumber(text) if n and n >= 0.01 and n <= 60 then RECAST_DELAY = n end end })
-        fishingTab:Toggle({ Title = "View Position Overlay", Default = false, Callback = function(state) fishingOverlayVisible = state if state and fishingSavedPosition then fishingShowOverlay(fishingSavedPosition.x, fishingSavedPosition.y) else fishingHideOverlay() end end })
-        fishingTab:Button({ Title = "Set Position", Callback = function() waitingForPosition = not waitingForPosition notifyUI("Set Position", waitingForPosition and "Klik layar untuk set posisi." or "Dibatalkan.", 3) end })
-        fishingTab:Toggle({ Title = "Auto Clicker", Default = false, Callback = function(state) fishingAutoClickEnabled = state end })
-        fishingTab:Input({ Title = "Delay (s)", Placeholder = "5", Default = "5", Callback = function(text) local n = tonumber(text) if n and n >= 0.01 and n <= 600 then fishingClickDelay = n end end })
-        fishingTab:Button({ Title = "Calibrate", Callback = function()
-            local cam = Workspace.CurrentCamera
-            local cx = cam.ViewportSize.X / 2
-            local cy = cam.ViewportSize.Y / 2
-            notifyUI("Calibrate", "Klik titik merah di tengah layar.", 4)
-            local gui = Instance.new("ScreenGui")
-            gui.Name = "Xeno_Calib"
-            gui.Parent = LocalPlayer.PlayerGui
-            local marker = Instance.new("Frame", gui)
-            marker.Size = UDim2.new(0,24,0,24)
-            marker.Position = UDim2.new(0,cx-12,0,cy-12)
-            marker.AnchorPoint = Vector2.new(0.5,0.5)
-            marker.BackgroundColor3 = Color3.fromRGB(255,0,0)
-            Instance.new("UICorner", marker).CornerRadius = UDim.new(1,0)
-            local conn
-            conn = UserInputService.InputBegan:Connect(function(inp,gp)
-                if gp then return end
-                if inp.UserInputType == Enum.UserInputType.MouseButton1 then
-                    local loc = UserInputService:GetMouseLocation()
-                    fishingOffsetX = cx - loc.X
-                    fishingOffsetY = cy - loc.Y
-                    notifyUI("Calibrate Done", ("Offset X=%.1f Y=%.1f"):format(fishingOffsetX, fishingOffsetY), 4)
-                    conn:Disconnect()
-                    gui:Destroy()
-                    if fishingOverlayVisible and fishingSavedPosition then fishingShowOverlay(fishingSavedPosition.x, fishingSavedPosition.y) end
-                end
-            end)
-        end })
-        fishingTab:Button({ Title = "Clean Fishing", Variant = "Destructive", Callback = function()
-            fishingAutoClickEnabled = false
-            waitingForPosition = false
-            fishingSavedPosition = nil
-            stopZone()
-            fishingHideOverlay()
-            pcall(function() LocalPlayer.PlayerGui.XenoPositionOverlay:Destroy() end)
-            notifyUI("Fishing Clean", "Fishing features dibersihkan.", 3)
-        end })
-
-                -- FARM TAB (original)
-        farmTab:Toggle({ Title = "Auto Crockpot (Carrot + Corn)", Icon = "flame", Default = false, Callback = function(state)
-            if scriptDisabled then return end
-            if state then
-                local ok = ensureCookingStations()
-                if not ok then AutoCookEnabled = false; notifyUI("Auto Crockpot", "Crock Pot / Chefs Station tidak ditemukan.", 4, "alert-triangle"); return end
-                AutoCookEnabled = true; startCookLoop()
-            else AutoCookEnabled = false end
-        end })
-        farmTab:Toggle({ Title = "Auto Scrapper → Grinder", Icon = "recycle", Default = false, Callback = function(state)
-            if scriptDisabled then return end
-            if state then
-                local ok = ensureScrapperTarget()
-                if not ok then ScrapEnabled = false; notifyUI("Auto Scrapper", "Scrapper target tidak ditemukan.", 4, "alert-triangle"); return end
-                ScrapEnabled = true; startScrapLoop()
-            else ScrapEnabled = false end
-        end })
-        farmTab:Toggle({ Title = "Auto Sacrifice Lava (Ikan & Loot)", Icon = "flame-kindling", Default = false, Callback = function(state)
-            if scriptDisabled then return end
-            if state and not lavaFound then notifyUI("Auto Sacrifice", "Lava belum ditemukan, script akan aktif begitu lava ready.", 4, "alert-triangle") end
-            AutoSacEnabled = state
-        end })
-        farmTab:Toggle({ Title = "Ultra Fast Coin & Ammo", Icon = "zap", Default = false, Callback = function(state) if scriptDisabled then return end; if state then startCoinAmmo() else stopCoinAmmo() end end })
-        farmTab:Paragraph({ Title = "Scrap Priority", Desc = table.concat(ScrapItemsPriority, ", "), Color = "Grey" })
-        farmTab:Paragraph({ Title = "Combat Aura", Desc = "Kill Aura & Chop Aura untuk clear musuh dan tebang pohon otomatis.\nRadius bisa diatur dari 50 sampai 200.", Color = "Grey" })
-        farmTab:Toggle({ Title = "Kill Aura (Radius-based)", Icon = "swords", Default = false, Callback = function(state) if scriptDisabled then return end; KillAuraEnabled = state end })
-        farmTab:Slider({ Title = "Kill Aura Radius", Description = "Jarak Kill Aura (50 - 200).", Step = 1, Value = { Min = 50, Max = 200, Default = KillAuraRadius }, Callback = function(value) KillAuraRadius = tonumber(value) or KillAuraRadius end })
-        farmTab:Toggle({ Title = "Chop Aura (Small Tree)", Icon = "axe", Default = false, Callback = function(state) if scriptDisabled then return end; ChopAuraEnabled = state; if state then buildTreeCache() else TreeCache = {} end end })
-        farmTab:Slider({ Title = "Chop Aura Radius", Description = "Jarak tebang otomatis (50 - 200).", Step = 1, Value = { Min = 50, Max = 200, Default = ChopAuraRadius }, Callback = function(value) ChopAuraRadius = tonumber(value) or ChopAuraRadius end })
-
-        -- TOOLS TAB (original)
-        utilTab:Button({ Title = "Scan Map.Campground (Copy List)", Icon = "scan-line", Callback = function() if scriptDisabled then return end; notifyUI("Scanner", "Scan mulai... cek console / clipboard.", 4, "radar"); scanCampground() end })
-
-        -- NIGHT TAB (original)
-        nightTab:Toggle({ Title = "Auto Skip Malam (Temporal)", Icon = "moon-star", Default = false, Callback = function(state)
-            if scriptDisabled then return end
-            autoTemporalEnabled = state
-            notifyUI("Auto Skip Malam", state and "Aktif: auto trigger saat Day naik." or "Dimatikan.", 4, state and "moon" or "toggle-left")
-        end })
-        nightTab:Button({ Title = "Trigger Temporal Sekali (Manual)", Icon = "zap", Callback = function() if scriptDisabled then return end; activateTemporal() end })
-
-        -- WEBHOOK TAB (original)
-        webhookTab:Input({ Title = "Discord Webhook URL", Icon = "link", Placeholder = WebhookURL, Numeric = false, Finished = false, Callback = function(txt) local t = trim(txt or "") if t ~= "" then WebhookURL = t; notifyUI("Webhook", "URL disimpan.", 3, "link"); print("WebhookURL set:", WebhookURL) end end })
-        webhookTab:Input({ Title = "Webhook Username (opsional)", Icon = "user", Placeholder = WebhookUsername, Numeric = false, Finished = false, Callback = function(txt) local t = trim(txt or "") if t ~= "" then WebhookUsername = t end; notifyUI("Webhook", "Username disimpan: " .. tostring(WebhookUsername), 3, "user") end })
-        webhookTab:Toggle({ Title = "Enable Webhook DayDisplay", Icon = "radio", Default = WebhookEnabled, Callback = function(state) WebhookEnabled = state; notifyUI("Webhook", state and "Webhook diaktifkan." or "Webhook dimatikan.", 3, state and "check-circle-2" or "x-circle") end })
-        webhookTab:Button({ Title = "Test Send Webhook", Icon = "flask-conical", Callback = function()
-            if scriptDisabled then return end
-            local players = Players:GetPlayers(); local names = {}
-            for _, p in ipairs(players) do table.insert(names, p.Name) end
-            local payload = { username = WebhookUsername, embeds = {{ title = "🧪 TEST - Webhook Aktif " .. tostring(WebhookUsername), description = ("**Webhook Aktif %s**\n\n**Progress:** `%s`\n\n**Pemain Aktif:**\n%s"):format(tostring(WebhookUsername), tostring(currentDayCached), namesToVerticalList(names)), color = 0x2ECC71, footer = { text = "Test sent: " .. os.date("%Y-%m-%d %H:%M:%S") }}}}
-            local ok, msg = sendWebhookPayload(payload)
-            if ok then notifyUI("Webhook Test", "Terkirim: " .. tostring(msg), 5, "check-circle-2"); print("Webhook Test success:", msg)
-            else notifyUI("Webhook Test Failed", tostring(msg), 8, "alert-triangle"); warn("Webhook Test failed:", msg) end
-        end})
-
-        -- HEALTH TAB (original)
-        healthTab:Paragraph({ Title = "Cek Health Script", Desc = "Klik tombol di bawah buat lihat status terbaru:\n- Uptime\n- Lava Ready / Scanning\n- Ping\n- FPS\n- Fitur aktif (Godmode, AFK, Farm, Aura, dll)\n\nMini panel di kiri layar juga selalu update realtime.", Color = "Grey" })
-        healthTab:Button({ Title = "Refresh Status Sekarang", Icon = "activity", Callback = function() if scriptDisabled then return end; local msg = getStatusSummary(); notifyUI("Status Script", msg, 7, "activity"); print("[PapiDimz] Status:\n" .. msg) 
+    fishingTab:Paragraph({ Title = "Fishing & Macro", Desc = "Sistem fishing otomatis dengan 100% success rate (zona hijau), auto recast, dan auto clicker.", Color = "Grey" })
+    fishingTab:Toggle({ Title = "100% Success Rate", Default = false, Callback = function(state) if state then startZone() else stopZone() end end })
+    fishingTab:Toggle({ Title = "Auto Recast", Default = false, Callback = function(state) autoRecastEnabled = state end })
+    fishingTab:Input({ Title = "Recast Delay (s)", Placeholder = "2", Default = "2", Callback = function(text) local n = tonumber(text) if n and n >= 0.01 and n <= 60 then RECAST_DELAY = n end end })
+    fishingTab:Toggle({ Title = "View Position Overlay", Default = false, Callback = function(state) fishingOverlayVisible = state if state and fishingSavedPosition then fishingShowOverlay(fishingSavedPosition.x, fishingSavedPosition.y) else fishingHideOverlay() end end })
+    fishingTab:Button({ Title = "Set Position", Callback = function() waitingForPosition = not waitingForPosition notifyUI("Set Position", waitingForPosition and "Klik layar untuk set posisi." or "Dibatalkan.", 3) end })
+    fishingTab:Toggle({ Title = "Auto Clicker", Default = false, Callback = function(state) fishingAutoClickEnabled = state end })
+    fishingTab:Input({ Title = "Delay (s)", Placeholder = "5", Default = "5", Callback = function(text) local n = tonumber(text) if n and n >= 0.01 and n <= 600 then fishingClickDelay = n end end })
+    fishingTab:Button({ Title = "Calibrate", Callback = function()
+        local cam = Workspace.CurrentCamera
+        local cx = cam.ViewportSize.X / 2
+        local cy = cam.ViewportSize.Y / 2
+        notifyUI("Calibrate", "Klik titik merah di tengah layar.", 4)
+        local gui = Instance.new("ScreenGui")
+        gui.Name = "Xeno_Calib"
+        gui.Parent = LocalPlayer.PlayerGui
+        local marker = Instance.new("Frame", gui)
+        marker.Size = UDim2.new(0,24,0,24)
+        marker.Position = UDim2.new(0,cx-12,0,cy-12)
+        marker.AnchorPoint = Vector2.new(0.5,0.5)
+        marker.BackgroundColor3 = Color3.fromRGB(255,0,0)
+        Instance.new("UICorner", marker).CornerRadius = UDim.new(1,0)
+        local conn
+        conn = UserInputService.InputBegan:Connect(function(inp,gp)
+            if gp then return end
+            if inp.UserInputType == Enum.UserInputType.MouseButton1 then
+                local loc = UserInputService:GetMouseLocation()
+                fishingOffsetX = cx - loc.X
+                fishingOffsetY = cy - loc.Y
+                notifyUI("Calibrate Done", ("Offset X=%.1f Y=%.1f"):format(fishingOffsetX, fishingOffsetY), 4)
+                conn:Disconnect()
+                gui:Destroy()
+                if fishingOverlayVisible and fishingSavedPosition then fishingShowOverlay(fishingSavedPosition.x, fishingSavedPosition.y) end
+            end
+        end)
+    end })
+    fishingTab:Button({ Title = "Clean Fishing", Variant = "Destructive", Callback = function()
+        fishingAutoClickEnabled = false
+        waitingForPosition = false
+        fishingSavedPosition = nil
+        stopZone()
+        fishingHideOverlay()
+        pcall(function() LocalPlayer.PlayerGui.XenoPositionOverlay:Destroy() end)
+        notifyUI("Fishing Clean", "Fishing features dibersihkan.", 3)
     end })
 
+            -- FARM TAB (original)
+    farmTab:Toggle({ Title = "Auto Crockpot (Carrot + Corn)", Icon = "flame", Default = false, Callback = function(state)
+        if scriptDisabled then return end
+        if state then
+            local ok = ensureCookingStations()
+            if not ok then AutoCookEnabled = false; notifyUI("Auto Crockpot", "Crock Pot / Chefs Station tidak ditemukan.", 4, "alert-triangle"); return end
+            AutoCookEnabled = true; startCookLoop()
+        else AutoCookEnabled = false end
+    end })
+    farmTab:Toggle({ Title = "Auto Scrapper → Grinder", Icon = "recycle", Default = false, Callback = function(state)
+        if scriptDisabled then return end
+        if state then
+            local ok = ensureScrapperTarget()
+            if not ok then ScrapEnabled = false; notifyUI("Auto Scrapper", "Scrapper target tidak ditemukan.", 4, "alert-triangle"); return end
+            ScrapEnabled = true; startScrapLoop()
+        else ScrapEnabled = false end
+    end })
+    farmTab:Toggle({ Title = "Auto Sacrifice Lava (Ikan & Loot)", Icon = "flame-kindling", Default = false, Callback = function(state)
+        if scriptDisabled then return end
+        if state and not lavaFound then notifyUI("Auto Sacrifice", "Lava belum ditemukan, script akan aktif begitu lava ready.", 4, "alert-triangle") end
+        AutoSacEnabled = state
+    end })
+    farmTab:Toggle({ Title = "Ultra Fast Coin & Ammo", Icon = "zap", Default = false, Callback = function(state) if scriptDisabled then return end; if state then startCoinAmmo() else stopCoinAmmo() end end })
+    farmTab:Paragraph({ Title = "Scrap Priority", Desc = table.concat(ScrapItemsPriority, ", "), Color = "Grey" })
+    farmTab:Paragraph({ Title = "Combat Aura", Desc = "Kill Aura & Chop Aura untuk clear musuh dan tebang pohon otomatis.\nRadius bisa diatur dari 50 sampai 200.", Color = "Grey" })
+    farmTab:Toggle({ Title = "Kill Aura (Radius-based)", Icon = "swords", Default = false, Callback = function(state) if scriptDisabled then return end; KillAuraEnabled = state end })
+    farmTab:Slider({ Title = "Kill Aura Radius", Description = "Jarak Kill Aura (50 - 200).", Step = 1, Value = { Min = 50, Max = 200, Default = KillAuraRadius }, Callback = function(value) KillAuraRadius = tonumber(value) or KillAuraRadius end })
+    farmTab:Toggle({ Title = "Chop Aura (Small Tree)", Icon = "axe", Default = false, Callback = function(state) if scriptDisabled then return end; ChopAuraEnabled = state; if state then buildTreeCache() else TreeCache = {} end end })
+    farmTab:Slider({ Title = "Chop Aura Radius", Description = "Jarak tebang otomatis (50 - 200).", Step = 1, Value = { Min = 50, Max = 200, Default = ChopAuraRadius }, Callback = function(value) ChopAuraRadius = tonumber(value) or ChopAuraRadius end })
+
+    -- TOOLS TAB (original)
+    utilTab:Button({ Title = "Scan Map.Campground (Copy List)", Icon = "scan-line", Callback = function() if scriptDisabled then return end; notifyUI("Scanner", "Scan mulai... cek console / clipboard.", 4, "radar"); scanCampground() end })
+
+    -- NIGHT TAB (original)
+    nightTab:Toggle({ Title = "Auto Skip Malam (Temporal)", Icon = "moon-star", Default = false, Callback = function(state)
+        if scriptDisabled then return end
+        autoTemporalEnabled = state
+        notifyUI("Auto Skip Malam", state and "Aktif: auto trigger saat Day naik." or "Dimatikan.", 4, state and "moon" or "toggle-left")
+    end })
+    nightTab:Button({ Title = "Trigger Temporal Sekali (Manual)", Icon = "zap", Callback = function() if scriptDisabled then return end; activateTemporal() end })
+
+    -- WEBHOOK TAB (original)
+    webhookTab:Input({ Title = "Discord Webhook URL", Icon = "link", Placeholder = WebhookURL, Numeric = false, Finished = false, Callback = function(txt) local t = trim(txt or "") if t ~= "" then WebhookURL = t; notifyUI("Webhook", "URL disimpan.", 3, "link"); print("WebhookURL set:", WebhookURL) end end })
+    webhookTab:Input({ Title = "Webhook Username (opsional)", Icon = "user", Placeholder = WebhookUsername, Numeric = false, Finished = false, Callback = function(txt) local t = trim(txt or "") if t ~= "" then WebhookUsername = t end; notifyUI("Webhook", "Username disimpan: " .. tostring(WebhookUsername), 3, "user") end })
+    webhookTab:Toggle({ Title = "Enable Webhook DayDisplay", Icon = "radio", Default = WebhookEnabled, Callback = function(state) WebhookEnabled = state; notifyUI("Webhook", state and "Webhook diaktifkan." or "Webhook dimatikan.", 3, state and "check-circle-2" or "x-circle") end })
+    webhookTab:Button({ Title = "Test Send Webhook", Icon = "flask-conical", Callback = function()
+        if scriptDisabled then return end
+        local players = Players:GetPlayers(); local names = {}
+        for _, p in ipairs(players) do table.insert(names, p.Name) end
+        local payload = { username = WebhookUsername, embeds = {{ title = "🧪 TEST - Webhook Aktif " .. tostring(WebhookUsername), description = ("**Webhook Aktif %s**\n\n**Progress:** `%s`\n\n**Pemain Aktif:**\n%s"):format(tostring(WebhookUsername), tostring(currentDayCached), namesToVerticalList(names)), color = 0x2ECC71, footer = { text = "Test sent: " .. os.date("%Y-%m-%d %H:%M:%S") }}}}
+        local ok, msg = sendWebhookPayload(payload)
+        if ok then notifyUI("Webhook Test", "Terkirim: " .. tostring(msg), 5, "check-circle-2"); print("Webhook Test success:", msg)
+        else notifyUI("Webhook Test Failed", tostring(msg), 8, "alert-triangle"); warn("Webhook Test failed:", msg) end
+    end})
+
+    -- HEALTH TAB (original)
+    healthTab:Paragraph({ Title = "Cek Health Script", Desc = "Klik tombol di bawah buat lihat status terbaru:\n- Uptime\n- Lava Ready / Scanning\n- Ping\n- FPS\n- Fitur aktif (Godmode, AFK, Farm, Aura, dll)\n\nMini panel di kiri layar juga selalu update realtime.", Color = "Grey" })
+    healthTab:Button({ Title = "Refresh Status Sekarang", Icon = "activity", Callback = function() if scriptDisabled then return end; local msg = getStatusSummary(); notifyUI("Status Script", msg, 7, "activity"); print("[PapiDimz] Status:\n" .. msg) end })
+
+    -- Hotkey toggle UI
+    UserInputService.InputBegan:Connect(function(input, gp)
+        if gp or scriptDisabled then return end
+        if input.KeyCode == toggleKeybind then
+            pcall(function() Window:Toggle() end)
+        end
+    end)
+    Window:OnDestroy(resetAll)
+end
 ---------------------------------------------------------
 -- FISHING FUNCTIONS (XENO GLASS)
 ---------------------------------------------------------
