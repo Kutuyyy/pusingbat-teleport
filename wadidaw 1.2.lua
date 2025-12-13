@@ -1881,8 +1881,6 @@ _G.SendManualDay = function(cur, prev, items)
     print("Manual send result:", ok, msg)
     return ok, msg
 end
-    Window:OnDestroy(resetAll)
-end
 
 -- INITIAL NON-BLOCKING RESOURCE WATCHERS
 backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
