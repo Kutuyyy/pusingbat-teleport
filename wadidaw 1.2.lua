@@ -1102,7 +1102,6 @@ local function createMainUI()
         healthTab:Button({ Title = "Refresh Status Sekarang", Icon = "activity", Callback = function() if scriptDisabled then return end; local msg = getStatusSummary(); notifyUI("Status Script", msg, 7, "activity"); print("[PapiDimz] Status:\n" .. msg) end })
         Window:OnDestroy(resetAll)
     end
-end
 
 ---------------------------------------------------------
 -- FISHING FUNCTIONS (XENO GLASS)
