@@ -119,7 +119,7 @@ infoTab:Keybind({
     Title = "Papi Dimz Keybind",
     Default = Enum.KeyCode.P,
     Callback = function(key)
-        currentKeybind = key
+        currentKeybind = "p"
         WindUI:Notify({
             Title = "Keybind Changed",
             Content = "New keybind: " .. tostring(key),
