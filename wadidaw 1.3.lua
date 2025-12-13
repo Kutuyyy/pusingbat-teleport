@@ -5,6 +5,12 @@
 -- SERVICES
 ---------------------------------------------------------
 local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+Character = char
+HumanoidRootPart = char:WaitForChild("HumanoidRootPart")
+humanoid = char:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
@@ -13,13 +19,10 @@ local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
 local Lighting = game:GetService("Lighting")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local ItemsFolder = Workspace:WaitForChild("Items")
 local RemoteEvents = ReplicatedStorage:WaitForChild("RemoteEvents")
 local RequestStartDragging = RemoteEvents:WaitForChild("RequestStartDraggingItem")
 local RequestStopDragging = RemoteEvents:WaitForChild("StopDraggingItem")
-local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 ---------------------------------------------------------
 -- UTIL: NON-BLOCKING FIND HELPERS
@@ -377,7 +380,126 @@ local function startMiniHudLoop()
         end
     end)
 end
+---------------------------------------------------------
+-- SCRAPPER & TELEPORT FUNCTIONS
+---------------------------------------------------------
+local function getScrapperTarget()
+    if ScrapperTarget and ScrapperTarget.Parent then
+        return ScrapperTarget
+    end
 
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return nil end
+
+    local camp = map:FindFirstChild("Campground")
+    if not camp then return nil end
+
+    local scrapper = camp:FindFirstChild("Scrapper")
+    if not scrapper then return nil end
+
+    local movers = scrapper:FindFirstChild("Movers")
+    if not movers then return nil end
+
+    local right = movers:FindFirstChild("Right")
+    if not right then return nil end
+
+    local grindersRight = right:FindFirstChild("GrindersRight")
+    if not grindersRight or not grindersRight:IsA("BasePart") then return nil end
+
+    ScrapperTarget = grindersRight
+    return ScrapperTarget
+end
+
+-- Get target position untuk Bring
+local function getTargetPosition(location)
+    if location == "Player" then
+        return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0)
+
+    elseif location == "Workbench" then
+        local scrapperPart = getScrapperTarget()
+        if scrapperPart then
+            return scrapperPart.Position + Vector3.new(0, BringHeight, 0)
+        else
+            WindUI:Notify({Title="Warning", Content="Scrapper tidak ditemukan! Default ke Player", Icon="alert-circle", Duration=6})
+            return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0)
+        end
+
+    elseif location == "Fire" then
+        local firePath = Workspace:FindFirstChild("Map")
+            and Workspace.Map:FindFirstChild("Campground")
+            and Workspace.Map.Campground:FindFirstChild("MainFire")
+            and Workspace.Map.Campground.MainFire:FindFirstChild("OuterTouchZone")
+        if firePath then
+            return firePath.Position + Vector3.new(0, BringHeight, 0)
+        else
+            WindUI:Notify({Title="Warning", Content="Fire tidak ditemukan! Default ke Player", Icon="alert-circle", Duration=6})
+            return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0)
+        end
+    end
+
+    return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0)
+end
+
+-- Circular drop untuk Bring
+local function getDropCFrame(basePos, index)
+    local angle = (index - 1) * (math.pi * 2 / 12)
+    local radius = 3
+    local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+    return CFrame.new(basePos + offset)
+end
+
+-- Core bring function
+local function bringItems(sectionItemList, selectedItems, location)
+    local targetPos = getTargetPosition(location)
+    local wantedNames = {}
+
+    if table.find(selectedItems, "All") then
+        for _, name in ipairs(sectionItemList) do
+            if name ~= "All" then table.insert(wantedNames, name) end
+        end
+    else
+        wantedNames = selectedItems
+    end
+
+    local candidates = {}
+    for _, item in ipairs(ItemsFolder:GetChildren()) do
+        if item:IsA("Model") and item.PrimaryPart and table.find(wantedNames, item.Name) then
+            table.insert(candidates, item)
+        end
+    end
+
+    if #candidates == 0 then
+        WindUI:Notify({Title="Info", Content="Item tidak ditemukan", Duration=4, Icon="search"})
+        return
+    end
+
+    WindUI:Notify({Title="Bringing", Content=#candidates.." item → "..location, Duration=5, Icon="zap"})
+
+    for i, item in ipairs(candidates) do
+        local cf = getDropCFrame(targetPos, i)
+        pcall(function() RequestStartDragging:FireServer(item) end)
+        task.wait(0.03)
+        pcall(function() item:PivotTo(cf) end)
+        task.wait(0.03)
+        pcall(function() RequestStopDragging:FireServer(item) end)
+        task.wait(0.02)
+    end
+
+    WindUI:Notify({Title="Selesai!", Content=#candidates.." item berhasil dibawa!", Duration=4, Icon="check-circle"})
+end
+
+-- Fungsi Teleport Umum
+local function teleportToCFrame(targetCF)
+    if not targetCF then
+        WindUI:Notify({Title="Error", Content="Lokasi tidak ditemukan!", Icon="alert-triangle", Duration=5})
+        return
+    end
+
+    if Character and Character:FindFirstChild("HumanoidRootPart") then
+        Character.HumanoidRootPart.CFrame = targetCF + Vector3.new(0, 4, 0)  -- Sedikit di atas biar aman
+        WindUI:Notify({Title="Teleport!", Content="Berhasil teleport!", Icon="navigation", Duration=4})
+    end
+end
 
 ---------------------------------------------------------
 -- LOCAL PLAYER FUNCTIONS
@@ -1528,8 +1650,8 @@ local function createMainUI()
         })
         mainTab = Window:Tab({ Title = "Main", Icon = "settings-2" })
         localTab = Window:Tab({ Title = "Local Player", Icon = "user" })
-        local BringTab = Window:Tab({Title = "Bring Item", Icon = "hand"})
-        local TeleportTab = Window:Tab({Title = "Teleport", Icon = "navigation"})
+        local bringTab = Window:Tab({ Title = "Bring Item", Icon = "hand" })
+        local teleportTab = Window:Tab({ Title = "Teleport", Icon = "navigation" })
         fishingTab = Window:Tab({ Title = "Fishing", Icon = "fish" })
         farmTab = Window:Tab({ Title = "Farm", Icon = "chef-hat" })
         utilTab = Window:Tab({ Title = "Tools", Icon = "wrench" })
@@ -1569,54 +1691,54 @@ local function createMainUI()
         -- ==============================================
         -- Bring Item Tab (tetap sama)
         -- ==============================================
-        local settingSec = BringTab:Section({Title = "Bring Setting", Icon = "settings", Collapsible = true, DefaultOpen = true})
+        local settingSec = bringTab:Section({Title = "Bring Setting", Icon = "settings", Collapsible = true, DefaultOpen = true})
         settingSec:Dropdown({Title = "Location", Desc = "Player / Workbench (Scrapper) / Fire", Values = {"Player", "Workbench", "Fire"}, Value = "Player", Callback = function(v) selectedLocation = v end})
         settingSec:Input({Title = "Bring Height", Placeholder = "20", Default = "20", Numeric = true, Callback = function(v) BringHeight = tonumber(v) or 20 end})
 
-        local cultistSec = BringTab:Section({Title = "Bring Cultist", Icon = "skull", Collapsible = true})
+        local cultistSec = bringTab:Section({Title = "Bring Cultist", Icon = "skull", Collapsible = true})
         local cultistList = {"All", "Crossbow Cultist", "Cultist"}
         local selCultist = {"All"}
         cultistSec:Dropdown({Title="Pilih Cultist", Values=cultistList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selCultist=o or {"All"} end})
         cultistSec:Button({Title="Bring Cultist", Callback=function() bringItems(cultistList, selCultist, selectedLocation) end})
 
-        local meteorSec = BringTab:Section({Title = "Bring Meteor Items", Icon = "zap", Collapsible = true})
+        local meteorSec = bringTab:Section({Title = "Bring Meteor Items", Icon = "zap", Collapsible = true})
         local meteorList = {"All", "Raw Obsidiron Ore", "Gold Shard", "Meteor Shard", "Scalding Obsidiron Ingot"}
         local selMeteor = {"All"}
         meteorSec:Dropdown({Title="Pilih Item", Values=meteorList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selMeteor=o or {"All"} end})
         meteorSec:Button({Title="Bring Meteor", Callback=function() bringItems(meteorList, selMeteor, selectedLocation) end})
 
-        local fuelSec = BringTab:Section({Title = "Fuels", Icon = "flame", Collapsible = true})
+        local fuelSec = bringTab:Section({Title = "Fuels", Icon = "flame", Collapsible = true})
         local fuelList = {"All", "Log", "Coal", "Chair", "Fuel Canister", "Oil Barrel"}
         local selFuel = {"All"}
         fuelSec:Dropdown({Title="Pilih Fuel", Values=fuelList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selFuel=o or {"All"} end})
         fuelSec:Button({Title="Bring Fuels", Callback=function() bringItems(fuelList, selFuel, selectedLocation) end})
         fuelSec:Button({Title="Bring Logs Only", Callback=function() bringItems(fuelList, {"Log"}, selectedLocation) end})
 
-        local foodSec = BringTab:Section({Title = "Food", Icon = "drumstick", Collapsible = true})
+        local foodSec = bringTab:Section({Title = "Food", Icon = "drumstick", Collapsible = true})
         local foodList = {"All", "Sweet Potato", "Stuffing", "Turkey Leg", "Carrot", "Pumkin", "Mackerel", "Salmon", "Swordfish", "Berry", "Ribs", "Stew", "Steak Dinner", "Morsel", "Steak", "Corn", "Cooked Morsel", "Cooked Steak", "Chilli", "Apple", "Cake"}
         local selFood = {"All"}
         foodSec:Dropdown({Title="Pilih Food", Values=foodList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selFood=o or {"All"} end})
         foodSec:Button({Title="Bring Food", Callback=function() bringItems(foodList, selFood, selectedLocation) end})
 
-        local healSec = BringTab:Section({Title = "Healing", Icon = "heart", Collapsible = true})
+        local healSec = bringTab:Section({Title = "Healing", Icon = "heart", Collapsible = true})
         local healList = {"All", "Medkit", "Bandage"}
         local selHeal = {"All"}
         healSec:Dropdown({Title="Pilih Healing", Values=healList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selHeal=o or {"All"} end})
         healSec:Button({Title="Bring Healing", Callback=function() bringItems(healList, selHeal, selectedLocation) end})
 
-        local gearSec = BringTab:Section({Title = "Gears (Scrap)", Icon = "wrench", Collapsible = true})
+        local gearSec = bringTab:Section({Title = "Gears (Scrap)", Icon = "wrench", Collapsible = true})
         local gearList = {"All", "Bolt", "Tyre", "Sheet Metal", "Old Radio", "Broken Fan", "Broken Microwave", "Washing Machine", "Old Car Engine", "UFO Scrap", "UFO Component", "UFO Junk", "Cultist Gem", "Gem of the Forest"}
         local selGear = {"All"}
         gearSec:Dropdown({Title="Pilih Gear", Values=gearList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selGear=o or {"All"} end})
         gearSec:Button({Title="Bring Gears", Callback=function() bringItems(gearList, selGear, selectedLocation) end})
 
-        local gunSec = BringTab:Section({Title = "Guns & Ammo", Icon = "swords", Collapsible = true})
+        local gunSec = bringTab:Section({Title = "Guns & Ammo", Icon = "swords", Collapsible = true})
         local gunList = {"All", "Infernal Sword", "Morningstar", "Crossbow", "Infernal Crossbow", "Laser Sword", "Raygun", "Ice Axe", "Ice Sword", "Chainsaw", "Strong Axe", "Axe Trim Kit", "Spear", "Good Axe", "Revolver", "Rifle", "Tactical Shotgun", "Revolver Ammo", "Rifle Ammo", "Alien Armour", "Frog Boots", "Leather Body", "Iron Body", "Thorn Body", "Riot Shield", "Armour Trim Kit", "Obsidiron Boots"}
         local selGun = {"All"}
         gunSec:Dropdown({Title="Pilih Weapon", Values=gunList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selGun=o or {"All"} end})
         gunSec:Button({Title="Bring Guns & Ammo", Callback=function() bringItems(gunList, selGun, selectedLocation) end})
 
-        local otherSec = BringTab:Section({Title = "Bring Other", Icon = "package", Collapsible = true})
+        local otherSec = bringTab:Section({Title = "Bring Other", Icon = "package", Collapsible = true})
         local otherList = {"All", "Purple Fur Tuft", "Halloween Candle", "Candy", "Frog Key", "Feather", "Wildfire", "Sacrifice Totem", "Old Rod", "Flower", "Coin Stack", "Infernal Sack", "Giant Sack", "Good Sack", "Seed Box", "Chainsaw", "Old Flashlight", "Strong Flashlight", "Bunny Foot", "Wolf Pelt", "Bear Pelt", "Mammoth Tusk", "Alpha Wolf Pelt", "Bear Corpse", "Meteor Shard", "Gold Shard", "Raw Obsidiron Ore", "Gem of the Forest", "Diamond", "Defense Blueprint"}
         local selOther = {"All"}
         otherSec:Dropdown({Title="Pilih Item", Values=otherList, Value={"All"}, Multi=true, AllowNone=true, Callback=function(o) selOther=o or {"All"} end})
@@ -1626,7 +1748,7 @@ local function createMainUI()
         -- Teleport Tab
         -- ==============================================
         -- Lost Child (seperti sebelumnya)
-        local lostChildSec = TeleportTab:Section({Title = "Teleport Lost Child", Icon = "baby", Collapsible = true, DefaultOpen = true})
+        local lostChildSec = teleportTab:Section({Title = "Teleport Lost Child", Icon = "baby", Collapsible = true, DefaultOpen = true})
         local childOptions = {"DinoKid", "KoalaKid", "KrakenKid", "SquidKid"}
         local selectedChild = "DinoKid"
         lostChildSec:Dropdown({Title = "Select Child", Values = childOptions, Value = "DinoKid", Callback = function(v) selectedChild = v end})
@@ -1652,7 +1774,7 @@ local function createMainUI()
         })
 
         -- Structure Teleport (BARU!)
-        local structureSec = TeleportTab:Section({
+        local structureSec = teleportTab:Section({
             Title = "Structure Teleport",
             Icon = "castle",            -- Icon bangunan / structure
             Collapsible = true,
