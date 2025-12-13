@@ -52,13 +52,14 @@ local WindUI = nil
 local maxRetries = 5
 local retryDelay = 2
 for i = 1, maxRetries do
+    print("[DEBUG] Attempt load WindUI ke-" .. i)
     local ok, res = pcall(function()
         local url = "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
         local code = game:HttpGet(url)
-        print("[DEBUG] HttpGet sukses, panjang kode: " .. #code)  -- Debug length
+        print("[DEBUG] HttpGet sukses, panjang kode: " .. #code)  -- Debug kalau get jalan
         return loadstring(code)()
     end)
-    if ok and res then
+    if ok and res and type(res) == "table" then
         WindUI = res
         print("[WindUI] Loaded sukses di attempt " .. i)
         pcall(function()
@@ -73,7 +74,7 @@ for i = 1, maxRetries do
 end
 if not WindUI then
     warn("[ERROR] Gagal load WindUI setelah " .. maxRetries .. " attempt. UI tidak akan muncul.")
-    return  -- Stop script kalau gagal
+    return  -- Stop script kalau gagal total
 end
 ---------------------------------------------------------
 -- STATE & CONFIG
@@ -1110,9 +1111,8 @@ local function createMainUI()
 
         -- HEALTH TAB (original)
         healthTab:Paragraph({ Title = "Cek Health Script", Desc = "Klik tombol di bawah buat lihat status terbaru:\n- Uptime\n- Lava Ready / Scanning\n- Ping\n- FPS\n- Fitur aktif (Godmode, AFK, Farm, Aura, dll)\n\nMini panel di kiri layar juga selalu update realtime.", Color = "Grey" })
-        healthTab:Button({ Title = "Refresh Status Sekarang", Icon = "activity", Callback = function() if scriptDisabled then return end; local msg = getStatusSummary(); notifyUI("Status Script", msg, 7, "activity"); print("[PapiDimz] Status:\n" .. msg) end })
-        Window:OnDestroy(resetAll)
-    end
+        healthTab:Button({ Title = "Refresh Status Sekarang", Icon = "activity", Callback = function() if scriptDisabled then return end; local msg = getStatusSummary(); notifyUI("Status Script", msg, 7, "activity"); print("[PapiDimz] Status:\n" .. msg) 
+    end })
 
 ---------------------------------------------------------
 -- FISHING FUNCTIONS (XENO GLASS)
