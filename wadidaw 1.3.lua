@@ -2042,17 +2042,16 @@ local function createMainUI()
             end
         })
 
-        -- Hotkey Toggle UI
+        -- Hotkey & Cleanup
         UserInputService.InputBegan:Connect(function(input, gp)
             if gp or scriptDisabled then return end
             if input.KeyCode == Enum.KeyCode.P then
-                pcall(function()
-                    Window:Toggle()
-                end)
+                pcall(function() Window:Toggle() end)
             end
         end)
+        Window:OnDestroy(resetAll)
     end
-
+end
 
 -- INITIAL NON-BLOCKING RESOURCE WATCHERS
 backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
