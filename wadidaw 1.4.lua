@@ -59,25 +59,47 @@ end
 ---------------------------------------------------------
 local WindUI = nil
 
-if type(loadstring) ~= "function" then
-    warn("[FATAL] loadstring tidak tersedia di executor ini.")
-else
-    local ok, res = pcall(function()
+task.spawn(function()
+    task.wait(0.2)
+
+    local ok, err = pcall(function()
+        if not game or not game.HttpGet then
+            error("HttpGet tidak tersedia")
+        end
+
         local src = game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
-        return loadstring(src)()
+
+        if type(loadstring) ~= "function" then
+            error("loadstring tidak tersedia di executor ini")
+        end
+
+        WindUI = loadstring(src)()
     end)
 
-    if ok and res then
-        WindUI = res
-        pcall(function()
-            WindUI:SetTheme("Dark")
-            WindUI.TransparencyValue = 0.2
-        end)
-    else
-        warn("[UI] Gagal load WindUI:", res)
+    if not ok or not WindUI then
+        warn("[UI] WindUI gagal load:", err)
+        return
     end
-end
 
+    pcall(function()
+        WindUI:SetTheme("Dark")
+        WindUI.TransparencyValue = 0.2
+    end)
+
+    -- BARU BOLEH bikin UI
+    splashScreen()
+    createMainUI()
+    createMiniHud()
+    startMiniHudLoop()
+    initAntiAFK()
+
+    notifyUI(
+        "Papi Dimz |HUB",
+        "Semua fitur loaded dengan aman (deferred loader).",
+        6,
+        "sparkles"
+    )
+end)
 
 ---------------------------------------------------------
 -- STATE & CONFIG
@@ -1633,6 +1655,7 @@ end
 -- MAIN UI
 ---------------------------------------------------------
 local function createMainUI()
+    if Window then return end
     if not WindUI then
         warn("[UI] WindUI tidak tersedia. UI dibatalkan.")
         return
