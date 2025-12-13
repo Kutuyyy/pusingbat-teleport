@@ -50,7 +50,7 @@ local function createFallbackNotify(msg)
     print("[PapiDimz][FALLBACK NOTIFY] " .. tostring(msg))
 end
 do
-    local ok, res = pcall(function()
+    local okWind, WindUI = pcall(function()
         return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
     end)
     if ok and res then
