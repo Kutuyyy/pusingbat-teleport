@@ -58,27 +58,26 @@ end
 -- LOAD WINDUI
 ---------------------------------------------------------
 local WindUI = nil
-local function createFallbackNotify(msg)
-    print("[PapiDimz][FALLBACK NOTIFY] " .. tostring(msg))
-end
 
-do
+if type(loadstring) ~= "function" then
+    warn("[FATAL] loadstring tidak tersedia di executor ini.")
+else
     local ok, res = pcall(function()
-        return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+        local src = game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
+        return loadstring(src)()
     end)
+
     if ok and res then
         WindUI = res
         pcall(function()
-            if type(WindUI.SetTheme) == "function" then
-                WindUI:SetTheme("Dark")
-            end
+            WindUI:SetTheme("Dark")
             WindUI.TransparencyValue = 0.2
         end)
     else
-        warn("[UI] Gagal load WindUI. Menggunakan fallback minimal.")
-        WindUI = nil
+        warn("[UI] Gagal load WindUI:", res)
     end
 end
+
 
 ---------------------------------------------------------
 -- STATE & CONFIG
