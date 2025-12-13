@@ -61,6 +61,7 @@ local WindUI = nil
 local function createFallbackNotify(msg)
     print("[PapiDimz][FALLBACK NOTIFY] " .. tostring(msg))
 end
+
 do
     local ok, res = pcall(function()
         return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
@@ -68,7 +69,9 @@ do
     if ok and res then
         WindUI = res
         pcall(function()
-            WindUI:SetTheme = "Dark"
+            if type(WindUI.SetTheme) == "function" then
+                WindUI:SetTheme("Dark")
+            end
             WindUI.TransparencyValue = 0.2
         end)
     else
@@ -478,7 +481,12 @@ local function bringItems(sectionItemList, selectedItems, location)
         return
     end
 
-    WindUI:Notify({Title="Bringing", Content=#candidates.." item → "..location, Duration=5, Icon="zap"})
+    WindUI:Notify({
+        Title="Bringing", 
+        Content = tostring(#candidates) .. " item → " .. tostring(location)
+        Duration=5, 
+        Icon="zap"
+    })
 
     for i, item in ipairs(candidates) do
         local cf = getDropCFrame(targetPos, i)
@@ -2039,6 +2047,8 @@ local function createMainUI()
                 end)
             end
         end)
+    end
+end
 
 -- INITIAL NON-BLOCKING RESOURCE WATCHERS
 backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
