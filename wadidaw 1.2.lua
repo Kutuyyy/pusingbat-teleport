@@ -45,24 +45,16 @@ end
 ---------------------------------------------------------
 -- LOAD WINDUI
 ---------------------------------------------------------
-local WindUI = nil
-local function createFallbackNotify(msg)
-    print("[PapiDimz][FALLBACK NOTIFY] " .. tostring(msg))
-end
-do
-    local okWind, WindUI = pcall(function()
-        return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
-    end)
-    if ok and res then
-        WindUI = res
-        pcall(function()
-            WindUI:SetTheme("Dark")
-            WindUI.TransparencyValue = 0.2
-        end)
-    else
-        warn("[UI] Gagal load WindUI. Menggunakan fallback minimal.")
-        WindUI = nil
-    end
+local WindUI
+local ok, result = pcall(function()
+    return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+end)
+
+if ok and type(result) == "table" and result.CreateWindow then
+    WindUI = result
+else
+    warn("[PapiDimz] WindUI gagal dimuat. Value:", result)
+    return print("[PapiDimz] UI tidak bisa tampil karena WindUI nil.")
 end
 ---------------------------------------------------------
 -- STATE & CONFIG
