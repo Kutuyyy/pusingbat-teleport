@@ -162,7 +162,35 @@ infoTab:Button({
 ---------------------------------------------------------
 --// TAB 2 : MAIN
 ---------------------------------------------------------
-mainTab = Window:Tab({ Title = "Main", Icon = "settings-2" })
+mainTab = Window:Tab({ 
+    Title = "Main", 
+    Icon = "settings-2" 
+})
+
+
+
+mainTab:Paragraph({
+    Title = "Papi Dimz Hub Loaded",
+    Desc  = "All main modules are active. Navigate tabs on the left to access features.",
+    Color = "Grey"
+})
+
+mainTab:Toggle({ 
+    Title = "GodMode (Damage -∞)", 
+    Icon = "shield", 
+    Default = false, 
+    Callback = function(state) GodmodeEnabled = state end 
+})
+
+mainTab:Toggle({ 
+    Title = "Anti AFK", 
+    Icon = "mouse-pointer-2", 
+    Default = true, 
+    Callback = function(state) AntiAFKEnabled = state end 
+})
+
+local GodmodeEnabled = false
+
 local function startGodmodeLoop()
     task.spawn(function()
         while not scriptDisabled do
@@ -186,15 +214,6 @@ local function initAntiAFK()
         VirtualUser:ClickButton2(Vector2.new())
     end)
 end
-
-mainTab:Paragraph({
-    Title = "Papi Dimz Hub Loaded",
-    Desc  = "All main modules are active. Navigate tabs on the left to access features.",
-    Color = "Grey"
-})
-
-mainTab:Toggle({ Title = "GodMode (Damage -∞)", Icon = "shield", Default = false, Callback = function(state) GodmodeEnabled = state end })
-mainTab:Toggle({ Title = "Anti AFK", Icon = "mouse-pointer-2", Default = true, Callback = function(state) AntiAFKEnabled = state end })
 ---------------------------------------------------------
 -- PART 1 END
 ---------------------------------------------------------
