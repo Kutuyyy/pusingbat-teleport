@@ -178,6 +178,36 @@ local selectedLocation = "Player"
 ---------------------------------------------------------
 -- GENERIC HELPERS
 ---------------------------------------------------------
+
+local function getScrapperTarget()
+    if ScrapperTarget and ScrapperTarget.Parent then
+        return ScrapperTarget
+    end
+
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return nil end
+
+    local camp = map:FindFirstChild("Campground")
+    if not camp then return nil end
+
+    local scrapper = camp:FindFirstChild("Scrapper")
+    if not scrapper then return nil end
+
+    local movers = scrapper:FindFirstChild("Movers")
+    if not movers then return nil end
+
+    local right = movers:FindFirstChild("Right")
+    if not right then return nil end
+
+    local grindersRight = right:FindFirstChild("GrindersRight")
+    if grindersRight and grindersRight:IsA("BasePart") then
+        ScrapperTarget = grindersRight
+        return grindersRight
+    end
+
+    return nil
+end
+
 local function tableToSet(list)
     local t = {}
     for _, v in ipairs(list) do t[v] = true end
