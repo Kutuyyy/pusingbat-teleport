@@ -223,7 +223,10 @@ end
 ---------------------------------------------------------
 local function getTargetPosition(location)
     if location == "Player" then
-        return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0)
+        local hrp = getRoot()
+        if not hrp then return Vector3.zero end
+        return hrp.Position + Vector3.new(0, BringHeight + 3, 0)
+
     elseif location == "Workbench" then
         local s = getScrapperTarget()
         if s then return s.Position + Vector3.new(0, BringHeight, 0) end
@@ -231,7 +234,9 @@ local function getTargetPosition(location)
         local fire = Workspace.Map.Campground.MainFire.OuterTouchZone
         if fire then return fire.Position + Vector3.new(0, BringHeight, 0) end
     end
-    return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0)
+    local hrp = getRoot()
+    if not hrp then return Vector3.zero end
+    return hrp.Position + Vector3.new(0, BringHeight + 3, 0)
 end
 
 ---------------------------------------------------------
@@ -251,37 +256,57 @@ end
 -- BRING CORE
 ---------------------------------------------------------
 local function bringItems(sectionItemList, selectedItems, location)
+    -- SAFETY ITEMS FOLDER
+    if not ItemsFolder then
+        notifyUI("Bring Item", "Items folder belum siap.", 3, "alert-triangle")
+        return
+    end
+
+    local hrp = getRoot()
+    if not hrp then
+        notifyUI("Bring Item", "Character belum siap.", 3, "alert-triangle")
+        return
+    end
+
     local targetPos = getTargetPosition(location)
     local wantedNames = {}
 
     if table.find(selectedItems, "All") then
         for _, name in ipairs(sectionItemList) do
-            if name ~= "All" then table.insert(wantedNames, name) end
+            if name ~= "All" then
+                table.insert(wantedNames, name)
+            end
         end
     else
         wantedNames = selectedItems
     end
 
     local candidates = {}
+
     for _, item in ipairs(ItemsFolder:GetChildren()) do
-        if item:IsA("Model") and item.PrimaryPart and table.find(wantedNames, item.Name) then
+        if item:IsA("Model")
+            and item.PrimaryPart
+            and table.find(wantedNames, item.Name)
+        then
             table.insert(candidates, item)
         end
     end
 
     if #candidates == 0 then
-        WindUI:Notify({Title="Info", Content="Item tidak ditemukan", Icon="search", Duration=4})
+        notifyUI("Bring Item", "Item tidak ditemukan.", 4, "search")
         return
     end
 
-    WindUI:Notify({Title="Bringing", Content=#candidates.." item → "..location, Icon="zap", Duration=5})
+    notifyUI("Bringing", #candidates .. " item → " .. location, 5, "zap")
 
     for i, item in ipairs(candidates) do
-        RequestStartDragging:FireServer(item)
-        task.wait(0.03)
-        item:PivotTo(getDropCFrame(targetPos, i))
-        task.wait(0.03)
-        RequestStopDragging:FireServer(item)
+        pcall(function()
+            RequestStartDragging:FireServer(item)
+            task.wait(0.03)
+            item:PivotTo(getDropCFrame(targetPos, i))
+            task.wait(0.03)
+            RequestStopDragging:FireServer(item)
+        end)
         task.wait(0.02)
     end
 end
@@ -294,7 +319,11 @@ local function teleportToCFrame(cf)
         WindUI:Notify({Title="Error", Content="Lokasi tidak ditemukan!", Icon="alert-triangle"})
         return
     end
-    HumanoidRootPart.CFrame = cf + Vector3.new(0,4,0)
+    local hrp = getRoot()
+    if hrp then
+        hrp.CFrame = cf + Vector3.new(0,4,0)
+    end
+
     WindUI:Notify({Title="Teleport!", Content="Berhasil teleport!", Icon="navigation", Duration=4})
 end
 
@@ -1606,9 +1635,9 @@ local function createMainUI()
         nightTab = Window:Tab({ Title = "Night", Icon = "moon" })
         webhookTab = Window:Tab({ Title = "Webhook", Icon = "radio" })
         healthTab = Window:Tab({ Title = "Cek Health", Icon = "activity" })
-        local bringTab = Window:Tab({ Title = "Bring Item", Icon = "hand" })
-        local teleportTab = Window:Tab({ Title = "Teleport", Icon = "navigation" })
-        local updateTab = Window:Tab({ Title = "Update Focused", Icon = "snowflake" })
+        local BringTab = Window:Tab({ Title = "Bring Item", Icon = "hand" })
+        local TeleportTab = Window:Tab({ Title = "Teleport", Icon = "navigation" })
+        local UpdateTab = Window:Tab({ Title = "Update Focused", Icon = "snowflake" })
     end
 
     if WindUI and mainTab then
