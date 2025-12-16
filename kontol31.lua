@@ -171,6 +171,7 @@ local selectedLocation = "Player"
 -- UI & HUD
 local Window
 local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
+local BringTab, TeleportTab
 local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFps
 
 local scriptStartTime = os.clock()
@@ -1019,6 +1020,16 @@ end
 ---------------------------------------------------------
 -- Bring item to target location
 ---------------------------------------------------------
+local function teleportToCFrame(cf)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp or not cf then return end
+
+    -- aman & instant
+    hrp.CFrame = cf
+end
+
+
 local function getBringTargetCFrame()
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -1043,33 +1054,6 @@ local function getBringTargetCFrame()
     end
 
     return nil
-end
-
----------------------------------------------------------
--- GODMODE & ANTI AFK
----------------------------------------------------------
-local function startGodmodeLoop()
-    task.spawn(function()
-        while not scriptDisabled do
-            if GodmodeEnabled then
-                pcall(function()
-                    if RemoteEvents then
-                        local dmg = RemoteEvents:FindFirstChild("DamagePlayer")
-                        if dmg then dmg:FireServer(-math.huge) end
-                    end
-                end)
-            end
-            task.wait(8)
-        end
-    end)
-end
-local function initAntiAFK()
-    LocalPlayer.Idled:Connect(function()
-        if scriptDisabled then return end
-        if not AntiAFKEnabled then return end
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-    end)
 end
 
 local function isItemAllowed(item, allowedList, selectedList)
@@ -1150,6 +1134,33 @@ function bringItems(masterList, selectedList, location)
         4,
         "package"
     )
+end
+
+---------------------------------------------------------
+-- GODMODE & ANTI AFK
+---------------------------------------------------------
+local function startGodmodeLoop()
+    task.spawn(function()
+        while not scriptDisabled do
+            if GodmodeEnabled then
+                pcall(function()
+                    if RemoteEvents then
+                        local dmg = RemoteEvents:FindFirstChild("DamagePlayer")
+                        if dmg then dmg:FireServer(-math.huge) end
+                    end
+                end)
+            end
+            task.wait(8)
+        end
+    end)
+end
+local function initAntiAFK()
+    LocalPlayer.Idled:Connect(function()
+        if scriptDisabled then return end
+        if not AntiAFKEnabled then return end
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
 end
 
 ---------------------------------------------------------
