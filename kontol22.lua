@@ -167,7 +167,6 @@ local fishingLoopThread = nil
 -- UI & HUD
 local Window
 local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
-local BringTab, TeleportTab
 local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFps
 
 -- Default height
