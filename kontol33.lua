@@ -1117,7 +1117,7 @@ function bringItems(masterList, selectedList, location)
                     end
                     task.wait(0.03)
 
-                    item:PivotTo(targetCF + offset)
+                    item:PivotTo(targetCF * CFrame.new(offset))
 
                     task.wait(0.03)
                     if RequestStopDragging then
