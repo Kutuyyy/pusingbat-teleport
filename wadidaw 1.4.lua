@@ -2207,10 +2207,7 @@ local function createMainUI()
             if gp or scriptDisabled then return end
             if input.KeyCode == Enum.KeyCode.P then
                 pcall(function()
-                    if Window and Window.SetVisible then
-                        uiVisible = not uiVisible
-                        Window:SetVisible(uiVisible)
-                    end
+                    Window:Toggle()
                 end)
             end
         end)
@@ -2223,6 +2220,7 @@ local function createMainUI()
             end
         end)
 
+return Window
 
 -- INITIAL NON-BLOCKING RESOURCE WATCHERS
 backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
@@ -2271,6 +2269,24 @@ end
 print("[PapiDimz] HUB Loaded - All-in-One")
 splashScreen()
 createMainUI()
+task.defer(function()
+    if Window and Window.EditOpenButton then
+        Window:EditOpenButton({
+            Title = "Papi Dimz |HUB",
+            Icon = "sparkles",
+            CornerRadius = UDim.new(0, 16),
+            StrokeThickness = 2,
+            Color = ColorSequence.new(
+                Color3.fromRGB(255, 15, 123),
+                Color3.fromRGB(248, 155, 41)
+            ),
+            OnlyMobile = true,
+            Enabled = true,
+            Draggable = true,
+        })
+    end
+end)
+
 createMiniHud()
 startMiniHudLoop()
 initAntiAFK()
