@@ -1,5 +1,5 @@
--- Papi Dimz |HUB (All-in-One: Local Player + XENO GLASS Fishing + Original Features + Bring & Teleport)
--- Versi: Menggunakan loadstring WindUI asli dari anjing.txt
+-- Papi Dimz |HUB (All-in-One: Local Player + XENO GLASS Fishing + Original Features)
+-- Versi: Fully Integrated UI
 -- WARNING: Use at your own risk.
 ---------------------------------------------------------
 -- SERVICES
@@ -15,10 +15,8 @@ local Lighting = game:GetService("Lighting")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart") -- Ditambahkan untuk kompatibilitas anjing.txt
 ---------------------------------------------------------
--- UTIL: NON-BLOCKING FIND HELPERS (from main.txt)
+-- UTIL: NON-BLOCKING FIND HELPERS
 ---------------------------------------------------------
 local function findWithTimeout(parent, name, timeout, pollInterval)
     timeout = timeout or 6
@@ -45,24 +43,40 @@ local function backgroundFind(parent, name, callback, pollInterval)
     end)
 end
 ---------------------------------------------------------
--- LOAD WINDUI (from anjing.txt - ORIGINAL)
+-- LOAD WINDUI
 ---------------------------------------------------------
-local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
--- Perhatian: Jika baris di atas menyebabkan error, maka URL WindUI inilah masalahnya.
--- Fallback tidak disertakan karena kita ingin UI muncul.
+local WindUI = nil
+local function createFallbackNotify(msg)
+    print("[PapiDimz][FALLBACK NOTIFY] " .. tostring(msg))
+end
+do
+    local ok, res = pcall(function()
+        return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+    end)
+    if ok and res then
+        WindUI = res
+        pcall(function()
+            WindUI:SetTheme("Dark")
+            WindUI.TransparencyValue = 0.2
+        end)
+    else
+        warn("[UI] Gagal load WindUI. Menggunakan fallback minimal.")
+        WindUI = nil
+    end
+end
 ---------------------------------------------------------
--- STATE & CONFIG (from main.txt + anjing.txt)
+-- STATE & CONFIG
 ---------------------------------------------------------
 local scriptDisabled = false
--- Remotes / folders (from main.txt)
+-- Remotes / folders
 local RemoteEvents = ReplicatedStorage:FindFirstChild("RemoteEvents")
 local RequestStartDragging, RequestStopDragging, CollectCoinRemote, ConsumeItemRemote, NightSkipRemote, ToolDamageRemote, EquipHandleRemote
 local ItemsFolder = Workspace:FindFirstChild("Items")
 local Structures = Workspace:FindFirstChild("Structures")
--- Original features state (from main.txt)
+-- Original features state
 local CookingStations = {}
 local ScrapperTarget = nil
-local MoveMode = "DragPivot"
+local MoveMode = "DragPivot"  -- kalau masih dipakai di print
 local AutoCookEnabled = false
 local CookLoopId = 0
 local CookDelaySeconds = 10
@@ -98,7 +112,7 @@ local ChopAuraRadius = 100
 local AuraAttackDelay = 0.16
 local AxeIDs = {["Old Axe"] = "3_7367831688",["Good Axe"] = "112_7367831688",["Strong Axe"] = "116_7367831688",Chainsaw = "647_8992824875",Spear = "196_8999010016"}
 local TreeCache = {}
--- Local Player state (from main.txt)
+-- Local Player state
 local defaultFOV = Camera.FieldOfView
 local fovEnabled = false
 local fovValue = 60
@@ -128,7 +142,7 @@ local promptOriginalHold = {}
 local promptConn = nil
 local humanoid = nil
 local rootPart = nil
--- Fishing state (from main.txt)
+-- Fishing state
 local fishingClickDelay = 5.0
 local fishingAutoClickEnabled = false
 local waitingForPosition = false
@@ -148,18 +162,16 @@ local lastRecastAt = 0
 local RECAST_DELAY = 2
 local MAX_RECENT_SECS = 5
 local fishingLoopThread = nil
--- Bring & Teleport state (from anjing.txt)
-local BringHeight = 20
-local selectedLocation = "Player"
--- UI & HUD (from main.txt)
+-- UI & HUD
 local Window
-local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab, bringTab, teleportTab, updateTab
+local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
 local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFps
+
 local scriptStartTime = os.clock()
 local currentFPS = 0
 local auraHeartbeatConnection = nil
 ---------------------------------------------------------
--- GENERIC HELPERS (from main.txt)
+-- GENERIC HELPERS
 ---------------------------------------------------------
 local function tableToSet(list)
     local t = {}
@@ -191,960 +203,17 @@ local function getInstancePath(inst)
     return table.concat(parts, ".")
 end
 local function notifyUI(title, content, duration, icon)
-    -- Fungsi ini sekarang hanya berfungsi jika WindUI berhasil dimuat di awal
-    pcall(function()
-        WindUI:Notify({ Title = title or "Info", Content = content or "", Duration = duration or 4, Icon = icon or "info" })
-    end)
-end
----------------------------------------------------------
--- BRING CORE (from anjing.txt)
----------------------------------------------------------
-local function bringItems(sectionItemList, selectedItems, location)
-    local targetPos = getTargetPosition(location)
-    local wantedNames = {}
-    if table.find(selectedItems, "All") then
-        for _, name in ipairs(sectionItemList) do
-            if name ~= "All" then table.insert(wantedNames, name) end
-        end
-    else
-        wantedNames = selectedItems
-    end
-    local candidates = {}
-    for _, item in ipairs(ItemsFolder:GetChildren()) do
-        if item:IsA("Model") and item.PrimaryPart and table.find(wantedNames, item.Name) then
-            table.insert(candidates, item)
-        end
-    end
-    if #candidates == 0 then
-        notifyUI("Info", "Item tidak ditemukan", 4, "search")
-        return
-    end
-    notifyUI("Bringing", #candidates.." item → "..location, 5, "zap")
-    for i, item in ipairs(candidates) do
-        RequestStartDragging:FireServer(item)
-        task.wait(0.03)
-        item:PivotTo(getDropCFrame(targetPos, i))
-        task.wait(0.03)
-        RequestStopDragging:FireServer(item)
-        task.wait(0.02)
-    end
-end
----------------------------------------------------------
--- TELEPORT CORE (from anjing.txt)
----------------------------------------------------------
-local function teleportToCFrame(cf)
-    if not cf then
-        notifyUI("Error", "Lokasi tidak ditemukan!", "alert-triangle")
-        return
-    end
-    HumanoidRootPart.CFrame = cf + Vector3.new(0,4,0) -- Gunakan HRP dari awal
-    notifyUI("Teleport!", "Berhasil teleport!", 4, "navigation")
-end
----------------------------------------------------------
--- TARGET POSITION (from anjing.txt)
----------------------------------------------------------
-local function getTargetPosition(location)
-    if location == "Player" then
-        return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0) -- Gunakan HRP dari awal
-    elseif location == "Workbench" then
-        local s = getScrapperTarget()
-        if s then return s.Position + Vector3.new(0, BringHeight, 0) end
-    elseif location == "Fire" then
-        local fire = Workspace.Map.Campground.MainFire.OuterTouchZone
-        if fire then return fire.Position + Vector3.new(0, BringHeight, 0) end
-    end
-    return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0) -- Gunakan HRP dari awal
-end
----------------------------------------------------------
--- DROP CIRCLE (from anjing.txt)
----------------------------------------------------------
-local function getDropCFrame(basePos, index)
-    local angle = (index - 1) * (math.pi * 2 / 12)
-    local radius = 3
-    return CFrame.new(basePos + Vector3.new(
-        math.cos(angle) * radius,
-        0,
-        math.sin(angle) * radius
-    ))
-end
----------------------------------------------------------
--- SCRAPPER CACHE (from anjing.txt)
----------------------------------------------------------
-local ScrapperTarget_Anjing = nil -- Renamed to avoid conflict with original feature
-local function getScrapperTarget()
-    if ScrapperTarget_Anjing and ScrapperTarget_Anjing.Parent then return ScrapperTarget_Anjing end
-    local map = Workspace:FindFirstChild("Map")
-    local camp = map and map:FindFirstChild("Campground")
-    local scrapper = camp and camp:FindFirstChild("Scrapper")
-    local movers = scrapper and scrapper:FindFirstChild("Movers")
-    local right = movers and movers:FindFirstChild("Right")
-    local grinder = right and right:FindFirstChild("GrindersRight")
-    if grinder and grinder:IsA("BasePart") then
-        ScrapperTarget_Anjing = grinder
-        return grinder
-    end
-end
----------------------------------------------------------
--- FISHING FUNCTIONS (XENO GLASS) - (from main.txt, hanya ditempatkan di sini untuk organisasi)
----------------------------------------------------------
-local function fishingEnsureOverlay()
-    local pg = LocalPlayer.PlayerGui
-    if pg:FindFirstChild("XenoPositionOverlay") then return pg.XenoPositionOverlay end
-    local g = Instance.new("ScreenGui")
-    g.Name = "XenoPositionOverlay"
-    g.ResetOnSpawn = false
-    g.IgnoreGuiInset = true
-    g.DisplayOrder = 9999
-    g.Parent = pg
-    local dot = Instance.new("Frame", g)
-    dot.Name = "RedDot"
-    dot.Size = UDim2.new(0, 14, 0, 14)
-    dot.AnchorPoint = Vector2.new(0.5, 0.5)
-    dot.BackgroundColor3 = Color3.fromRGB(220,50,50)
-    dot.BorderSizePixel = 0
-    dot.ZIndex = 9999
-    dot.Visible = false
-    Instance.new("UICorner", dot).CornerRadius = UDim.new(1,0)
-    g.Enabled = false
-    return g
-end
-local function fishingShowOverlay(x,y)
-    local g = fishingEnsureOverlay()
-    g.Enabled = true
-    local dot = g.RedDot
-    if dot then
-        dot.Visible = true
-        dot.Position = UDim2.new(0, math.floor(x + fishingOffsetX), 0, math.floor(y + fishingOffsetY))
-    end
-end
-local function fishingHideOverlay()
-    local g = LocalPlayer.PlayerGui:FindFirstChild("XenoPositionOverlay")
-    if g then g.Enabled = false; if g.RedDot then g.RedDot.Visible = false end end
-end
-local function fishingDoClick()
-    if not fishingSavedPosition then return end
-    local x = math.floor(fishingSavedPosition.x + fishingOffsetX)
-    local y = math.floor(fishingSavedPosition.y + fishingOffsetY)
-    pcall(function()
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
-        task.wait(0.01)
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
-    end)
-end
-local function zone_getTimingBar()
-    local iface = LocalPlayer.PlayerGui:FindFirstChild("Interface")
-    if not iface then return nil end
-    local fcf = iface:FindFirstChild("FishingCatchFrame")
-    if not fcf then return nil end
-    return fcf:FindFirstChild("TimingBar")
-end
-local function zone_makeGreenFull()
-    if not zoneEnabled or zoneDestroyed then return end
-    pcall(function()
-        local tb = zone_getTimingBar()
-        if tb and tb:FindFirstChild("SuccessArea") then
-            local sa = tb.SuccessArea
-            sa.Size = UDim2.new(0,120,0,330)
-            sa.Position = UDim2.new(0,52,0,-5)
-            sa.BackgroundTransparency = 0
-            if not sa:FindFirstChild("UICorner") then Instance.new("UICorner", sa).CornerRadius = UDim.new(0,12) end
-        end
-    end)
-end
-local function zone_isTimingBarVisible()
-    if zoneDestroyed then return false end
-    local tb = zone_getTimingBar()
-    if not tb then return false end
-    local cur = tb
-    while cur and cur ~= LocalPlayer.PlayerGui do
-        if cur:IsA("ScreenGui") and not cur.Enabled then return false end
-        if cur:IsA("GuiObject") and not cur.Visible then return false end
-        cur = cur.Parent
-    end
-    return true
-end
-local function zone_doSpamClick()
-    pcall(function()
-        local cam = Workspace.CurrentCamera
-        local pt = cam and Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2) or Vector2.new(300,300)
-        VirtualUser:Button1Down(pt); task.wait(0.02); VirtualUser:Button1Up(pt)
-    end)
-end
-local function zone_startSpam()
-    if zoneSpamClicking or zoneDestroyed or not zoneEnabled then return end
-    zoneSpamClicking = true
-    zoneSpamThread = task.spawn(function()
-        while zoneSpamClicking and not zoneDestroyed and zoneEnabled do
-            if not zone_isTimingBarVisible() then zoneSpamClicking = false; break end
-            zone_doSpamClick()
-            task.wait(zoneSpamInterval)
-        end
-    end)
-end
-local function zone_stopSpam()
-    zoneSpamClicking = false
-end
-local function startZone()
-    zoneDestroyed = false
-    zoneEnabled = true
-    task.spawn(function()
-        while not zoneDestroyed do
-            task.wait(0.15)
-            if zoneEnabled then pcall(zone_makeGreenFull) end
-        end
-    end)
-    task.spawn(function()
-        zoneLastVisible = zone_isTimingBarVisible()
-        wasTimingBarVisible = zoneLastVisible
-        if zoneLastVisible then lastTimingBarSeenAt = tick() end
-        while not zoneDestroyed do
-            task.wait(0.06)
-            local nowVisible = zone_isTimingBarVisible()
-            if nowVisible then lastTimingBarSeenAt = tick() end
-            if nowVisible ~= zoneLastVisible then
-                zoneLastVisible = nowVisible
-                if nowVisible then
-                    wasTimingBarVisible = true
-                    lastTimingBarSeenAt = tick()
-                    if zoneEnabled then pcall(zone_makeGreenFull); zone_startSpam() end
-                else
-                    zone_stopSpam()
-                    if autoRecastEnabled and fishingSavedPosition then
-                        local sinceSeen = tick() - lastTimingBarSeenAt
-                        local sinceRecast = tick() - lastRecastAt
-                        if wasTimingBarVisible and sinceSeen <= MAX_RECENT_SECS and sinceRecast >= RECAST_DELAY then
-                            task.spawn(function()
-                                task.wait(RECAST_DELAY)
-                                fishingDoClick()
-                                lastRecastAt = tick()
-                                notifyUI("Auto Recast", "Recast dilakukan.", 2)
-                            end)
-                        end
-                    end
-                    wasTimingBarVisible = false
-                end
-            end
-        end
-    end)
-    task.spawn(function()
-        task.wait(0.15)
-        if zoneEnabled and zone_isTimingBarVisible() then zone_startSpam() end
-    end)
-end
-local function stopZone()
-    zoneEnabled = false
-    zone_stopSpam()
-    zoneDestroyed = true
-end
--- Fishing auto click loop
-fishingLoopThread = task.spawn(function()
-    while true do
-        if fishingAutoClickEnabled and fishingSavedPosition and not scriptDisabled then
-            fishingDoClick()
-        end
-        task.wait(fishingClickDelay)
-    end
-end)
--- Position set handler
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp or not waitingForPosition or scriptDisabled then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        local loc = UserInputService:GetMouseLocation()
-        local vp = Camera.ViewportSize
-        local px = math.clamp(math.floor(loc.X), 0, vp.X)
-        local py = math.clamp(math.floor(loc.Y), 0, vp.Y)
-        fishingSavedPosition = {x = px, y = py}
-        waitingForPosition = false
-        notifyUI("Position Set", ("X=%d Y=%d"):format(px, py), 3)
-        if fishingOverlayVisible then fishingShowOverlay(px, py) end
-    end
-end)
----------------------------------------------------------
--- LAVA FINDER (from main.txt)
----------------------------------------------------------
-local function findLava()
-    if lavaFound then return end
-    local map = Workspace:FindFirstChild("Map")
-    if not map then return end
-    local landmarks = map:FindFirstChild("Landmarks")
-    if not landmarks then return end
-    local volcano = landmarks:FindFirstChild("Volcano")
-    if not volcano then return end
-    local functional = volcano:FindFirstChild("Functional")
-    if not functional then return end
-    local lava = functional:FindFirstChild("Lava")
-    if lava and lava:IsA("BasePart") then
-        LavaCFrame = lava.CFrame * CFrame.new(0, 4, 0)
-        lavaFound = true
-        print("[Lava] Volcano lava ditemukan.")
-        notifyUI("Lava", "Volcano lava ditemukan. Auto-sacrifice siap.", 4, "flame")
-    end
-end
-task.spawn(function()
-    while not lavaFound and not scriptDisabled do
-        findLava()
-        task.wait(1.5)
-    end
-end)
----------------------------------------------------------
--- AUTO SACRIFICE LAVA (from main.txt)
----------------------------------------------------------
-local function sacrificeItemToLava(item)
-    if not AutoSacEnabled then return end
-    if not item or not item.Parent or not item:IsA("Model") or not item.PrimaryPart then return end
-    if not lavaFound or not LavaCFrame then return end
-    if not table.find(SacrificeList, item.Name) then return end
-    pcall(function()
-        if RequestStartDragging then RequestStartDragging:FireServer(item) end
-        task.wait(0.1)
-        local offset = CFrame.new(math.random(-6, 6), 0, math.random(-6, 6))
-        item:PivotTo(LavaCFrame * offset)
-        task.wait(0.2)
-        if RequestStopDragging then RequestStopDragging:FireServer(item) end
-    end)
-end
-task.spawn(function()
-    while not scriptDisabled do
-        if AutoSacEnabled and lavaFound and ItemsFolder then
-            for _, obj in ipairs(ItemsFolder:GetChildren()) do
-                sacrificeItemToLava(obj)
-            end
-        end
-        task.wait(0.7)
-    end
-end)
----------------------------------------------------------
--- AUTO CROCKPOT (from main.txt)
----------------------------------------------------------
-local function ensureCookingStations()
-    local structures = Workspace:FindFirstChild("Structures")
-    if not structures then
-        CookingStations = {}
-        warn("[Cook] workspace.Structures tidak ditemukan.")
-        return false
-    end
-    local stations = {}
-    local crock = structures:FindFirstChild("Crock Pot")
-    local chef = structures:FindFirstChild("Chefs Station")
-    if crock then table.insert(stations, crock) end
-    if chef then table.insert(stations, chef) end
-    if #stations == 0 then
-        CookingStations = {}
-        warn("[Cook] Tidak ada Crock Pot / Chefs Station.")
-        return false
-    end
-    CookingStations = stations
-    local names = {}
-    for _, s in ipairs(stations) do table.insert(names, s.Name) end
-    print("[Cook] Cooking Stations:", table.concat(names, ", "))
-    return true
-end
-local function getStationBase(station)
-    if not station then return nil end
-    local base = station.PrimaryPart or station:FindFirstChildOfClass("BasePart")
-    if not base then warn("[Cook] Station tanpa PrimaryPart/BasePart:", station.Name) end
-    return base
-end
-local function getCookDropCFrame(basePart, index)
-    local radius = 2
-    local height = 3
-    local angle = (index - 1) * (math.pi / 4)
-    local basePos = basePart.Position
-    local offsetX = math.cos(angle) * radius
-    local offsetZ = math.sin(angle) * radius
-    return CFrame.new(basePos + Vector3.new(offsetX, height, offsetZ))
-end
-local function collectCookCandidates(basePart, targetSet, maxCount)
-    local best = {}
-    if not ItemsFolder then return {} end
-    for _, item in ipairs(ItemsFolder:GetChildren()) do
-        if item:IsA("Model")
-            and item.PrimaryPart
-            and targetSet[item.Name]
-            and not string.find(item.Name, "Item Chest")
-        then
-            local dist = (item.PrimaryPart.Position - basePart.Position).Magnitude
-            if #best < maxCount then
-                table.insert(best, { instance = item, distance = dist })
-            else
-                local worstIndex, worstDist = 1, best[1].distance
-                for i = 2, #best do
-                    if best[i].distance > worstDist then
-                        worstDist = best[i].distance
-                        worstIndex = i
-                    end
-                end
-                if dist < worstDist then best[worstIndex] = { instance = item, distance = dist } end
-            end
-        end
-    end
-    table.sort(best, function(a, b) return a.distance < b.distance end)
-    return best
-end
-local function cookOnce()
-    if not AutoCookEnabled then return end
-    if not SelectedCookItems or #SelectedCookItems == 0 then print("[Cook] No items selected."); return end
-    if not CookingStations or #CookingStations == 0 then print("[Cook] CookingStations kosong."); return end
-    local targetSet = tableToSet(SelectedCookItems)
-    print(string.format("[Cook] Mode: %s | Stations: %d", MoveMode or "unknown", #CookingStations))
-    for _, station in ipairs(CookingStations) do
-        if station and station.Parent then
-            local base = getStationBase(station)
-            if base then
-                local candidates = collectCookCandidates(base, targetSet, CookItemsPerCycle)
-                if #candidates == 0 then
-                    print("[Cook] No candidates:", station.Name)
-                else
-                    local maxCount = math.min(CookItemsPerCycle, #candidates)
-                    print(string.format("[Cook] %s | Use: %d candidates", station.Name, maxCount))
-                    for i = 1, maxCount do
-                        local entry = candidates[i]
-                        local item = entry.instance
-                        if item and item.Parent then
-                            local dropCF = getCookDropCFrame(base, i)
-                            pcall(function() if RequestStartDragging then RequestStartDragging:FireServer(item) end end)
-                            task.wait(0.03)
-                            pcall(function() item:PivotTo(dropCF) end)
-                            task.wait(0.03)
-                            pcall(function() if RequestStopDragging then RequestStopDragging:FireServer(item) end end)
-                            print(string.format("[Cook] %s → %s (dist=%.1f)", item.Name, station.Name, entry.distance))
-                            task.wait(0.03)
-                        end
-                    end
-                end
-            end
-        else
-            print("[Cook] Station invalid:", station and station.Name or "unknown")
-        end
-    end
-end
-local function startCookLoop()
-    CookLoopId += 1
-    local current = CookLoopId
-    task.spawn(function()
-        print("[Cook] Auto Crockpot start.")
-        while AutoCookEnabled and current == CookLoopId and not scriptDisabled do
-            cookOnce()
-            task.wait(math.clamp(CookDelaySeconds, 5, 20))
-        end
-        print("[Cook] Auto Crockpot stop.")
-    end)
-end
----------------------------------------------------------
--- SCRAPPER (GRINDER) (from main.txt, updated for Bring/Teleport)
----------------------------------------------------------
-local function ensureScrapperTarget()
-    if ScrapperTarget_Anjing and ScrapperTarget_Anjing.Parent then return true end
-    local map = Workspace:FindFirstChild("Map")
-    if not map then warn("[Scrap/TP] workspace.Map tidak ditemukan."); ScrapperTarget_Anjing = nil; return false end
-    local camp = map:FindFirstChild("Campground")
-    if not camp then warn("[Scrap/TP] Map.Campground tidak ditemukan."); ScrapperTarget_Anjing = nil; return false end
-    local scrapper = camp:FindFirstChild("Scrapper")
-    if not scrapper then warn("[Scrap/TP] Campground.Scrapper tidak ditemukan."); ScrapperTarget_Anjing = nil; return false end
-    local movers = scrapper:FindFirstChild("Movers")
-    if not movers then warn("[Scrap/TP] Scrapper.Movers tidak ditemukan."); ScrapperTarget_Anjing = nil; return false end
-    local right = movers:FindFirstChild("Right")
-    if not right then warn("[Scrap/TP] Scrapper.Movers.Right tidak ditemukan."); ScrapperTarget_Anjing = nil; return false end
-    local grindersRight = right:FindFirstChild("GrindersRight")
-    if not grindersRight or not grindersRight:IsA("BasePart") then warn("[Scrap/TP] GrindersRight tidak ditemukan / bukan BasePart."); ScrapperTarget_Anjing = nil; return false end
-    ScrapperTarget_Anjing = grindersRight
-    print("[Scrap/TP] Scrapper target:", getInstancePath(ScrapperTarget_Anjing))
-    return true
-end
-local function getScrapDropCFrame(scrapBase, index)
-    local radius = 1.5
-    local height = 6
-    local angle = (index - 1) * (math.pi / 6)
-    local basePos = scrapBase.Position
-    local offsetX = math.cos(angle) * radius
-    local offsetZ = math.sin(angle) * radius
-    return CFrame.new(basePos + Vector3.new(offsetX, height, offsetZ))
-end
-local function scrapOnceFullPass()
-    if not ScrapEnabled then return end
-    if not ensureScrapperTarget() then print("[Scrap] Scrapper target belum siap."); return end
-    local scrapBase = ScrapperTarget_Anjing
-    for _, name in ipairs(ScrapItemsPriority) do
-        if not ScrapEnabled or scriptDisabled then return end
-        local batch = {}
-        if ItemsFolder then
-            for _, item in ipairs(ItemsFolder:GetChildren()) do
-                if item:IsA("Model") and item.PrimaryPart and item.Name == name then
-                    local dist = (item.PrimaryPart.Position - scrapBase.Position).Magnitude
-                    table.insert(batch, { instance = item, distance = dist })
-                end
-            end
-        end
-        if #batch > 0 then
-            table.sort(batch, function(a, b) return a.distance < b.distance end)
-            print(string.format("[Scrap] %s | jumlah=%d", name, #batch))
-            for i, entry in ipairs(batch) do
-                if not ScrapEnabled or scriptDisabled then return end
-                local item = entry.instance
-                if item and item.Parent then
-                    local dropCF = getScrapDropCFrame(scrapBase, i)
-                    pcall(function() if RequestStartDragging then RequestStartDragging:FireServer(item) end end)
-                    task.wait(0.02)
-                    pcall(function() item:PivotTo(dropCF) end)
-                    task.wait(0.02)
-                    pcall(function() if RequestStopDragging then RequestStopDragging:FireServer(item) end end)
-                    print(string.format("[Scrap] %s → Grinder (dist=%.1f)", item.Name, entry.distance or -1))
-                    task.wait(0.02)
-                end
-            end
-        end
-    end
-end
-local function startScrapLoop()
-    ScrapLoopId += 1
-    local current = ScrapLoopId
-    task.spawn(function()
-        print("[Scrap] Auto Scrapper start.")
-        while ScrapEnabled and current == ScrapLoopId and not scriptDisabled do
-            scrapOnceFullPass()
-            task.wait(math.clamp(ScrapScanInterval, 10, 300))
-        end
-        print("[Scrap] Auto Scrapper stop.")
-    end)
-end
----------------------------------------------------------
--- GODMODE & ANTI AFK (from main.txt)
----------------------------------------------------------
-local function startGodmodeLoop()
-    task.spawn(function()
-        while not scriptDisabled do
-            if GodmodeEnabled then
-                pcall(function()
-                    if RemoteEvents then
-                        local dmg = RemoteEvents:FindFirstChild("DamagePlayer")
-                        if dmg then dmg:FireServer(-math.huge) end
-                    end
-                end)
-            end
-            task.wait(8)
-        end
-    end)
-end
-local function initAntiAFK()
-    LocalPlayer.Idled:Connect(function()
-        if scriptDisabled then return end
-        if not AntiAFKEnabled then return end
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-    end)
-end
----------------------------------------------------------
--- ULTRA COIN & AMMO (from main.txt)
----------------------------------------------------------
-local function stopCoinAmmo()
-    CoinAmmoEnabled = false
-    if coinAmmoDescAddedConn then coinAmmoDescAddedConn:Disconnect(); coinAmmoDescAddedConn = nil end
-    if CoinAmmoConnection then CoinAmmoConnection:Disconnect(); CoinAmmoConnection = nil end
-end
-local function startCoinAmmo()
-    stopCoinAmmo()
-    CoinAmmoEnabled = true
-    task.spawn(function()
-        for _, v in ipairs(Workspace:GetDescendants()) do
-            if not CoinAmmoEnabled or scriptDisabled then break end
-            pcall(function()
-                if v.Name == "Coin Stack" and CollectCoinRemote then
-                    CollectCoinRemote:InvokeServer(v)
-                elseif (v.Name == "Revolver Ammo" or v.Name == "Rifle Ammo") and ConsumeItemRemote then
-                    ConsumeItemRemote:InvokeServer(v)
-                end
-            end)
-        end
-        notifyUI("Ultra Coin & Ammo", "Initial collect selesai. Listening spawn baru...", 4, "zap")
-        coinAmmoDescAddedConn = Workspace.DescendantAdded:Connect(function(desc)
-            if not CoinAmmoEnabled or scriptDisabled then return end
-            task.wait(0.01)
-            pcall(function()
-                if desc.Name == "Coin Stack" and CollectCoinRemote then
-                    CollectCoinRemote:InvokeServer(desc)
-                elseif (desc.Name == "Revolver Ammo" or desc.Name == "Rifle Ammo") and ConsumeItemRemote then
-                    ConsumeItemRemote:InvokeServer(desc)
-                end
-            end)
+    if WindUI then
+        pcall(function()
+            WindUI:Notify({ Title = title or "Info", Content = content or "", Duration = duration or 4, Icon = icon or "info" })
         end)
-        while CoinAmmoEnabled and not scriptDisabled do task.wait(0.5) end
-        stopCoinAmmo()
-        print("[CoinAmmo] Dimatikan.")
-    end)
-end
----------------------------------------------------------
--- KILL AURA + CHOP AURA (from main.txt)
----------------------------------------------------------
-local nextAuraTick = 0
-local function GetBestAxe(forTree)
-    for name, id in pairs(AxeIDs) do
-        if (not forTree) or (name ~= "Chainsaw" and name ~= "Spear") then
-            local inv = LocalPlayer:FindFirstChild("Inventory")
-            if inv then
-                local tool = inv:FindFirstChild(name)
-                if tool then return tool, id end
-            end
-        end
-    end
-    return nil, nil
-end
-local function EquipAxe(tool)
-    if tool and EquipHandleRemote then
-        pcall(function() EquipHandleRemote:FireServer("FireAllClients", tool) end)
-    end
-end
-local function buildTreeCache()
-    TreeCache = {}
-    local map = Workspace:FindFirstChild("Map")
-    if not map then return end
-    local function scan(folder)
-        if not folder then return end
-        for _, obj in ipairs(folder:GetDescendants()) do
-            if obj.Name == "Small Tree" and obj:FindFirstChild("Trunk") then
-                table.insert(TreeCache, obj)
-            end
-        end
-    end
-    scan(map:FindFirstChild("Foliage"))
-    scan(map:FindFirstChild("Landmarks"))
-    print(string.format("[ChopAura] Tree cache built, total %d trees.", #TreeCache))
-end
-auraHeartbeatConnection = RunService.Heartbeat:Connect(function()
-    if scriptDisabled then return end
-    if (not KillAuraEnabled) and (not ChopAuraEnabled) then return end
-    local now = tick()
-    if now < nextAuraTick then return end
-    nextAuraTick = now + AuraAttackDelay
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    -- KILL AURA
-    if KillAuraEnabled then
-        local axe, axeId = GetBestAxe(false)
-        if axe and axeId and ToolDamageRemote then
-            EquipAxe(axe)
-            local charsFolder = Workspace:FindFirstChild("Characters")
-            if charsFolder then
-                for _, target in ipairs(charsFolder:GetChildren()) do
-                    if target ~= char and target:IsA("Model") then
-                        local root = target:FindFirstChildWhichIsA("BasePart")
-                        if root and (root.Position - hrp.Position).Magnitude <= KillAuraRadius then
-                            pcall(function()
-                                ToolDamageRemote:InvokeServer(target, axe, axeId, CFrame.new(root.Position))
-                            end)
-                        end
-                    end
-                end
-            end
-        end
-    end
-    -- CHOP AURA
-    if ChopAuraEnabled then
-        if #TreeCache == 0 then buildTreeCache() end
-        local axe = GetBestAxe(true)
-        if axe and ToolDamageRemote then
-            EquipAxe(axe)
-            for i = #TreeCache, 1, -1 do
-                local tree = TreeCache[i]
-                if tree and tree.Parent and tree:FindFirstChild("Trunk") then
-                    local trunk = tree.Trunk
-                    if (trunk.Position - hrp.Position).Magnitude <= ChopAuraRadius then
-                        pcall(function()
-                            ToolDamageRemote:InvokeServer(tree, axe, "999_7367831688",
-                                CFrame.new(-2.962610244751,4.5547881126404,-75.950843811035,
-                                           0.89621275663376,-1.3894891459643e-8,0.44362446665764,
-                                           -7.994568895775e-10,1,3.293635941759e-8,
-                                           -0.44362446665764,-2.9872644802253e-8,0.89621275663376))
-                        end)
-                    end
-                else
-                    table.remove(TreeCache, i)
-                end
-            end
-        end
-    end
-end)
----------------------------------------------------------
--- TEMPORAL / NIGHT SKIP (from main.txt)
----------------------------------------------------------
-local function activateTemporal()
-    if scriptDisabled then return end
-    if not TemporalAccelerometer or not TemporalAccelerometer.Parent then
-        Structures = Workspace:FindFirstChild("Structures") or Structures
-        TemporalAccelerometer = Structures and Structures:FindFirstChild("Temporal Accelerometer") or TemporalAccelerometer
-    end
-    if not TemporalAccelerometer then
-        warn("[Temporal] Temporal Accelerometer tidak ditemukan.")
-        notifyUI("Temporal", "Temporal Accelerometer belum tersedia.", 4, "alert-triangle")
-        return
-    end
-    if NightSkipRemote then
-        NightSkipRemote:FireServer(TemporalAccelerometer)
-        print("[Temporal] RequestActivate dikirim.")
-    end
-end
----------------------------------------------------------
--- WEBHOOK HELPERS (from main.txt)
----------------------------------------------------------
-local function namesToVerticalList(names)
-    if type(names) ~= "table" or #names == 0 then return "_Tidak ada pemain aktif_" end
-    local lines = {}
-    for _, n in ipairs(names) do table.insert(lines, "- " .. tostring(n)) end
-    return table.concat(lines, "
-")
-end
-local function try_syn_request(url, body)
-    if not syn or not syn.request then return false, "syn.request not available" end
-    local ok, res = pcall(function()
-        return syn.request({ Url = url, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = body })
-    end)
-    if not ok then return false, res end
-    return true, res
-end
-local function try_request(url, body)
-    if not request then return false, "request not available" end
-    local ok, res = pcall(function()
-        return request({ Url = url, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = body })
-    end)
-    if not ok then return false, res end
-    return true, res
-end
-local function try_httpservice_post(url, body)
-    local ok, res = pcall(function()
-        return HttpService:PostAsync(url, body, Enum.HttpContentType.ApplicationJson)
-    end)
-    return ok, res
-end
-local function buildDayEmbed(currentDay, previousDay, bedCount, kidCount, itemsList, isTest)
-    local players = Players:GetPlayers()
-    local names = {}
-    for _, p in ipairs(players) do table.insert(names, p.Name) end
-    local prev = tostring(previousDay or "N/A")
-    local cur = tostring(currentDay or "N/A")
-    local delta = "N/A"
-    if tonumber(cur) and tonumber(prev) then delta = tostring(tonumber(cur) - tonumber(prev)) end
-    local sampleItems = ""
-    if type(itemsList) == "table" and #itemsList > 0 then
-        local limit = math.min(#itemsList, 6)
-        for i = 1, limit do sampleItems = sampleItems .. "• `" .. tostring(itemsList[i]) .. "`
-" end
-        if #itemsList > limit then sampleItems = sampleItems .. "• `...and more`" end
     else
-        sampleItems = "_No items recorded_"
+        createFallbackNotify(string.format("%s - %s", tostring(title), tostring(content)))
     end
-    local titlePrefix = isTest and "🧪 TEST - " or ""
-    local title = string.format("%s🌅 DAY PROGRESSION UPDATE %s", titlePrefix, cur)
-    local subtitle = "Ringkasan hari, pemain aktif, dan item penting."
-    local playerListValue = namesToVerticalList(names)
-    if #playerListValue > 1024 then
-        local sample = {}
-        for i = 1, math.min(#names, 15) do table.insert(sample, names[i]) end
-        playerListValue = namesToVerticalList(sample) .. "
-- ...and more"
-    end
-    local embed = {
-        title = title,
-        description = table.concat({
-            "✨ **" .. subtitle .. "**",
-            "",
-            string.format("📅 **Progress:** `%s → %s` • **Δ**: `%s` hari", prev, cur, delta),
-            string.format("🛏️ **Beds:** `%s` 👶 **Kids:** `%s`", tostring(bedCount or 0), tostring(kidCount or 0)),
-            string.format("🎮 **Players Online:** `%s`", tostring(#names)),
-            "",
-            "🎒 **Item Highlights:**",
-            sampleItems
-        }, "
-"),
-        color = 0xFAA61A,
-        fields = {
-            { name = "📈 Perubahan Hari", value = string.format("`%s` → `%s` (Δ %s)", prev, cur, tostring(delta)), inline = true },
-            { name = "🎮 Jumlah Pemain", value = "`" .. tostring(#names) .. "`", inline = true },
-            { name = "🧟 Pemain Aktif (list)", value = playerListValue, inline = false },
-        },
-        footer = { text = "🕒 Update generated at " .. os.date("%Y-%m-%d %H:%M:%S") }
-    }
-    local payload = { username = WebhookUsername or "Day Monitor", embeds = { embed } }
-    return payload
-end
-local function sendWebhookPayload(payloadTable)
-    if not WebhookURL or trim(WebhookURL) == "" then return false, "Webhook URL kosong" end
-    local body = HttpService:JSONEncode(payloadTable)
-    local ok1, res1 = try_syn_request(WebhookURL, body)
-    if ok1 then
-        if type(res1) == "table" and res1.StatusCode then
-            if res1.StatusCode >= 200 and res1.StatusCode < 300 then return true, ("syn.request: HTTP %d"):format(res1.StatusCode) end
-            return false, ("syn.request: HTTP %d"):format(res1.StatusCode)
-        end
-        return true, "syn.request: success"
-    end
-    local ok2, res2 = try_request(WebhookURL, body)
-    if ok2 then
-        if type(res2) == "table" and res2.StatusCode then
-            if res2.StatusCode >= 200 and res2.StatusCode < 300 then return true, ("request: HTTP %d"):format(res2.StatusCode) end
-            return false, ("request: HTTP %d"):format(res2.StatusCode)
-        end
-        return true, "request: success"
-    end
-    local ok3, res3 = try_httpservice_post(WebhookURL, body)
-    if ok3 then return true, "HttpService:PostAsync success" end
-    local errmsg = ("syn_err=%s | request_err=%s | http_err=%s"):format(tostring(res1), tostring(res2), tostring(res3))
-    return false, errmsg
-end
-_G.SendManualDay = function(cur, prev, items)
-    local curN, prevN = tonumber(cur) or cur, tonumber(prev) or prev
-    local beds, kids = 0, 0
-    if type(items) == "table" then
-        for _, v in ipairs(items) do
-            if type(v) == "string" then
-                local s = v:lower()
-                if s:find("bed") then beds = beds + 1 end
-                if s:find("child") or s:find("kid") then kids = kids + 1 end
-            end
-        end
-    end
-    local payload = buildDayEmbed(curN, prevN, beds, kids, items, false)
-    local ok, msg = sendWebhookPayload(payload)
-    print("Manual send result:", ok, msg)
-    return ok, msg
 end
 ---------------------------------------------------------
--- DAYDISPLAY (from main.txt)
+-- MINI HUD & SPLASH
 ---------------------------------------------------------
-local function tryHookDayDisplay()
-    if DayDisplayConnection then DayDisplayConnection:Disconnect(); DayDisplayConnection = nil end
-    local function attach(remote)
-        if not remote or not remote.OnClientEvent then return end
-        DayDisplayRemote = remote
-        DayDisplayConnection = DayDisplayRemote.OnClientEvent:Connect(function(...)
-            if scriptDisabled then return end
-            local args = { ... }
-            if #args == 1 then
-                local dayNumber = args[1]
-                if type(dayNumber) ~= "number" then return end
-                if not autoTemporalEnabled then return end
-                if dayNumber == lastProcessedDay then return end
-                lastProcessedDay = dayNumber
-                print("[Temporal] Day", dayNumber, "terdeteksi. Auto skip 5 detik...")
-                task.delay(5, function()
-                    if scriptDisabled or not autoTemporalEnabled then return end
-                    activateTemporal()
-                    end)
-                return
-            end
-            local currentDay = tonumber(args[1]) or args[1]
-            local previousDay = tonumber(args[2]) or args[2] or 0
-            local itemsList = args[3]
-            currentDayCached = currentDay
-            previousDayCached = previousDay
-            print("DayDisplay event:", currentDay, previousDay)
-            if type(currentDay) == "number" and type(previousDay) == "number" then
-                if currentDay > previousDay then
-                    local bedCount, kidCount = 0, 0
-                    if type(itemsList) == "table" then
-                        for _, v in ipairs(itemsList) do
-                            if type(v) == "string" then
-                                local s = v:lower()
-                                if s:find("bed") then bedCount = bedCount + 1 end
-                                if s:find("child") or s:find("kid") then kidCount = kidCount + 1 end
-                            end
-                        end
-                    end
-                    local payload = buildDayEmbed(currentDay, previousDay, bedCount, kidCount, itemsList, false)
-                    print(("Days increased: %s -> %s | beds=%d kids=%d"):format(tostring(previousDay), tostring(currentDay), bedCount, kidCount))
-                    if WebhookEnabled then
-                        local ok, msg = sendWebhookPayload(payload)
-                        if ok then notifyUI("Webhook Sent", "Day " .. tostring(previousDay) .. " → " .. tostring(currentDay), 6, "radio") end
-                        if not ok then notifyUI("Webhook Failed", tostring(msg), 6, "alert-triangle"); warn("Day webhook failed:", msg) end
-                    else
-                        notifyUI("Day Increased", "Day " .. tostring(previousDay) .. " → " .. tostring(currentDay) .. " (webhook OFF)", 5, "calendar")
-                    end
-                else
-                    print("DayDisplay event tanpa kenaikan day:", previousDay, "->", currentDay)
-                end
-            else
-                print("DayDisplay event non-numeric:", tostring(currentDay), tostring(previousDay))
-            end
-        end)
-        print("[DayDisplay] Listener terpasang ke:", getInstancePath(remote))
-        notifyUI("DayDisplay", "Listener terpasang.", 4, "radio")
-    end
-    if RemoteEvents and RemoteEvents:FindFirstChild("DayDisplay") then
-        attach(RemoteEvents:FindFirstChild("DayDisplay"))
-        return
-    elseif ReplicatedStorage:FindFirstChild("DayDisplay") then
-        attach(ReplicatedStorage:FindFirstChild("DayDisplay"))
-        return
-    end
-    task.spawn(function()
-        local found = false
-        local tries = 0
-        while not found and tries < 120 and not scriptDisabled do
-            tries += 1
-            if RemoteEvents and RemoteEvents:FindFirstChild("DayDisplay") then
-                attach(RemoteEvents:FindFirstChild("DayDisplay")); found = true; break
-            end
-            if ReplicatedStorage:FindFirstChild("DayDisplay") then
-                attach(ReplicatedStorage:FindFirstChild("DayDisplay")); found = true; break
-            end
-            task.wait(0.5)
-        end
-        if not found then
-            warn("[DayDisplay] DayDisplay tidak ditemukan setelah timeout.")
-            notifyUI("DayDisplay", "DayDisplay remote tidak ditemukan (timeout). Fitur DayDisplay/Webhook menunggu.", 6, "alert-triangle")
-        end
-    end)
-end
----------------------------------------------------------
--- RESET / CLEANUP (from main.txt)
----------------------------------------------------------
-function resetAll()
-    scriptDisabled = true
-    AutoCookEnabled = false
-    ScrapEnabled = false
-    AutoSacEnabled = false
-    GodmodeEnabled = false
-    AntiAFKEnabled = false
-    CoinAmmoEnabled = false
-    autoTemporalEnabled = false
-    KillAuraEnabled = false
-    ChopAuraEnabled = false
-    TreeCache = {}
-    CookLoopId += 1
-    ScrapLoopId += 1
-    stopCoinAmmo()
-    stopFly()
-    stopTPWalk()
-    stopInfiniteJump()
-    disableFullBright()
-    disableInstantOpen()
-    stopZone()
-    fishingAutoClickEnabled = false
-    if DayDisplayConnection then DayDisplayConnection:Disconnect(); DayDisplayConnection = nil end
-    if auraHeartbeatConnection then auraHeartbeatConnection:Disconnect(); auraHeartbeatConnection = nil end
-    if coinAmmoDescAddedConn then coinAmmoDescAddedConn:Disconnect(); coinAmmoDescAddedConn = nil end
-    if miniHudGui then pcall(function() miniHudGui:Destroy() end); miniHudGui = nil end
-    if Window then pcall(function() Window:Destroy() end); Window = nil end
-    print("[PapiDimz] Semua fitur dimatikan & UI dibersihkan.")
-end
----------------------------------------------------------
--- STATUS / HEALTH (from main.txt)
----------------------------------------------------------
-local function getStatusSummary()
-    local uptimeStr = formatTime(os.clock() - scriptStartTime)
-    local pingMs = math.floor((LocalPlayer:GetNetworkPing() or 0) * 1000 + 0.5)
-    local lavaStr = lavaFound and "Ready" or "Scanning..."
-    local featStr = getFeatureCodes()
-    local msg = table.concat({
-        "UPTIME : " .. uptimeStr,
-        "LAVA : " .. lavaStr,
-        string.format("PING : %d ms", pingMs),
-        string.format("FPS : %d", currentFPS),
-        "FITUR : " .. featStr
-    }, "
-")
-    return msg
-end
 local function formatTime(seconds)
     seconds = math.floor(seconds)
     local h = math.floor(seconds / 3600)
@@ -1168,16 +237,108 @@ local function getFeatureCodes()
     if zoneEnabled then table.insert(t, "ZH") end
     return (#t > 0) and table.concat(t, " | ") or "None"
 end
----------------------------------------------------------
--- MINI HUD & SPLASH (from main.txt - simplified, requires WindUI)
----------------------------------------------------------
+local function splashScreen()
+    local parent = getGuiParent()
+    if not parent then return end
+    local ok, gui = pcall(function()
+        local g = Instance.new("ScreenGui")
+        g.Name = "PapiDimz_Splash"
+        g.IgnoreGuiInset = true
+        g.ResetOnSpawn = false
+        g.Parent = parent
+        local bg = Instance.new("Frame")
+        bg.Size = UDim2.new(1, 0, 1, 0)
+        bg.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+        bg.BackgroundTransparency = 1
+        bg.BorderSizePixel = 0
+        bg.Parent = g
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.new(1, 0, 1, 0)
+        label.BackgroundTransparency = 1
+        label.Font = Enum.Font.GothamBold
+        label.TextSize = 42
+        label.TextColor3 = Color3.fromRGB(230, 230, 230)
+        label.Text = ""
+        label.TextXAlignment = Enum.TextXAlignment.Center
+        label.TextYAlignment = Enum.TextYAlignment.Center
+        label.TextStrokeTransparency = 0.75
+        label.TextStrokeColor3 = Color3.fromRGB(10, 10, 10)
+        label.Parent = bg
+        task.spawn(function()
+            local durBg = 0.35
+            local t = 0
+            while t < durBg do
+                t += RunService.Heartbeat:Wait()
+                local alpha = math.clamp(t / durBg, 0, 1)
+                bg.BackgroundTransparency = 1 - (alpha * 0.9)
+            end
+            bg.BackgroundTransparency = 0.1
+        end)
+        local text = "Papi Dimz :v"
+        local speed = 0.05
+        for i = 1, #text do
+            label.Text = string.sub(text, 1, i)
+            task.wait(speed)
+        end
+        local remain = 2 - (#text * speed)
+        if remain > 0 then task.wait(remain) end
+        local durOut = 0.3
+        task.spawn(function()
+            local t = 0
+            while t < durOut do
+                t += RunService.Heartbeat:Wait()
+                local alpha = math.clamp(t / durOut, 0, 1)
+                bg.BackgroundTransparency = 0.1 + alpha
+                label.TextTransparency = alpha
+            end
+            g:Destroy()
+        end)
+        return g
+    end)
+end
 local function createMiniHud()
-    if not WindUI then return end -- Hanya buat jika WindUI berhasil dimuat
-    -- ... (kode createMiniHud dari main.txt bisa ditambahkan di sini jika diinginkan, tapi kompleks tanpa fungsi helper tambahan)
-    -- Untuk saat ini, kita abaikan mini HUD jika WindUI gagal sejak awal.
+    if miniHudGui then return end
+    local parent = getGuiParent()
+    if not parent then return end
+    miniHudGui = Instance.new("ScreenGui")
+    miniHudGui.Name = "PapiDimz_MiniHUD"
+    miniHudGui.ResetOnSpawn = false
+    miniHudGui.Parent = parent
+    miniHudFrame = Instance.new("Frame")
+    miniHudFrame.Size = UDim2.fromOffset(220, 90)
+    miniHudFrame.Position = UDim2.new(0, 20, 0, 100)
+    miniHudFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    miniHudFrame.BackgroundTransparency = 0.3
+    miniHudFrame.BorderSizePixel = 0
+    miniHudFrame.Active = true
+    miniHudFrame.Draggable = true
+    miniHudFrame.Parent = miniHudGui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = miniHudFrame
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 1
+    stroke.Transparency = 0.6
+    stroke.Parent = miniHudFrame
+    local function makeLabel(yOffset)
+        local lbl = Instance.new("TextLabel")
+        lbl.BackgroundTransparency = 1
+        lbl.Size = UDim2.new(1, -10, 0, 18)
+        lbl.Position = UDim2.new(0, 5, 0, yOffset)
+        lbl.Font = Enum.Font.Gotham
+        lbl.TextSize = 12
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+        lbl.Text = ""
+        lbl.Parent = miniHudFrame
+        return lbl
+    end
+    miniUptimeLabel = makeLabel(4)
+    miniLavaLabel = makeLabel(24)
+    miniPingFpsLabel = makeLabel(44)
+    miniFeaturesLabel = makeLabel(64)
 end
 local function startMiniHudLoop()
-    if not WindUI then return end -- Hanya jalan jika WindUI berhasil dimuat
     scriptStartTime = os.clock()
     task.spawn(function()
         local last = tick()
@@ -1195,18 +356,16 @@ local function startMiniHudLoop()
             local pingMs = math.floor((LocalPlayer:GetNetworkPing() or 0) * 1000 + 0.5)
             local lavaStr = lavaFound and "Ready" or "Scan"
             local featStr = getFeatureCodes()
-            -- Update label mini HUD jika ada
+            if miniUptimeLabel then miniUptimeLabel.Text = "UP : " .. uptimeStr end
+            if miniLavaLabel then miniLavaLabel.Text = "LV : " .. lavaStr end
+            if miniPingFpsLabel then miniPingFpsLabel.Text = string.format("PG : %d ms | FP : %d", pingMs, currentFPS) end
+            if miniFeaturesLabel then miniFeaturesLabel.Text = "FT : " .. featStr end
             task.wait(1)
         end
     end)
 end
-local function splashScreen()
-    if not WindUI then return end -- Hanya splash jika WindUI berhasil dimuat
-    -- ... (kode splashScreen dari main.txt bisa ditambahkan di sini jika diinginkan, tapi menggunakan UI WindUI atau Roblox biasa)
-    -- Untuk saat ini, kita abaikan splash screen jika WindUI gagal sejak awal.
-end
 ---------------------------------------------------------
--- LOCAL PLAYER FUNCTIONS (from main.txt)
+-- LOCAL PLAYER FUNCTIONS
 ---------------------------------------------------------
 local function getCharacter()
     return LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -1422,13 +581,914 @@ local function disableInstantOpen()
     notifyUI("Instant Open", "Durasi dikembalikan.", 3, "refresh-ccw")
 end
 ---------------------------------------------------------
--- MAIN UI (Integrated)
+-- FISHING FUNCTIONS (XENO GLASS)
+---------------------------------------------------------
+local function fishingEnsureOverlay()
+    local pg = LocalPlayer.PlayerGui
+    if pg:FindFirstChild("XenoPositionOverlay") then return pg.XenoPositionOverlay end
+    local g = Instance.new("ScreenGui")
+    g.Name = "XenoPositionOverlay"
+    g.ResetOnSpawn = false
+    g.IgnoreGuiInset = true
+    g.DisplayOrder = 9999
+    g.Parent = pg
+    local dot = Instance.new("Frame", g)
+    dot.Name = "RedDot"
+    dot.Size = UDim2.new(0, 14, 0, 14)
+    dot.AnchorPoint = Vector2.new(0.5, 0.5)
+    dot.BackgroundColor3 = Color3.fromRGB(220,50,50)
+    dot.BorderSizePixel = 0
+    dot.ZIndex = 9999
+    dot.Visible = false
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1,0)
+    g.Enabled = false
+    return g
+end
+local function fishingShowOverlay(x,y)
+    local g = fishingEnsureOverlay()
+    g.Enabled = true
+    local dot = g.RedDot
+    if dot then
+        dot.Visible = true
+        dot.Position = UDim2.new(0, math.floor(x + fishingOffsetX), 0, math.floor(y + fishingOffsetY))
+    end
+end
+local function fishingHideOverlay()
+    local g = LocalPlayer.PlayerGui:FindFirstChild("XenoPositionOverlay")
+    if g then g.Enabled = false; if g.RedDot then g.RedDot.Visible = false end end
+end
+local function fishingDoClick()
+    if not fishingSavedPosition then return end
+    local x = math.floor(fishingSavedPosition.x + fishingOffsetX)
+    local y = math.floor(fishingSavedPosition.y + fishingOffsetY)
+    pcall(function()
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+        task.wait(0.01)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+    end)
+end
+local function zone_getTimingBar()
+    local iface = LocalPlayer.PlayerGui:FindFirstChild("Interface")
+    if not iface then return nil end
+    local fcf = iface:FindFirstChild("FishingCatchFrame")
+    if not fcf then return nil end
+    return fcf:FindFirstChild("TimingBar")
+end
+local function zone_makeGreenFull()
+    if not zoneEnabled or zoneDestroyed then return end
+    pcall(function()
+        local tb = zone_getTimingBar()
+        if tb and tb:FindFirstChild("SuccessArea") then
+            local sa = tb.SuccessArea
+            sa.Size = UDim2.new(0,120,0,330)
+            sa.Position = UDim2.new(0,52,0,-5)
+            sa.BackgroundTransparency = 0
+            if not sa:FindFirstChild("UICorner") then Instance.new("UICorner", sa).CornerRadius = UDim.new(0,12) end
+        end
+    end)
+end
+local function zone_isTimingBarVisible()
+    if zoneDestroyed then return false end
+    local tb = zone_getTimingBar()
+    if not tb then return false end
+    local cur = tb
+    while cur and cur ~= LocalPlayer.PlayerGui do
+        if cur:IsA("ScreenGui") and not cur.Enabled then return false end
+        if cur:IsA("GuiObject") and not cur.Visible then return false end
+        cur = cur.Parent
+    end
+    return true
+end
+local function zone_doSpamClick()
+    pcall(function()
+        local cam = Workspace.CurrentCamera
+        local pt = cam and Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2) or Vector2.new(300,300)
+        VirtualUser:Button1Down(pt); task.wait(0.02); VirtualUser:Button1Up(pt)
+    end)
+end
+local function zone_startSpam()
+    if zoneSpamClicking or zoneDestroyed or not zoneEnabled then return end
+    zoneSpamClicking = true
+    zoneSpamThread = task.spawn(function()
+        while zoneSpamClicking and not zoneDestroyed and zoneEnabled do
+            if not zone_isTimingBarVisible() then zoneSpamClicking = false; break end
+            zone_doSpamClick()
+            task.wait(zoneSpamInterval)
+        end
+    end)
+end
+local function zone_stopSpam()
+    zoneSpamClicking = false
+end
+local function startZone()
+    zoneDestroyed = false
+    zoneEnabled = true
+    task.spawn(function()
+        while not zoneDestroyed do
+            task.wait(0.15)
+            if zoneEnabled then pcall(zone_makeGreenFull) end
+        end
+    end)
+    task.spawn(function()
+        zoneLastVisible = zone_isTimingBarVisible()
+        wasTimingBarVisible = zoneLastVisible
+        if zoneLastVisible then lastTimingBarSeenAt = tick() end
+        while not zoneDestroyed do
+            task.wait(0.06)
+            local nowVisible = zone_isTimingBarVisible()
+            if nowVisible then lastTimingBarSeenAt = tick() end
+            if nowVisible ~= zoneLastVisible then
+                zoneLastVisible = nowVisible
+                if nowVisible then
+                    wasTimingBarVisible = true
+                    lastTimingBarSeenAt = tick()
+                    if zoneEnabled then pcall(zone_makeGreenFull); zone_startSpam() end
+                else
+                    zone_stopSpam()
+                    if autoRecastEnabled and fishingSavedPosition then
+                        local sinceSeen = tick() - lastTimingBarSeenAt
+                        local sinceRecast = tick() - lastRecastAt
+                        if wasTimingBarVisible and sinceSeen <= MAX_RECENT_SECS and sinceRecast >= RECAST_DELAY then
+                            task.spawn(function()
+                                task.wait(RECAST_DELAY)
+                                fishingDoClick()
+                                lastRecastAt = tick()
+                                notifyUI("Auto Recast", "Recast dilakukan.", 2)
+                            end)
+                        end
+                    end
+                    wasTimingBarVisible = false
+                end
+            end
+        end
+    end)
+    task.spawn(function()
+        task.wait(0.15)
+        if zoneEnabled and zone_isTimingBarVisible() then zone_startSpam() end
+    end)
+end
+local function stopZone()
+    zoneEnabled = false
+    zone_stopSpam()
+    zoneDestroyed = true
+end
+-- Fishing auto click loop
+fishingLoopThread = task.spawn(function()
+    while true do
+        if fishingAutoClickEnabled and fishingSavedPosition and not scriptDisabled then
+            fishingDoClick()
+        end
+        task.wait(fishingClickDelay)
+    end
+end)
+-- Position set handler
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp or not waitingForPosition or scriptDisabled then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        local loc = UserInputService:GetMouseLocation()
+        local vp = Camera.ViewportSize
+        local px = math.clamp(math.floor(loc.X), 0, vp.X)
+        local py = math.clamp(math.floor(loc.Y), 0, vp.Y)
+        fishingSavedPosition = {x = px, y = py}
+        waitingForPosition = false
+        notifyUI("Position Set", ("X=%d Y=%d"):format(px, py), 3)
+        if fishingOverlayVisible then fishingShowOverlay(px, py) end
+    end
+end)
+---------------------------------------------------------
+-- ORIGINAL FEATURES (Lava, Cook, Scrap, Aura, etc) - omitted for space but fully included in actual execution
+---------------------------------------------------------
+---------------------------------------------------------
+-- LAVA FINDER
+---------------------------------------------------------
+local function findLava()
+    if lavaFound then return end
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return end
+    local landmarks = map:FindFirstChild("Landmarks")
+    if not landmarks then return end
+    local volcano = landmarks:FindFirstChild("Volcano")
+    if not volcano then return end
+    local functional = volcano:FindFirstChild("Functional")
+    if not functional then return end
+    local lava = functional:FindFirstChild("Lava")
+    if lava and lava:IsA("BasePart") then
+        LavaCFrame = lava.CFrame * CFrame.new(0, 4, 0)
+        lavaFound = true
+        print("[Lava] Volcano lava ditemukan.")
+        notifyUI("Lava", "Volcano lava ditemukan. Auto-sacrifice siap.", 4, "flame")
+    end
+end
+task.spawn(function()
+    while not lavaFound and not scriptDisabled do
+        findLava()
+        task.wait(1.5)
+    end
+end)
+
+---------------------------------------------------------
+-- AUTO SACRIFICE LAVA
+---------------------------------------------------------
+local function sacrificeItemToLava(item)
+    if not AutoSacEnabled then return end
+    if not item or not item.Parent or not item:IsA("Model") or not item.PrimaryPart then return end
+    if not lavaFound or not LavaCFrame then return end
+    if not table.find(SacrificeList, item.Name) then return end
+    pcall(function()
+        if RequestStartDragging then RequestStartDragging:FireServer(item) end
+        task.wait(0.1)
+        local offset = CFrame.new(math.random(-6, 6), 0, math.random(-6, 6))
+        item:PivotTo(LavaCFrame * offset)
+        task.wait(0.2)
+        if RequestStopDragging then RequestStopDragging:FireServer(item) end
+    end)
+end
+task.spawn(function()
+    while not scriptDisabled do
+        if AutoSacEnabled and lavaFound and ItemsFolder then
+            for _, obj in ipairs(ItemsFolder:GetChildren()) do
+                sacrificeItemToLava(obj)
+            end
+        end
+        task.wait(0.7)
+    end
+end)
+
+---------------------------------------------------------
+-- AUTO CROCKPOT
+---------------------------------------------------------
+local function ensureCookingStations()
+    local structures = Workspace:FindFirstChild("Structures")
+    if not structures then
+        CookingStations = {}
+        warn("[Cook] workspace.Structures tidak ditemukan.")
+        return false
+    end
+    local stations = {}
+    local crock = structures:FindFirstChild("Crock Pot")
+    local chef = structures:FindFirstChild("Chefs Station")
+    if crock then table.insert(stations, crock) end
+    if chef then table.insert(stations, chef) end
+    if #stations == 0 then
+        CookingStations = {}
+        warn("[Cook] Tidak ada Crock Pot / Chefs Station.")
+        return false
+    end
+    CookingStations = stations
+    local names = {}
+    for _, s in ipairs(stations) do table.insert(names, s.Name) end
+    print("[Cook] Cooking Stations:", table.concat(names, ", "))
+    return true
+end
+local function getStationBase(station)
+    if not station then return nil end
+    local base = station.PrimaryPart or station:FindFirstChildOfClass("BasePart")
+    if not base then warn("[Cook] Station tanpa PrimaryPart/BasePart:", station.Name) end
+    return base
+end
+local function getCookDropCFrame(basePart, index)
+    local radius = 2
+    local height = 3
+    local angle = (index - 1) * (math.pi / 4)
+    local basePos = basePart.Position
+    local offsetX = math.cos(angle) * radius
+    local offsetZ = math.sin(angle) * radius
+    return CFrame.new(basePos + Vector3.new(offsetX, height, offsetZ))
+end
+local function collectCookCandidates(basePart, targetSet, maxCount)
+    local best = {}
+    if not ItemsFolder then return {} end
+    for _, item in ipairs(ItemsFolder:GetChildren()) do
+        if item:IsA("Model")
+            and item.PrimaryPart
+            and targetSet[item.Name]
+            and not string.find(item.Name, "Item Chest")
+        then
+            local dist = (item.PrimaryPart.Position - basePart.Position).Magnitude
+            if #best < maxCount then
+                table.insert(best, { instance = item, distance = dist })
+            else
+                local worstIndex, worstDist = 1, best[1].distance
+                for i = 2, #best do
+                    if best[i].distance > worstDist then
+                        worstDist = best[i].distance
+                        worstIndex = i
+                    end
+                end
+                if dist < worstDist then best[worstIndex] = { instance = item, distance = dist } end
+            end
+        end
+    end
+    table.sort(best, function(a, b) return a.distance < b.distance end)
+    return best
+end
+local function cookOnce()
+    if not AutoCookEnabled then return end
+    if not SelectedCookItems or #SelectedCookItems == 0 then print("[Cook] No items selected."); return end
+    if not CookingStations or #CookingStations == 0 then print("[Cook] CookingStations kosong."); return end
+    local targetSet = tableToSet(SelectedCookItems)
+    print(string.format("[Cook] Mode: %s | Stations: %d", MoveMode or "unknown", #CookingStations))
+    for _, station in ipairs(CookingStations) do
+        if station and station.Parent then
+            local base = getStationBase(station)
+            if base then
+                local candidates = collectCookCandidates(base, targetSet, CookItemsPerCycle)
+                if #candidates == 0 then
+                    print("[Cook] No candidates:", station.Name)
+                else
+                    local maxCount = math.min(CookItemsPerCycle, #candidates)
+                    print(string.format("[Cook] %s | Use: %d candidates", station.Name, maxCount))
+                    for i = 1, maxCount do
+                        local entry = candidates[i]
+                        local item = entry.instance
+                        if item and item.Parent then
+                            local dropCF = getCookDropCFrame(base, i)
+                            pcall(function() if RequestStartDragging then RequestStartDragging:FireServer(item) end end)
+                            task.wait(0.03)
+                            pcall(function() item:PivotTo(dropCF) end)
+                            task.wait(0.03)
+                            pcall(function() if RequestStopDragging then RequestStopDragging:FireServer(item) end end)
+                            print(string.format("[Cook] %s → %s (dist=%.1f)", item.Name, station.Name, entry.distance))
+                            task.wait(0.03)
+                        end
+                    end
+                end
+            end
+        else
+            print("[Cook] Station invalid:", station and station.Name or "unknown")
+        end
+    end
+end
+local function startCookLoop()
+    CookLoopId += 1
+    local current = CookLoopId
+    task.spawn(function()
+        print("[Cook] Auto Crockpot start.")
+        while AutoCookEnabled and current == CookLoopId and not scriptDisabled do
+            cookOnce()
+            task.wait(math.clamp(CookDelaySeconds, 5, 20))
+        end
+        print("[Cook] Auto Crockpot stop.")
+    end)
+end
+
+---------------------------------------------------------
+-- SCRAPPER (GRINDER)
+---------------------------------------------------------
+local function ensureScrapperTarget()
+    if ScrapperTarget and ScrapperTarget.Parent then return true end
+    local map = Workspace:FindFirstChild("Map")
+    if not map then warn("[Scrap] workspace.Map tidak ditemukan."); ScrapperTarget = nil; return false end
+    local camp = map:FindFirstChild("Campground")
+    if not camp then warn("[Scrap] Map.Campground tidak ditemukan."); ScrapperTarget = nil; return false end
+    local scrapper = camp:FindFirstChild("Scrapper")
+    if not scrapper then warn("[Scrap] Campground.Scrapper tidak ditemukan."); ScrapperTarget = nil; return false end
+    local movers = scrapper:FindFirstChild("Movers")
+    if not movers then warn("[Scrap] Scrapper.Movers tidak ditemukan."); ScrapperTarget = nil; return false end
+    local right = movers:FindFirstChild("Right")
+    if not right then warn("[Scrap] Scrapper.Movers.Right tidak ditemukan."); ScrapperTarget = nil; return false end
+    local grindersRight = right:FindFirstChild("GrindersRight")
+    if not grindersRight or not grindersRight:IsA("BasePart") then warn("[Scrap] GrindersRight tidak ditemukan / bukan BasePart."); ScrapperTarget = nil; return false end
+    ScrapperTarget = grindersRight
+    print("[Scrap] Scrapper target:", getInstancePath(ScrapperTarget))
+    return true
+end
+local function getScrapDropCFrame(scrapBase, index)
+    local radius = 1.5
+    local height = 6
+    local angle = (index - 1) * (math.pi / 6)
+    local basePos = scrapBase.Position
+    local offsetX = math.cos(angle) * radius
+    local offsetZ = math.sin(angle) * radius
+    return CFrame.new(basePos + Vector3.new(offsetX, height, offsetZ))
+end
+local function scrapOnceFullPass()
+    if not ScrapEnabled then return end
+    if not ensureScrapperTarget() then print("[Scrap] Scrapper target belum siap."); return end
+    local scrapBase = ScrapperTarget
+    for _, name in ipairs(ScrapItemsPriority) do
+        if not ScrapEnabled or scriptDisabled then return end
+        local batch = {}
+        if ItemsFolder then
+            for _, item in ipairs(ItemsFolder:GetChildren()) do
+                if item:IsA("Model") and item.PrimaryPart and item.Name == name then
+                    local dist = (item.PrimaryPart.Position - scrapBase.Position).Magnitude
+                    table.insert(batch, { instance = item, distance = dist })
+                end
+            end
+        end
+        if #batch > 0 then
+            table.sort(batch, function(a, b) return a.distance < b.distance end)
+            print(string.format("[Scrap] %s | jumlah=%d", name, #batch))
+            for i, entry in ipairs(batch) do
+                if not ScrapEnabled or scriptDisabled then return end
+                local item = entry.instance
+                if item and item.Parent then
+                    local dropCF = getScrapDropCFrame(scrapBase, i)
+                    pcall(function() if RequestStartDragging then RequestStartDragging:FireServer(item) end end)
+                    task.wait(0.02)
+                    pcall(function() item:PivotTo(dropCF) end)
+                    task.wait(0.02)
+                    pcall(function() if RequestStopDragging then RequestStopDragging:FireServer(item) end end)
+                    print(string.format("[Scrap] %s → Grinder (dist=%.1f)", item.Name, entry.distance or -1))
+                    task.wait(0.02)
+                end
+            end
+        end
+    end
+end
+local function startScrapLoop()
+    ScrapLoopId += 1
+    local current = ScrapLoopId
+    task.spawn(function()
+        print("[Scrap] Auto Scrapper start.")
+        while ScrapEnabled and current == ScrapLoopId and not scriptDisabled do
+            scrapOnceFullPass()
+            task.wait(math.clamp(ScrapScanInterval, 10, 300))
+        end
+        print("[Scrap] Auto Scrapper stop.")
+    end)
+end
+
+---------------------------------------------------------
+-- GODMODE & ANTI AFK
+---------------------------------------------------------
+local function startGodmodeLoop()
+    task.spawn(function()
+        while not scriptDisabled do
+            if GodmodeEnabled then
+                pcall(function()
+                    if RemoteEvents then
+                        local dmg = RemoteEvents:FindFirstChild("DamagePlayer")
+                        if dmg then dmg:FireServer(-math.huge) end
+                    end
+                end)
+            end
+            task.wait(8)
+        end
+    end)
+end
+local function initAntiAFK()
+    LocalPlayer.Idled:Connect(function()
+        if scriptDisabled then return end
+        if not AntiAFKEnabled then return end
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+    end)
+end
+
+---------------------------------------------------------
+-- ULTRA COIN & AMMO
+---------------------------------------------------------
+local function stopCoinAmmo()
+    CoinAmmoEnabled = false
+    if coinAmmoDescAddedConn then coinAmmoDescAddedConn:Disconnect(); coinAmmoDescAddedConn = nil end
+    if CoinAmmoConnection then CoinAmmoConnection:Disconnect(); CoinAmmoConnection = nil end
+end
+local function startCoinAmmo()
+    stopCoinAmmo()
+    CoinAmmoEnabled = true
+    task.spawn(function()
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            if not CoinAmmoEnabled or scriptDisabled then break end
+            pcall(function()
+                if v.Name == "Coin Stack" and CollectCoinRemote then
+                    CollectCoinRemote:InvokeServer(v)
+                elseif (v.Name == "Revolver Ammo" or v.Name == "Rifle Ammo") and ConsumeItemRemote then
+                    ConsumeItemRemote:InvokeServer(v)
+                end
+            end)
+        end
+        notifyUI("Ultra Coin & Ammo", "Initial collect selesai. Listening spawn baru...", 4, "zap")
+        coinAmmoDescAddedConn = Workspace.DescendantAdded:Connect(function(desc)
+            if not CoinAmmoEnabled or scriptDisabled then return end
+            task.wait(0.01)
+            pcall(function()
+                if desc.Name == "Coin Stack" and CollectCoinRemote then
+                    CollectCoinRemote:InvokeServer(desc)
+                elseif (desc.Name == "Revolver Ammo" or desc.Name == "Rifle Ammo") and ConsumeItemRemote then
+                    ConsumeItemRemote:InvokeServer(desc)
+                end
+            end)
+        end)
+        while CoinAmmoEnabled and not scriptDisabled do task.wait(0.5) end
+        stopCoinAmmo()
+        print("[CoinAmmo] Dimatikan.")
+    end)
+end
+
+---------------------------------------------------------
+-- KILL AURA + CHOP AURA (Heartbeat)
+---------------------------------------------------------
+local nextAuraTick = 0
+local function GetBestAxe(forTree)
+    for name, id in pairs(AxeIDs) do
+        if (not forTree) or (name ~= "Chainsaw" and name ~= "Spear") then
+            local inv = LocalPlayer:FindFirstChild("Inventory")
+            if inv then
+                local tool = inv:FindFirstChild(name)
+                if tool then return tool, id end
+            end
+        end
+    end
+    return nil, nil
+end
+local function EquipAxe(tool)
+    if tool and EquipHandleRemote then
+        pcall(function() EquipHandleRemote:FireServer("FireAllClients", tool) end)
+    end
+end
+local function buildTreeCache()
+    TreeCache = {}
+    local map = Workspace:FindFirstChild("Map")
+    if not map then return end
+    local function scan(folder)
+        if not folder then return end
+        for _, obj in ipairs(folder:GetDescendants()) do
+            if obj.Name == "Small Tree" and obj:FindFirstChild("Trunk") then
+                table.insert(TreeCache, obj)
+            end
+        end
+    end
+    scan(map:FindFirstChild("Foliage"))
+    scan(map:FindFirstChild("Landmarks"))
+    print(string.format("[ChopAura] Tree cache built, total %d trees.", #TreeCache))
+end
+auraHeartbeatConnection = RunService.Heartbeat:Connect(function()
+    if scriptDisabled then return end
+    if (not KillAuraEnabled) and (not ChopAuraEnabled) then return end
+    local now = tick()
+    if now < nextAuraTick then return end
+    nextAuraTick = now + AuraAttackDelay
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    -- KILL AURA
+    if KillAuraEnabled then
+        local axe, axeId = GetBestAxe(false)
+        if axe and axeId and ToolDamageRemote then
+            EquipAxe(axe)
+            local charsFolder = Workspace:FindFirstChild("Characters")
+            if charsFolder then
+                for _, target in ipairs(charsFolder:GetChildren()) do
+                    if target ~= char and target:IsA("Model") then
+                        local root = target:FindFirstChildWhichIsA("BasePart")
+                        if root and (root.Position - hrp.Position).Magnitude <= KillAuraRadius then
+                            pcall(function()
+                                ToolDamageRemote:InvokeServer(target, axe, axeId, CFrame.new(root.Position))
+                            end)
+                        end
+                    end
+                end
+            end
+        end
+    end
+    -- CHOP AURA
+    if ChopAuraEnabled then
+        if #TreeCache == 0 then buildTreeCache() end
+        local axe = GetBestAxe(true)
+        if axe and ToolDamageRemote then
+            EquipAxe(axe)
+            for i = #TreeCache, 1, -1 do
+                local tree = TreeCache[i]
+                if tree and tree.Parent and tree:FindFirstChild("Trunk") then
+                    local trunk = tree.Trunk
+                    if (trunk.Position - hrp.Position).Magnitude <= ChopAuraRadius then
+                        pcall(function()
+                            ToolDamageRemote:InvokeServer(tree, axe, "999_7367831688",
+                                CFrame.new(-2.962610244751,4.5547881126404,-75.950843811035,
+                                           0.89621275663376,-1.3894891459643e-8,0.44362446665764,
+                                           -7.994568895775e-10,1,3.293635941759e-8,
+                                           -0.44362446665764,-2.9872644802253e-8,0.89621275663376))
+                        end)
+                    end
+                else
+                    table.remove(TreeCache, i)
+                end
+            end
+        end
+    end
+end)
+
+---------------------------------------------------------
+-- TEMPORAL / NIGHT SKIP
+---------------------------------------------------------
+local function activateTemporal()
+    if scriptDisabled then return end
+    if not TemporalAccelerometer or not TemporalAccelerometer.Parent then
+        Structures = Workspace:FindFirstChild("Structures") or Structures
+        TemporalAccelerometer = Structures and Structures:FindFirstChild("Temporal Accelerometer") or TemporalAccelerometer
+    end
+    if not TemporalAccelerometer then
+        warn("[Temporal] Temporal Accelerometer tidak ditemukan.")
+        notifyUI("Temporal", "Temporal Accelerometer belum tersedia.", 4, "alert-triangle")
+        return
+    end
+    if NightSkipRemote then
+        NightSkipRemote:FireServer(TemporalAccelerometer)
+        print("[Temporal] RequestActivate dikirim.")
+    end
+end
+
+---------------------------------------------------------
+-- WEBHOOK HELPERS
+---------------------------------------------------------
+local function namesToVerticalList(names)
+    if type(names) ~= "table" or #names == 0 then return "_Tidak ada pemain aktif_" end
+    local lines = {}
+    for _, n in ipairs(names) do table.insert(lines, "- " .. tostring(n)) end
+    return table.concat(lines, "\n")
+end
+local function try_syn_request(url, body)
+    if not syn or not syn.request then return false, "syn.request not available" end
+    local ok, res = pcall(function()
+        return syn.request({ Url = url, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = body })
+    end)
+    if not ok then return false, res end
+    return true, res
+end
+local function try_request(url, body)
+    if not request then return false, "request not available" end
+    local ok, res = pcall(function()
+        return request({ Url = url, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = body })
+    end)
+    if not ok then return false, res end
+    return true, res
+end
+local function try_httpservice_post(url, body)
+    local ok, res = pcall(function()
+        return HttpService:PostAsync(url, body, Enum.HttpContentType.ApplicationJson)
+    end)
+    return ok, res
+end
+local function buildDayEmbed(currentDay, previousDay, bedCount, kidCount, itemsList, isTest)
+    local players = Players:GetPlayers()
+    local names = {}
+    for _, p in ipairs(players) do table.insert(names, p.Name) end
+    local prev = tostring(previousDay or "N/A")
+    local cur = tostring(currentDay or "N/A")
+    local delta = "N/A"
+    if tonumber(cur) and tonumber(prev) then delta = tostring(tonumber(cur) - tonumber(prev)) end
+    local sampleItems = ""
+    if type(itemsList) == "table" and #itemsList > 0 then
+        local limit = math.min(#itemsList, 6)
+        for i = 1, limit do sampleItems = sampleItems .. "• `" .. tostring(itemsList[i]) .. "`\n" end
+        if #itemsList > limit then sampleItems = sampleItems .. "• `...and more`" end
+    else
+        sampleItems = "_No items recorded_"
+    end
+    local titlePrefix = isTest and "🧪 TEST - " or ""
+    local title = string.format("%s🌅 DAY PROGRESSION UPDATE %s", titlePrefix, cur)
+    local subtitle = "Ringkasan hari, pemain aktif, dan item penting."
+    local playerListValue = namesToVerticalList(names)
+    if #playerListValue > 1024 then
+        local sample = {}
+        for i = 1, math.min(#names, 15) do table.insert(sample, names[i]) end
+        playerListValue = namesToVerticalList(sample) .. "\n- ...and more"
+    end
+    local embed = {
+        title = title,
+        description = table.concat({
+            "✨ **" .. subtitle .. "**",
+            "",
+            string.format("📆 **Progress:** `%s → %s` • **Δ**: `%s` hari", prev, cur, delta),
+            string.format("🛏️ **Beds:** `%s` 👶 **Kids:** `%s`", tostring(bedCount or 0), tostring(kidCount or 0)),
+            string.format("🎮 **Players Online:** `%s`", tostring(#names)),
+            "",
+            "🎒 **Item Highlights:**",
+            sampleItems
+        }, "\n"),
+        color = 0xFAA61A,
+        fields = {
+            { name = "📈 Perubahan Hari", value = string.format("`%s` → `%s` (Δ %s)", prev, cur, tostring(delta)), inline = true },
+            { name = "🎮 Jumlah Pemain", value = "`" .. tostring(#names) .. "`", inline = true },
+            { name = "🧍 Pemain Aktif (list)", value = playerListValue, inline = false },
+        },
+        footer = { text = "🕒 Update generated at " .. os.date("%Y-%m-%d %H:%M:%S") }
+    }
+    local payload = { username = WebhookUsername or "Day Monitor", embeds = { embed } }
+    return payload
+end
+local function sendWebhookPayload(payloadTable)
+    if not WebhookURL or trim(WebhookURL) == "" then return false, "Webhook URL kosong" end
+    local body = HttpService:JSONEncode(payloadTable)
+    local ok1, res1 = try_syn_request(WebhookURL, body)
+    if ok1 then
+        if type(res1) == "table" and res1.StatusCode then
+            if res1.StatusCode >= 200 and res1.StatusCode < 300 then return true, ("syn.request: HTTP %d"):format(res1.StatusCode) end
+            return false, ("syn.request: HTTP %d"):format(res1.StatusCode)
+        end
+        return true, "syn.request: success"
+    end
+    local ok2, res2 = try_request(WebhookURL, body)
+    if ok2 then
+        if type(res2) == "table" and res2.StatusCode then
+            if res2.StatusCode >= 200 and res2.StatusCode < 300 then return true, ("request: HTTP %d"):format(res2.StatusCode) end
+            return false, ("request: HTTP %d"):format(res2.StatusCode)
+        end
+        return true, "request: success"
+    end
+    local ok3, res3 = try_httpservice_post(WebhookURL, body)
+    if ok3 then return true, "HttpService:PostAsync success" end
+    local errmsg = ("syn_err=%s | request_err=%s | http_err=%s"):format(tostring(res1), tostring(res2), tostring(res3))
+    return false, errmsg
+end
+_G.SendManualDay = function(cur, prev, items)
+    local curN, prevN = tonumber(cur) or cur, tonumber(prev) or prev
+    local beds, kids = 0, 0
+    if type(items) == "table" then
+        for _, v in ipairs(items) do
+            if type(v) == "string" then
+                local s = v:lower()
+                if s:find("bed") then beds = beds + 1 end
+                if s:find("child") or s:find("kid") then kids = kids + 1 end
+            end
+        end
+    end
+    local payload = buildDayEmbed(curN, prevN, beds, kids, items, false)
+    local ok, msg = sendWebhookPayload(payload)
+    print("Manual send result:", ok, msg)
+    return ok, msg
+end
+
+---------------------------------------------------------
+-- DAYDISPLAY (non-blocking hook)
+---------------------------------------------------------
+local function tryHookDayDisplay()
+    if DayDisplayConnection then DayDisplayConnection:Disconnect(); DayDisplayConnection = nil end
+    local function attach(remote)
+        if not remote or not remote.OnClientEvent then return end
+        DayDisplayRemote = remote
+        DayDisplayConnection = DayDisplayRemote.OnClientEvent:Connect(function(...)
+            if scriptDisabled then return end
+            local args = { ... }
+            if #args == 1 then
+                local dayNumber = args[1]
+                if type(dayNumber) ~= "number" then return end
+                if not autoTemporalEnabled then return end
+                if dayNumber == lastProcessedDay then return end
+                lastProcessedDay = dayNumber
+                print("[Temporal] Day", dayNumber, "terdeteksi. Auto skip 5 detik...")
+                task.delay(5, function()
+                    if scriptDisabled or not autoTemporalEnabled then return end
+                    activateTemporal()
+                    end)
+                return
+            end
+            local currentDay = tonumber(args[1]) or args[1]
+            local previousDay = tonumber(args[2]) or args[2] or 0
+            local itemsList = args[3]
+            currentDayCached = currentDay
+            previousDayCached = previousDay
+            print("DayDisplay event:", currentDay, previousDay)
+            if type(currentDay) == "number" and type(previousDay) == "number" then
+                if currentDay > previousDay then
+                    local bedCount, kidCount = 0, 0
+                    if type(itemsList) == "table" then
+                        for _, v in ipairs(itemsList) do
+                            if type(v) == "string" then
+                                local s = v:lower()
+                                if s:find("bed") then bedCount = bedCount + 1 end
+                                if s:find("child") or s:find("kid") then kidCount = kidCount + 1 end
+                            end
+                        end
+                    end
+                    local payload = buildDayEmbed(currentDay, previousDay, bedCount, kidCount, itemsList, false)
+                    print(("Days increased: %s -> %s | beds=%d kids=%d"):format(tostring(previousDay), tostring(currentDay), bedCount, kidCount))
+                    if WebhookEnabled then
+                        local ok, msg = sendWebhookPayload(payload)
+                        if ok then notifyUI("Webhook Sent", "Day " .. tostring(previousDay) .. " → " .. tostring(currentDay), 6, "radio") end
+                        if not ok then notifyUI("Webhook Failed", tostring(msg), 6, "alert-triangle"); warn("Day webhook failed:", msg) end
+                    else
+                        notifyUI("Day Increased", "Day " .. tostring(previousDay) .. " → " .. tostring(currentDay) .. " (webhook OFF)", 5, "calendar")
+                    end
+                else
+                    print("DayDisplay event tanpa kenaikan day:", previousDay, "->", currentDay)
+                end
+            else
+                print("DayDisplay event non-numeric:", tostring(currentDay), tostring(previousDay))
+            end
+        end)
+        print("[DayDisplay] Listener terpasang ke:", getInstancePath(remote))
+        notifyUI("DayDisplay", "Listener terpasang.", 4, "radio")
+    end
+    if RemoteEvents and RemoteEvents:FindFirstChild("DayDisplay") then
+        attach(RemoteEvents:FindFirstChild("DayDisplay"))
+        return
+    elseif ReplicatedStorage:FindFirstChild("DayDisplay") then
+        attach(ReplicatedStorage:FindFirstChild("DayDisplay"))
+        return
+    end
+    task.spawn(function()
+        local found = false
+        local tries = 0
+        while not found and tries < 120 and not scriptDisabled do
+            tries += 1
+            if RemoteEvents and RemoteEvents:FindFirstChild("DayDisplay") then
+                attach(RemoteEvents:FindFirstChild("DayDisplay")); found = true; break
+            end
+            if ReplicatedStorage:FindFirstChild("DayDisplay") then
+                attach(ReplicatedStorage:FindFirstChild("DayDisplay")); found = true; break
+            end
+            task.wait(0.5)
+        end
+        if not found then
+            warn("[DayDisplay] DayDisplay tidak ditemukan setelah timeout.")
+            notifyUI("DayDisplay", "DayDisplay remote tidak ditemukan (timeout). Fitur DayDisplay/Webhook menunggu.", 6, "alert-triangle")
+        end
+    end)
+end
+
+---------------------------------------------------------
+-- RESET / CLEANUP
+---------------------------------------------------------
+function resetAll()
+    scriptDisabled = true
+    AutoCookEnabled = false
+    ScrapEnabled = false
+    AutoSacEnabled = false
+    GodmodeEnabled = false
+    AntiAFKEnabled = false
+    CoinAmmoEnabled = false
+    autoTemporalEnabled = false
+    KillAuraEnabled = false
+    ChopAuraEnabled = false
+    TreeCache = {}
+    CookLoopId += 1
+    ScrapLoopId += 1
+    stopCoinAmmo()
+    stopFly()
+    stopTPWalk()
+    stopInfiniteJump()
+    disableFullBright()
+    disableInstantOpen()
+    stopZone()
+    fishingAutoClickEnabled = false
+    if DayDisplayConnection then DayDisplayConnection:Disconnect(); DayDisplayConnection = nil end
+    if auraHeartbeatConnection then auraHeartbeatConnection:Disconnect(); auraHeartbeatConnection = nil end
+    if coinAmmoDescAddedConn then coinAmmoDescAddedConn:Disconnect(); coinAmmoDescAddedConn = nil end
+    if miniHudGui then pcall(function() miniHudGui:Destroy() end); miniHudGui = nil end
+    if Window then pcall(function() Window:Destroy() end); Window = nil end
+    print("[PapiDimz] Semua fitur dimatikan & UI dibersihkan.")
+end
+
+---------------------------------------------------------
+-- STATUS / HEALTH
+---------------------------------------------------------
+local function getStatusSummary()
+    local uptimeStr = formatTime(os.clock() - scriptStartTime)
+    local pingMs = math.floor((LocalPlayer:GetNetworkPing() or 0) * 1000 + 0.5)
+    local lavaStr = lavaFound and "Ready" or "Scanning..."
+    local featStr = getFeatureCodes()
+    local msg = table.concat({
+        "UPTIME : " .. uptimeStr,
+        "LAVA : " .. lavaStr,
+        string.format("PING : %d ms", pingMs),
+        string.format("FPS : %d", currentFPS),
+        "FITUR : " .. featStr
+    }, "\n")
+    return msg
+end
+
+---------------------------------------------------------
+-- MAP / CAMP SCANNER
+---------------------------------------------------------
+local function scanCampground()
+    local map = Workspace:FindFirstChild("Map")
+    if not map then
+        warn("[Scan] workspace.Map tidak ditemukan.")
+        return
+    end
+    local camp = map:FindFirstChild("Campground")
+    if not camp then
+        warn("[Scan] Map.Campground tidak ditemukan.")
+        return
+    end
+    local descendants = camp:GetDescendants()
+    local lines = {}
+    table.insert(lines, string.format("[Scan] Map.Campground - total %d descendants\n", #descendants))
+    for _, inst in ipairs(descendants) do
+        local path = getInstancePath(inst)
+        local line = string.format("%s | %s", path, inst.ClassName)
+        table.insert(lines, line)
+    end
+    local text = table.concat(lines, "\n")
+    print(text)
+    if typeof(setclipboard) == "function" then
+        pcall(setclipboard, text)
+        print("[Scan] List Campground dicopy ke clipboard.")
+    else
+        print("[Scan] setclipboard tidak tersedia, copy manual dari console.")
+    end
+end
+
+---------------------------------------------------------
+-- MAIN UI
 ---------------------------------------------------------
 local function createMainUI()
     if Window then return end
-    if WindUI then -- Memastikan WindUI ada sebelum membuat window
-        WindUI:SetTheme("Dark")
-        WindUI.TransparencyValue = 0.2
+    if WindUI then
         Window = WindUI:CreateWindow({
             Title = "Papi Dimz |HUB",
             Icon = "gamepad-2",
@@ -1454,22 +1514,21 @@ local function createMainUI()
         mainTab = Window:Tab({ Title = "Main", Icon = "settings-2" })
         localTab = Window:Tab({ Title = "Local Player", Icon = "user" })
         fishingTab = Window:Tab({ Title = "Fishing", Icon = "fish" })
+        BringTab = Window:Tab({Title = "Bring Item", Icon = "hand"})
         farmTab = Window:Tab({ Title = "Farm", Icon = "chef-hat" })
         utilTab = Window:Tab({ Title = "Tools", Icon = "wrench" })
         nightTab = Window:Tab({ Title = "Night", Icon = "moon" })
         webhookTab = Window:Tab({ Title = "Webhook", Icon = "radio" })
         healthTab = Window:Tab({ Title = "Cek Health", Icon = "activity" })
-        bringTab = Window:Tab({ Title = "Bring Item", Icon = "hand" })
-        teleportTab = Window:Tab({ Title = "Teleport", Icon = "navigation" })
-        updateTab = Window:Tab({ Title = "Update Focused", Icon = "snowflake" })
     end
-    if WindUI and mainTab then -- Memastikan WindUI dan mainTab ada sebelum menambahkan elemen
+
+    if WindUI and mainTab then
         -- MAIN TAB
-        mainTab:Paragraph({ Title = "Papi Dimz HUB", Desc = "Godmode, AntiAFK, Auto Sacrifice Lava, Auto Farm, Aura, Webhook DayDisplay.
-Hotkey PC: P untuk toggle UI.", Color = "Grey" })
+        mainTab:Paragraph({ Title = "Papi Dimz HUB", Desc = "Godmode, AntiAFK, Auto Sacrifice Lava, Auto Farm, Aura, Webhook DayDisplay.\nHotkey PC: P untuk toggle UI.", Color = "Grey" })
         mainTab:Toggle({ Title = "GodMode (Damage -∞)", Icon = "shield", Default = false, Callback = function(state) GodmodeEnabled = state end })
         mainTab:Toggle({ Title = "Anti AFK", Icon = "mouse-pointer-2", Default = true, Callback = function(state) AntiAFKEnabled = state end })
         mainTab:Button({ Title = "Tutup UI & Matikan Script", Icon = "power", Variant = "Destructive", Callback = resetAll })
+
         -- LOCAL PLAYER TAB
         localTab:Paragraph({ Title = "Self", Desc = "Atur FOV kamera.", Color = "Grey" })
         localTab:Toggle({ Title = "FOV", Icon = "zoom-in", Default = false, Callback = function(state) fovEnabled = state; applyFOV() end })
@@ -1491,6 +1550,7 @@ Hotkey PC: P untuk toggle UI.", Color = "Grey" })
         localTab:Button({ Title = "Remove Sky", Icon = "cloud-off", Callback = removeSky })
         localTab:Paragraph({ Title = "Misc", Desc = "Instant Open, Reset.", Color = "Grey" })
         localTab:Toggle({ Title = "Instant Open (ProximityPrompt)", Icon = "bolt", Default = false, Callback = function(state) if state then enableInstantOpen() else disableInstantOpen() end end })
+
         -- FISHING TAB
         fishingTab:Paragraph({ Title = "Fishing & Macro", Desc = "Sistem fishing otomatis dengan 100% success rate (zona hijau), auto recast, dan auto clicker.", Color = "Grey" })
         fishingTab:Toggle({ Title = "100% Success Rate", Default = false, Callback = function(state) if state then startZone() else stopZone() end end })
@@ -1537,6 +1597,7 @@ Hotkey PC: P untuk toggle UI.", Color = "Grey" })
             pcall(function() LocalPlayer.PlayerGui.XenoPositionOverlay:Destroy() end)
             notifyUI("Fishing Clean", "Fishing features dibersihkan.", 3)
         end })
+
                 -- FARM TAB (original)
         farmTab:Toggle({ Title = "Auto Crockpot (Carrot + Corn)", Icon = "flame", Default = false, Callback = function(state)
             if scriptDisabled then return end
@@ -1561,308 +1622,15 @@ Hotkey PC: P untuk toggle UI.", Color = "Grey" })
         end })
         farmTab:Toggle({ Title = "Ultra Fast Coin & Ammo", Icon = "zap", Default = false, Callback = function(state) if scriptDisabled then return end; if state then startCoinAmmo() else stopCoinAmmo() end end })
         farmTab:Paragraph({ Title = "Scrap Priority", Desc = table.concat(ScrapItemsPriority, ", "), Color = "Grey" })
-        farmTab:Paragraph({ Title = "Combat Aura", Desc = "Kill Aura & Chop Aura untuk clear musuh dan tebang pohon otomatis.
-Radius bisa diatur dari 50 sampai 200.", Color = "Grey" })
+        farmTab:Paragraph({ Title = "Combat Aura", Desc = "Kill Aura & Chop Aura untuk clear musuh dan tebang pohon otomatis.\nRadius bisa diatur dari 50 sampai 200.", Color = "Grey" })
         farmTab:Toggle({ Title = "Kill Aura (Radius-based)", Icon = "swords", Default = false, Callback = function(state) if scriptDisabled then return end; KillAuraEnabled = state end })
         farmTab:Slider({ Title = "Kill Aura Radius", Description = "Jarak Kill Aura (50 - 200).", Step = 1, Value = { Min = 50, Max = 200, Default = KillAuraRadius }, Callback = function(value) KillAuraRadius = tonumber(value) or KillAuraRadius end })
         farmTab:Toggle({ Title = "Chop Aura (Small Tree)", Icon = "axe", Default = false, Callback = function(state) if scriptDisabled then return end; ChopAuraEnabled = state; if state then buildTreeCache() else TreeCache = {} end end })
         farmTab:Slider({ Title = "Chop Aura Radius", Description = "Jarak tebang otomatis (50 - 200).", Step = 1, Value = { Min = 50, Max = 200, Default = ChopAuraRadius }, Callback = function(value) ChopAuraRadius = tonumber(value) or ChopAuraRadius end })
 
-        -- BRING ITEM TAB (from anjing.txt)
-        if bringTab then
-            local setSec = bringTab:Section({Title="Bring Setting", Icon="settings", DefaultOpen=true})
-            setSec:Dropdown({
-                Title="Location",
-                Values={"Player","Workbench","Fire"},
-                Value="Player",
-                Callback=function(v) selectedLocation=v end
-            })
-            setSec:Input({
-                Title="Bring Height",
-                Default="20",
-                Numeric=true,
-                Callback=function(v) BringHeight=tonumber(v) or 20 end
-            })
-
-            -- Cultist Section
-            do
-                local list={"All","Crossbow Cultist","Cultist"}
-                local sel={"All"}
-                local sec=bringTab:Section({Title="Bring Cultist",Icon="skull",Collapsible=true})
-                sec:Dropdown({Title="Pilih Cultist",Values=list,Value={"All"},Multi=true,AllowNone=true,Callback=function(v)sel=v or{"All"}end})
-                sec:Button({Title="Bring Cultist",Callback=function()bringItems(list,sel,selectedLocation)end})
-            end
-            -- Meteor Section
-            do
-                local list={"All","Raw Obsidiron Ore","Gold Shard","Meteor Shard","Scalding Obsidiron Ingot"}
-                local sel={"All"}
-                local sec=bringTab:Section({Title="Bring Meteor Items",Icon="zap",Collapsible=true})
-                sec:Dropdown({Title="Pilih Item",Values=list,Value={"All"},Multi=true,AllowNone=true,Callback=function(v)sel=v or{"All"}end})
-                sec:Button({Title="Bring Meteor",Callback=function()bringItems(list,sel,selectedLocation)end})
-            end
-            -- Fuel + Logs Only Section
-            do
-                local list={"All","Log","Coal","Chair","Fuel Canister","Oil Barrel"}
-                local sel={"All"}
-                local sec=bringTab:Section({Title="Fuels",Icon="flame",Collapsible=true})
-                sec:Dropdown({Title="Pilih Fuel",Values=list,Value={"All"},Multi=true,AllowNone=true,Callback=function(v)sel=v or{"All"}end})
-                sec:Button({Title="Bring Fuels",Callback=function()bringItems(list,sel,selectedLocation)end})
-                sec:Button({Title="Bring Logs Only",Callback=function()bringItems(list,{"Log"},selectedLocation)end})
-            end
-            -- Food (FULL) Section
-            do
-                local list={
-                    "All","Sweet Potato","Stuffing","Turkey Leg","Carrot","Pumkin","Mackerel",
-                    "Salmon","Swordfish","Berry","Ribs","Stew","Steak Dinner","Morsel","Steak",
-                    "Corn","Cooked Morsel","Cooked Steak","Chilli","Apple","Cake"
-                }
-                local sel={"All"}
-                local sec=bringTab:Section({Title="Food",Icon="drumstick",Collapsible=true})
-                sec:Dropdown({Title="Pilih Food",Values=list,Value={"All"},Multi=true,AllowNone=true,Callback=function(v)sel=v or{"All"}end})
-                sec:Button({Title="Bring Food",Callback=function()bringItems(list,sel,selectedLocation)end})
-            end
-            -- Healing Section
-            do
-                local list={"All","Medkit","Bandage"}
-                local sel={"All"}
-                local sec=bringTab:Section({Title="Healing",Icon="heart",Collapsible=true})
-                sec:Dropdown({Title="Pilih Healing",Values=list,Value={"All"},Multi=true,AllowNone=true,Callback=function(v)sel=v or{"All"}end})
-                sec:Button({Title="Bring Healing",Callback=function()bringItems(list,sel,selectedLocation)end})
-            end
-            -- Gears Section
-            do
-                local list={
-                    "All","Bolt","Tyre","Sheet Metal","Old Radio","Broken Fan","Broken Microwave",
-                    "Washing Machine","Old Car Engine","UFO Scrap","UFO Component","UFO Junk",
-                    "Cultist Gem","Gem of the Forest"
-                }
-                local sel={"All"}
-                local sec=bringTab:Section({Title="Gears (Scrap)",Icon="wrench",Collapsible=true})
-                sec:Dropdown({Title="Pilih Gear",Values=list,Value={"All"},Multi=true,AllowNone=true,Callback=function(v)sel=v or{"All"}end})
-                sec:Button({Title="Bring Gears",Callback=function()bringItems(list,sel,selectedLocation)end})
-            end
-            -- Guns & Ammo Section
-            do
-                local list={
-                    "All","Infernal Sword","Morningstar","Crossbow","Infernal Crossbow","Laser Sword",
-                    "Raygun","Ice Axe","Ice Sword","Chainsaw","Strong Axe","Axe Trim Kit","Spear",
-                    "Good Axe","Revolver","Rifle","Tactical Shotgun","Revolver Ammo","Rifle Ammo",
-                    "Alien Armour","Frog Boots","Leather Body","Iron Body","Thorn Body",
-                    "Riot Shield","Armour Trim Kit","Obsidiron Boots"
-                }
-                local sel={"All"}
-                local sec=bringTab:Section({Title="Guns & Ammo",Icon="swords",Collapsible=true})
-                sec:Dropdown({Title="Pilih Weapon",Values=list,Value={"All"},Multi=true,AllowNone=true,Callback=function(v)sel=v or{"All"}end})
-                sec:Button({Title="Bring Guns & Ammo",Callback=function()bringItems(list,sel,selectedLocation)end})
-            end
-            -- Other Section
-            do
-                local list={
-                    "All","Purple Fur Tuft","Halloween Candle","Candy","Frog Key","Feather",
-                    "Wildfire","Sacrifice Totem","Old Rod","Flower","Coin Stack","Infernal Sack",
-                    "Giant Sack","Good Sack","Seed Box","Chainsaw","Old Flashlight",
-                    "Strong Flashlight","Bunny Foot","Wolf Pelt","Bear Pelt","Mammoth Tusk",
-                    "Alpha Wolf Pelt","Bear Corpse","Meteor Shard","Gold Shard",
-                    "Raw Obsidiron Ore","Gem of the Forest","Diamond","Defense Blueprint"
-                }
-                local sel={"All"}
-                local sec=bringTab:Section({Title="Bring Other",Icon="package",Collapsible=true})
-                sec:Dropdown({Title="Pilih Item",Values=list,Value={"All"},Multi=true,AllowNone=true,Callback=function(v)sel=v or{"All"}end})
-                sec:Button({Title="Bring Other",Callback=function()bringItems(list,sel,selectedLocation)end})
-            end
-        end -- End Bring Tab
-
-        -- TELEPORT TAB (from anjing.txt)
-        if teleportTab then
-            -- LOST CHILD Section
-            local lostChildSec = teleportTab:Section({
-                Title = "Teleport Lost Child",
-                Icon = "baby",
-                Collapsible = true,
-                DefaultOpen = true
-            })
-            local childOptions = {"DinoKid", "KoalaKid", "KrakenKid", "SquidKid"}
-            local selectedChild = "DinoKid"
-            lostChildSec:Dropdown({
-                Title = "Select Child",
-                Values = childOptions,
-                Value = "DinoKid",
-                Callback = function(v)
-                    selectedChild = v
-                end
-            })
-            lostChildSec:Button({
-                Title = "Teleport To Child",
-                Callback = function()
-                    local chars = Workspace:FindFirstChild("Characters")
-                    if not chars then return end
-                    local targetHRP = nil
-                    if selectedChild == "DinoKid" then
-                        targetHRP = chars:FindFirstChild("Lost Child")
-                    elseif selectedChild == "KoalaKid" then
-                        targetHRP = chars:FindFirstChild("Lost Child4")
-                    elseif selectedChild == "KrakenKid" then
-                        targetHRP = chars:FindFirstChild("Lost Child2")
-                    elseif selectedChild == "SquidKid" then
-                        targetHRP = chars:FindFirstChild("Lost Child3")
-                    end
-                    local hrp = targetHRP and targetHRP:FindFirstChild("HumanoidRootPart")
-                    teleportToCFrame(hrp and hrp.CFrame)
-                end
-            })
-
-            -- STRUCTURE TELEPORT Section
-            local structureSec = teleportTab:Section({
-                Title = "Structure Teleport",
-                Icon = "castle",
-                Collapsible = true,
-                DefaultOpen = false
-            })
-            -- CAMP
-            structureSec:Button({
-                Title = "Teleport to Camp",
-                Callback = function()
-                    local fire = Workspace:FindFirstChild("Map")
-                        and Workspace.Map:FindFirstChild("Campground")
-                        and Workspace.Map.Campground:FindFirstChild("MainFire")
-                        and Workspace.Map.Campground.MainFire:FindFirstChild("OuterTouchZone")
-                    teleportToCFrame(fire and fire.CFrame)
-                end
-            })
-            -- CULTIST GENERATOR
-            structureSec:Button({
-                Title = "Teleport to Cultist Generator Base",
-                Callback = function()
-                    local cg = Workspace:FindFirstChild("Map")
-                        and Workspace.Map:FindFirstChild("Landmarks")
-                        and Workspace.Map.Landmarks:FindFirstChild("CultistGenerator")
-                    teleportToCFrame(cg and cg.PrimaryPart and cg.PrimaryPart.CFrame)
-                end
-            })
-            -- STRONGHOLD
-            structureSec:Button({
-                Title = "Teleport to Stronghold",
-                Callback = function()
-                    local sign = Workspace:FindFirstChild("Map")
-                        and Workspace.Map:FindFirstChild("Landmarks")
-                        and Workspace.Map.Landmarks:FindFirstChild("Stronghold")
-                        and Workspace.Map.Landmarks.Stronghold:FindFirstChild("Building")
-                        and Workspace.Map.Landmarks.Stronghold.Building:FindFirstChild("Sign")
-                        and Workspace.Map.Landmarks.Stronghold.Building.Sign:FindFirstChild("Main")
-                    teleportToCFrame(sign and sign.CFrame)
-                end
-            })
-            -- STRONGHOLD DIAMOND CHEST
-            structureSec:Button({
-                Title = "Teleport to Stronghold Diamond Chest",
-                Callback = function()
-                    local chest = Workspace:FindFirstChild("Items")
-                        and Workspace.Items:FindFirstChild("Stronghold Diamond Chest")
-                    teleportToCFrame(chest and chest.CFrame)
-                end
-            })
-            -- CARAVAN
-            structureSec:Button({
-                Title = "Teleport to Caravan",
-                Callback = function()
-                    local caravan = Workspace:FindFirstChild("Map")
-                        and Workspace.Map:FindFirstChild("Landmarks")
-                        and Workspace.Map.Landmarks:FindFirstChild("Caravan")
-                    teleportToCFrame(caravan and caravan.PrimaryPart and caravan.PrimaryPart.CFrame)
-                end
-            })
-            -- FAIRY
-            structureSec:Button({
-                Title = "Teleport to Fairy",
-                Callback = function()
-                    local fairy = Workspace:FindFirstChild("Map")
-                        and Workspace.Map:FindFirstChild("Landmarks")
-                        and Workspace.Map.Landmarks:FindFirstChild("Fairy House")
-                        and Workspace.Map.Landmarks["Fairy House"]:FindFirstChild("Fairy")
-                        and Workspace.Map.Landmarks["Fairy House"].Fairy:FindFirstChild("HumanoidRootPart")
-                    teleportToCFrame(fairy and fairy.CFrame)
-                end
-            })
-            -- ANVIL
-            structureSec:Button({
-                Title = "Teleport to Anvil",
-                Callback = function()
-                    local anvil = Workspace:FindFirstChild("Map")
-                        and Workspace.Map:FindFirstChild("Landmarks")
-                        and Workspace.Map.Landmarks:FindFirstChild("ToolWorkshop")
-                        and Workspace.Map.Landmarks.ToolWorkshop:FindFirstChild("Functional")
-                        and Workspace.Map.Landmarks.ToolWorkshop.Functional:FindFirstChild("ToolBench")
-                        and Workspace.Map.Landmarks.ToolWorkshop.Functional.ToolBench:FindFirstChild("Hammer")
-                    teleportToCFrame(anvil and anvil.CFrame)
-                end
-            })
-        end -- End Teleport Tab
-
-        -- UPDATE FOCUSED TAB (from anjing.txt)
-        if updateTab then
-            local christmasSec = updateTab:Section({Title="Christmas",Icon="gift",DefaultOpen=true})
-            christmasSec:Button({
-                Title="Teleport to Christmas Present",
-                Callback=function()
-                    local p = Workspace.Items:FindFirstChild("ChristmasPresent1")
-                    local part = p and (p.PrimaryPart or p:FindFirstChildWhichIsA("BasePart",true))
-                    teleportToCFrame(part and part.CFrame)
-                end
-            })
-            christmasSec:Button({
-                Title="Teleport to Santa's Sack",
-                Callback=function()
-                    local sled = Workspace.Map.Landmarks["Santa's Sack"].SantaSack.Sled
-                    teleportToCFrame(
-                        (sled.Rail and sled.Rail.Part and sled.Rail.Part.CFrame)
-                        or (sled.Engine and sled.Engine.CFrame)
-                    )
-                end
-            })
-            local optList={"North Pole","Elf Tree","Elf Ice Lake","Elf Ice Race"}
-            local selectedOpt="North Pole"
-            christmasSec:Dropdown({
-                Title="Teleport Options",
-                Values=optList,
-                Value="North Pole",
-                Callback=function(v)selectedOpt=v end
-            })
-            christmasSec:Button({
-                Title="Teleport",
-                Callback=function()
-                    local t=nil
-                    if selectedOpt=="North Pole" then
-                        local np = Workspace.Map.Landmarks:FindFirstChild("North Pole")
-                            and Workspace.Map.Landmarks["North Pole"]:FindFirstChild("Festive Carpet Blueprint")
-                        t =
-                            np and np:FindFirstChild("GraphLines")
-                            or np and np:FindFirstChild("Star")
-                    elseif selectedOpt=="Elf Tree" then
-                        t=Workspace.Map.Landmarks["Elf Tree"].Trees["Northern Pine"].TrunkPart
-                    elseif selectedOpt=="Elf Ice Lake" then
-                        local l=Workspace.Map.Landmarks["Elf Ice Lake"]
-                        t=l:FindFirstChild("Main") or l.GrassFolder:FindFirstChild("Grass")
-                    elseif selectedOpt=="Elf Ice Race" then
-                        t=Workspace.Map.Landmarks["Elf Ice Race"].Obstacles.SnowStoneTall.Part
-                    end
-                    teleportToCFrame(t and t.CFrame)
-                end
-            })
-            local mazeSec = updateTab:Section({Title="Maze",Icon="map"})
-            mazeSec:Button({
-                Title="TP to End",
-                Callback=function()
-                    local chest = Workspace.Items:FindFirstChild("Halloween Maze Chest")
-                    local target =
-                        chest and chest:FindFirstChild("Main")
-                        or chest and chest:FindFirstChild("ItemDrop")
-                    teleportToCFrame(target and target.CFrame)
-                end
-            })
-        end -- End Update Focused Tab
-
         -- TOOLS TAB (original)
-        utilTab:Button({ Title = "Scan Map.Campground (Copy List)", Icon = "scan-line", Callback = function() if scriptDisabled then return end; notifyUI("Scanner", "Scan mulai... cek console / clipboard.", 4, "radar"); --[[ scanCampground() -- Fungsi ini dihilangkan untuk kesederhanaan ]] end })
+        utilTab:Button({ Title = "Scan Map.Campground (Copy List)", Icon = "scan-line", Callback = function() if scriptDisabled then return end; notifyUI("Scanner", "Scan mulai... cek console / clipboard.", 4, "radar"); scanCampground() end })
+
         -- NIGHT TAB (original)
         nightTab:Toggle({ Title = "Auto Skip Malam (Temporal)", Icon = "moon-star", Default = false, Callback = function(state)
             if scriptDisabled then return end
@@ -1870,6 +1638,7 @@ Radius bisa diatur dari 50 sampai 200.", Color = "Grey" })
             notifyUI("Auto Skip Malam", state and "Aktif: auto trigger saat Day naik." or "Dimatikan.", 4, state and "moon" or "toggle-left")
         end })
         nightTab:Button({ Title = "Trigger Temporal Sekali (Manual)", Icon = "zap", Callback = function() if scriptDisabled then return end; activateTemporal() end })
+
         -- WEBHOOK TAB (original)
         webhookTab:Input({ Title = "Discord Webhook URL", Icon = "link", Placeholder = WebhookURL, Numeric = false, Finished = false, Callback = function(txt) local t = trim(txt or "") if t ~= "" then WebhookURL = t; notifyUI("Webhook", "URL disimpan.", 3, "link"); print("WebhookURL set:", WebhookURL) end end })
         webhookTab:Input({ Title = "Webhook Username (opsional)", Icon = "user", Placeholder = WebhookUsername, Numeric = false, Finished = false, Callback = function(txt) local t = trim(txt or "") if t ~= "" then WebhookUsername = t end; notifyUI("Webhook", "Username disimpan: " .. tostring(WebhookUsername), 3, "user") end })
@@ -1878,24 +1647,15 @@ Radius bisa diatur dari 50 sampai 200.", Color = "Grey" })
             if scriptDisabled then return end
             local players = Players:GetPlayers(); local names = {}
             for _, p in ipairs(players) do table.insert(names, p.Name) end
-            local payload = { username = WebhookUsername, embeds = {{ title = "🧪 TEST - Webhook Aktif " .. tostring(WebhookUsername), description = ("**Webhook Aktif %s**
-**Progress:** `%s`
-**Pemain Aktif:**
-%s"):format(tostring(WebhookUsername), tostring(currentDayCached), namesToVerticalList(names)), color = 0x2ECC71, footer = { text = "Test sent: " .. os.date("%Y-%m-%d %H:%M:%S") }}}}
+            local payload = { username = WebhookUsername, embeds = {{ title = "🧪 TEST - Webhook Aktif " .. tostring(WebhookUsername), description = ("**Webhook Aktif %s**\n\n**Progress:** `%s`\n\n**Pemain Aktif:**\n%s"):format(tostring(WebhookUsername), tostring(currentDayCached), namesToVerticalList(names)), color = 0x2ECC71, footer = { text = "Test sent: " .. os.date("%Y-%m-%d %H:%M:%S") }}}}
             local ok, msg = sendWebhookPayload(payload)
             if ok then notifyUI("Webhook Test", "Terkirim: " .. tostring(msg), 5, "check-circle-2"); print("Webhook Test success:", msg)
             else notifyUI("Webhook Test Failed", tostring(msg), 8, "alert-triangle"); warn("Webhook Test failed:", msg) end
         end})
+
         -- HEALTH TAB (original)
-        healthTab:Paragraph({ Title = "Cek Health Script", Desc = "Klik tombol di bawah buat lihat status terbaru:
-- Uptime
-- Lava Ready / Scanning
-- Ping
-- FPS
-- Fitur aktif (Godmode, AFK, Farm, Aura, dll)
-Mini panel di kiri layar juga selalu update realtime.", Color = "Grey" })
-        healthTab:Button({ Title = "Refresh Status Sekarang", Icon = "activity", Callback = function() if scriptDisabled then return end; local msg = getStatusSummary(); notifyUI("Status Script", msg, 7, "activity"); print("[PapiDimz] Status:
-" .. msg) end })
+        healthTab:Paragraph({ Title = "Cek Health Script", Desc = "Klik tombol di bawah buat lihat status terbaru:\n- Uptime\n- Lava Ready / Scanning\n- Ping\n- FPS\n- Fitur aktif (Godmode, AFK, Farm, Aura, dll)\n\nMini panel di kiri layar juga selalu update realtime.", Color = "Grey" })
+        healthTab:Button({ Title = "Refresh Status Sekarang", Icon = "activity", Callback = function() if scriptDisabled then return end; local msg = getStatusSummary(); notifyUI("Status Script", msg, 7, "activity"); print("[PapiDimz] Status:\n" .. msg) end })
         -- Hotkey & Cleanup
         UserInputService.InputBegan:Connect(function(input, gp)
             if gp or scriptDisabled then return end
@@ -1906,11 +1666,9 @@ Mini panel di kiri layar juga selalu update realtime.", Color = "Grey" })
         Window:OnDestroy(resetAll)
     end
 end
----------------------------------------------------------
--- INITIAL NON-BLOCKING RESOURCE WATCHERS (from main.txt)
----------------------------------------------------------
+
+-- INITIAL NON-BLOCKING RESOURCE WATCHERS
 backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
-    if scriptDisabled then return end
     RemoteEvents = re
     notifyUI("Init", "RemoteEvents ditemukan.", 3, "radio")
     RequestStartDragging = re:FindFirstChild("RequestStartDraggingItem")
@@ -1923,23 +1681,21 @@ backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
     tryHookDayDisplay()
 end)
 backgroundFind(Workspace, "Items", function(it)
-    if scriptDisabled then return end
     ItemsFolder = it
     notifyUI("Init", "Items folder ditemukan.", 3, "archive")
 end)
 backgroundFind(Workspace, "Structures", function(st)
-    if scriptDisabled then return end
     Structures = st
     notifyUI("Init", "Structures ditemukan.", 3, "layers")
     TemporalAccelerometer = st:FindFirstChild("Temporal Accelerometer")
 end)
-task.spawn(function() if not scriptDisabled then tryHookDayDisplay() end end)
+task.spawn(function() tryHookDayDisplay() end)
 startGodmodeLoop()
+
 ---------------------------------------------------------
--- INIT (from main.txt)
+-- INIT
 ---------------------------------------------------------
 LocalPlayer.CharacterAdded:Connect(function(char)
-    if scriptDisabled then return end
     task.wait(0.5)
     humanoid = char:WaitForChild("Humanoid")
     rootPart = char:WaitForChild("HumanoidRootPart")
@@ -1951,17 +1707,17 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     if flyEnabled then task.delay(0.2, startFly) end
 end)
 if LocalPlayer.Character then
-    if scriptDisabled then return end
     humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
     rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if humanoid then defaultWalkSpeed = humanoid.WalkSpeed; defaultHipHeight = humanoid.HipHeight end
 end
-print("[PapiDimz] HUB Loaded - All-in-One (with Bring & Teleport)")
--- Coba buat UI setelah WindUI dimuat
+
+print("[PapiDimz] HUB Loaded - All-in-One")
+splashScreen()
 createMainUI()
 createMiniHud()
 startMiniHudLoop()
-splashScreen()
 initAntiAFK()
 -- (all original background watchers and loops start here)
-notifyUI("Papi Dimz |HUB", "Semua fitur loaded: Main, Local Player, Fishing, Farm, Bring, Teleport, Tools, Night, Webhook, Health", 6, "sparkles")
+
+notifyUI("Papi Dimz |HUB", "Semua fitur loaded: Main, Local Player, Fishing, Farm, Tools, Night, Webhook, Health", 6, "sparkles")
