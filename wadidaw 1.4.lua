@@ -164,7 +164,7 @@ local MAX_RECENT_SECS = 5
 local fishingLoopThread = nil
 -- UI & HUD
 local Window
-local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
+local mainTab, localTab,BringTab,TeleportTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
 local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFps
 local uiVisible = true
 local scriptStartTime = os.clock()
