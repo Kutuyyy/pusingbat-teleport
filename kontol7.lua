@@ -1515,6 +1515,7 @@ local function createMainUI()
         localTab = Window:Tab({ Title = "Local Player", Icon = "user" })
         fishingTab = Window:Tab({ Title = "Fishing", Icon = "fish" })
         BringTab = Window:Tab({Title = "Bring Item", Icon = "hand"})
+        TeleportTab = Window:Tab({Title = "Teleport", Icon = "navigation"})
         farmTab = Window:Tab({ Title = "Farm", Icon = "chef-hat" })
         utilTab = Window:Tab({ Title = "Tools", Icon = "wrench" })
         nightTab = Window:Tab({ Title = "Night", Icon = "moon" })
@@ -1523,6 +1524,168 @@ local function createMainUI()
     end
 
     if WindUI and mainTab then
+        -- ==============================================
+        -- Teleport Tab
+        -- ==============================================
+        -- Lost Child (seperti sebelumnya)
+        local lostChildSec = TeleportTab:Section({Title = "Teleport Lost Child", Icon = "baby", Collapsible = true, DefaultOpen = true})
+        local childOptions = {"DinoKid", "KoalaKid", "KrakenKid", "SquidKid"}
+        local selectedChild = "DinoKid"
+        lostChildSec:Dropdown({Title = "Select Child", Values = childOptions, Value = "DinoKid", Callback = function(v) selectedChild = v end})
+        lostChildSec:Button({
+            Title = "Teleport To Child",
+            Callback = function()
+                local hrp = nil
+                if selectedChild == "DinoKid" then
+                    hrp = Workspace.Characters:FindFirstChild("Lost Child") and Workspace.Characters["Lost Child"]:FindFirstChild("HumanoidRootPart")
+                elseif selectedChild == "KoalaKid" then
+                    hrp = Workspace.Characters:FindFirstChild("Lost Child4") and Workspace.Characters["Lost Child4"]:FindFirstChild("HumanoidRootPart")
+                elseif selectedChild == "KrakenKid" then
+                    hrp = Workspace.Characters:FindFirstChild("Lost Child2") and Workspace.Characters["Lost Child2"]:FindFirstChild("HumanoidRootPart")
+                elseif selectedChild == "SquidKid" then
+                    hrp = Workspace.Characters:FindFirstChild("Lost Child3") and Workspace.Characters["Lost Child3"]:FindFirstChild("HumanoidRootPart")
+                end
+                if hrp then
+                    teleportToCFrame(hrp.CFrame)
+                else
+                    WindUI:Notify({Title="Error", Content=selectedChild.." tidak ditemukan!", Icon="alert-triangle"})
+                end
+            end
+        })
+
+        -- Structure Teleport (BARU!)
+        local structureSec = TeleportTab:Section({
+            Title = "Structure Teleport",
+            Icon = "castle",            -- Icon bangunan / structure
+            Collapsible = true,
+            DefaultOpen = false
+        })
+
+        -- Teleport to Camp (ke Fire)
+        structureSec:Button({
+            Title = "Teleport to Camp",
+            Callback = function()
+                local firePath = Workspace:FindFirstChild("Map")
+                    and Workspace.Map:FindFirstChild("Campground")
+                    and Workspace.Map.Campground:FindFirstChild("MainFire")
+                    and Workspace.Map.Campground.MainFire:FindFirstChild("OuterTouchZone")
+                if firePath then
+                    teleportToCFrame(firePath.CFrame)
+                else
+                    WindUI:Notify({Title="Error", Content="Camp (Fire) tidak ditemukan!", Icon="alert-triangle"})
+                end
+            end
+        })
+
+        -- Teleport to Cultist Generator Base (asumsi path dari game, sesuaikan kalau ada info lebih)
+        structureSec:Button({
+            Title = "Teleport to Cultist Generator Base",
+            Callback = function()
+                -- Contoh path umum, sesuaikan kalau tahu exact
+                local cultistBase = Workspace:FindFirstChild("Map")
+                    and Workspace.Map:FindFirstChild("Landmarks")
+                    and Workspace.Map.Landmarks:FindFirstChild("CultistGenerator")
+                if cultistBase and cultistBase.PrimaryPart then
+                    teleportToCFrame(cultistBase.PrimaryPart.CFrame)
+                else
+                    WindUI:Notify({Title="Error", Content="Cultist Generator Base tidak ditemukan!", Icon="alert-triangle"})
+                end
+            end
+        })
+
+        -- Teleport to Stronghold (prioritas Diamond Chest kalau ada)
+        structureSec:Button({
+            Title = "Teleport to Stronghold",
+            Callback = function()
+                local diamondChest = Workspace:FindFirstChild("Items")
+                    and Workspace.Items:FindFirstChild("Stronghold Diamond Chest")
+                    and Workspace.Items["Stronghold Diamond Chest"]:FindFirstChild("ChestLid")
+                    and Workspace.Items["Stronghold Diamond Chest"].ChestLid:FindFirstChild("Meshes/diamondchest_Cube.005")
+                if diamondChest then
+                    teleportToCFrame(diamondChest.CFrame)
+                    return
+                end
+
+                local sign = Workspace:FindFirstChild("Map")
+                    and Workspace.Map:FindFirstChild("Landmarks")
+                    and Workspace.Map.Landmarks:FindFirstChild("Stronghold")
+                    and Workspace.Map.Landmarks.Stronghold:FindFirstChild("Building")
+                    and Workspace.Map.Landmarks.Stronghold.Building:FindFirstChild("Sign")
+                    and Workspace.Map.Landmarks.Stronghold.Building.Sign:FindFirstChild("Main")
+                if sign then
+                    teleportToCFrame(sign.CFrame)
+                else
+                    WindUI:Notify({Title="Error", Content="Stronghold tidak ditemukan!", Icon="alert-triangle"})
+                end
+            end
+        })
+
+        -- Teleport to Stronghold Diamond Chest (pisah button)
+        structureSec:Button({
+            Title = "Teleport to Stronghold Diamond Chest",
+            Callback = function()
+                local diamondChest = Workspace:FindFirstChild("Items")
+                    and Workspace.Items:FindFirstChild("Stronghold Diamond Chest")
+                    and Workspace.Items["Stronghold Diamond Chest"]:FindFirstChild("ChestLid")
+                    and Workspace.Items["Stronghold Diamond Chest"].ChestLid:FindFirstChild("Meshes/diamondchest_Cube.005")
+                if diamondChest then
+                    teleportToCFrame(diamondChest.CFrame)
+                else
+                    WindUI:Notify({Title="Error", Content="Stronghold Diamond Chest tidak ditemukan!", Icon="alert-triangle"})
+                end
+            end
+        })
+
+        -- Teleport to Caravan
+        structureSec:Button({
+            Title = "Teleport to Caravan",
+            Callback = function()
+                local caravan = Workspace:FindFirstChild("Map")
+                    and Workspace.Map:FindFirstChild("Landmarks")
+                    and Workspace.Map.Landmarks:FindFirstChild("Caravan")
+                if caravan and caravan.PrimaryPart then
+                    teleportToCFrame(caravan.PrimaryPart.CFrame)
+                else
+                    WindUI:Notify({Title="Error", Content="Caravan tidak ditemukan!", Icon="alert-triangle"})
+                end
+            end
+        })
+
+        -- Teleport to Fairy
+        structureSec:Button({
+            Title = "Teleport to Fairy",
+            Callback = function()
+                local fairyHRP = Workspace:FindFirstChild("Map")
+                    and Workspace.Map:FindFirstChild("Landmarks")
+                    and Workspace.Map.Landmarks:FindFirstChild("Fairy House")
+                    and Workspace.Map.Landmarks["Fairy House"]:FindFirstChild("Fairy")
+                    and Workspace.Map.Landmarks["Fairy House"].Fairy:FindFirstChild("HumanoidRootPart")
+                if fairyHRP then
+                    teleportToCFrame(fairyHRP.CFrame)
+                else
+                    WindUI:Notify({Title="Error", Content="Fairy tidak ditemukan!", Icon="alert-triangle"})
+                end
+            end
+        })
+
+        -- Teleport to Anvil
+        structureSec:Button({
+            Title = "Teleport to Anvil",
+            Callback = function()
+                local anvil = Workspace:FindFirstChild("Map")
+                    and Workspace.Map:FindFirstChild("Landmarks")
+                    and Workspace.Map.Landmarks:FindFirstChild("ToolWorkshop")
+                    and Workspace.Map.Landmarks.ToolWorkshop:FindFirstChild("Functional")
+                    and Workspace.Map.Landmarks.ToolWorkshop.Functional:FindFirstChild("ToolBench")
+                    and Workspace.Map.Landmarks.ToolWorkshop.Functional.ToolBench:FindFirstChild("Hammer")
+                if anvil then
+                    teleportToCFrame(anvil.CFrame)
+                else
+                    WindUI:Notify({Title="Error", Content="Anvil tidak ditemukan!", Icon="alert-triangle"})
+                end
+            end
+        })
+
         -- ==============================================
         -- Bring Item Tab (tetap sama)
         -- ==============================================
