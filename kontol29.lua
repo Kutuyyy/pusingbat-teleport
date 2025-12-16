@@ -1013,6 +1013,35 @@ local function startScrapLoop()
 end
 
 ---------------------------------------------------------
+-- Bring item to target location
+---------------------------------------------------------
+local function getBringTargetCFrame()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    if selectedLocation == "Player" then
+        if not hrp then return nil end
+        return hrp.CFrame * CFrame.new(0, BringHeight, 0)
+
+    elseif selectedLocation == "Workbench" then
+        if ensureScrapperTarget() and ScrapperTarget then
+            return ScrapperTarget.CFrame * CFrame.new(0, BringHeight, 0)
+        end
+
+    elseif selectedLocation == "Fire" then
+        local fire = Workspace:FindFirstChild("Map")
+            and Workspace.Map:FindFirstChild("Campground")
+            and Workspace.Map.Campground:FindFirstChild("MainFire")
+            and Workspace.Map.Campground.MainFire:FindFirstChild("OuterTouchZone")
+        if fire then
+            return fire.CFrame * CFrame.new(0, BringHeight, 0)
+        end
+    end
+
+    return nil
+end
+
+---------------------------------------------------------
 -- GODMODE & ANTI AFK
 ---------------------------------------------------------
 local function startGodmodeLoop()
@@ -1037,6 +1066,73 @@ local function initAntiAFK()
         VirtualUser:CaptureController()
         VirtualUser:ClickButton2(Vector2.new())
     end)
+end
+
+local function isItemAllowed(item, allowedList, selectedList)
+    if not item or not item:IsA("Model") or not item.PrimaryPart then return false end
+
+    -- kalau pilih "All"
+    if table.find(selectedList, "All") then
+        return table.find(allowedList, item.Name) ~= nil
+    end
+
+    return table.find(selectedList, item.Name) ~= nil
+end
+
+function bringItems(masterList, selectedList, location)
+    if scriptDisabled then return end
+    if not ItemsFolder then
+        notifyUI("Bring Item", "Items folder belum siap.", 3, "alert-triangle")
+        return
+    end
+
+    selectedLocation = location or selectedLocation
+    local targetCF = getBringTargetCFrame()
+    if not targetCF then
+        notifyUI("Bring Item", "Target lokasi tidak ditemukan.", 3, "alert-triangle")
+        return
+    end
+
+    local count = 0
+    local offsetIndex = 0
+
+    for _, item in ipairs(ItemsFolder:GetChildren()) do
+        if isItemAllowed(item, masterList, selectedList) then
+            offsetIndex += 1
+            count += 1
+
+            local spread = 2
+            local angle = (offsetIndex - 1) * (math.pi / 4)
+            local offset = Vector3.new(
+                math.cos(angle) * spread,
+                BringHeight,
+                math.sin(angle) * spread
+            )
+
+            task.spawn(function()
+                pcall(function()
+                    if RequestStartDragging then
+                        RequestStartDragging:FireServer(item)
+                    end
+                    task.wait(0.03)
+
+                    item:PivotTo(targetCF + offset)
+
+                    task.wait(0.03)
+                    if RequestStopDragging then
+                        RequestStopDragging:FireServer(item)
+                    end
+                end)
+            end)
+        end
+    end
+
+    notifyUI(
+        "Bring Item",
+        string.format("Berhasil memindahkan %d item ke %s.", count, selectedLocation),
+        4,
+        "package"
+    )
 end
 
 ---------------------------------------------------------
