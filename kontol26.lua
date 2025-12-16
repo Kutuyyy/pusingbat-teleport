@@ -169,6 +169,9 @@ local Window
 local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
 local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFps
 
+-- Bring defaults (WAJIB)
+local BringHeight = 20
+local selectedLocation = "Player"
 
 local scriptStartTime = os.clock()
 local currentFPS = 0
