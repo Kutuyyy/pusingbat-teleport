@@ -1067,7 +1067,7 @@ local function isItemAllowed(item, allowedList, selectedList)
     return table.find(selectedList, item.Name) ~= nil
 end
 
-function bringItems(masterList, selectedList, location)
+local function bringItems(masterList, selectedList, location)
     if scriptDisabled then return end
     if not ItemsFolder then
         notifyUI("Bring Item", "Items folder belum siap.", 3, "alert-triangle")
