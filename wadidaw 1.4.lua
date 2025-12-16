@@ -1595,10 +1595,11 @@ end
 ---------------------------------------------------------
 -- STATUS / HEALTH
 ---------------------------------------------------------
+-- replace the broken version that used '.' concatenation
 local function getStatusSummary()
     local uptimeStr = formatTime(os.clock() - scriptStartTime)
     local pingMs = math.floor((LocalPlayer:GetNetworkPing() or 0) * 1000 + 0.5)
-    local lavaStr = lavaFound and "Ready" or "Scanning..."
+    local lavaStr = lavaFound and "Ready" or "Scanning."
     local featStr = getFeatureCodes()
     local msg = table.concat({
         "UPTIME : " .. uptimeStr,
@@ -1609,6 +1610,7 @@ local function getStatusSummary()
     }, "\n")
     return msg
 end
+
 
 ---------------------------------------------------------
 -- MAP / CAMP SCANNER
@@ -2207,10 +2209,14 @@ local function createMainUI()
             if gp or scriptDisabled then return end
             if input.KeyCode == Enum.KeyCode.P then
                 pcall(function()
-                    Window:Toggle()
+                    if Window and Window.SetVisible then
+                        uiVisible = not uiVisible
+                        Window:SetVisible(uiVisible)
+                    end
                 end)
             end
         end)
+
 
 
         -- OPTIONAL SAFE GUARD (sebenarnya tidak wajib)
@@ -2219,8 +2225,6 @@ local function createMainUI()
                 Window:OnDestroy(resetAll)
             end
         end)
-
-return Window
 
 -- INITIAL NON-BLOCKING RESOURCE WATCHERS
 backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
@@ -2269,24 +2273,6 @@ end
 print("[PapiDimz] HUB Loaded - All-in-One")
 splashScreen()
 createMainUI()
-task.defer(function()
-    if Window and Window.EditOpenButton then
-        Window:EditOpenButton({
-            Title = "Papi Dimz |HUB",
-            Icon = "sparkles",
-            CornerRadius = UDim.new(0, 16),
-            StrokeThickness = 2,
-            Color = ColorSequence.new(
-                Color3.fromRGB(255, 15, 123),
-                Color3.fromRGB(248, 155, 41)
-            ),
-            OnlyMobile = true,
-            Enabled = true,
-            Draggable = true,
-        })
-    end
-end)
-
 createMiniHud()
 startMiniHudLoop()
 initAntiAFK()
