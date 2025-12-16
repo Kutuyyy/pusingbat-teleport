@@ -2155,18 +2155,42 @@ local function createMainUI()
         })
 
         -- HEALTH TAB (original)
-        healthTab:Paragraph({ Title = "Cek Health Script", Desc = "Klik tombol di bawah buat lihat status terbaru:\n- Uptime\n- Lava Ready / Scanning\n- Ping\n- FPS\n- Fitur aktif (Godmode, AFK, Farm, Aura, dll)\n\nMini panel di kiri layar juga selalu update realtime.", Color = "Grey" })
-        healthTab:Button({ Title = "Refresh Status Sekarang", Icon = "activity", Callback = function() if scriptDisabled then return end; local msg = getStatusSummary(); notifyUI("Status Script", msg, 7, "activity"); print("[PapiDimz] Status:\n" .. msg) end })
-        -- Hotkey & Cleanup
+        healthTab:Paragraph({
+            Title = "Cek Health Script",
+            Desc = "Klik tombol di bawah buat lihat status terbaru:\n- Uptime\n- Lava Ready / Scanning\n- Ping\n- FPS\n- Fitur aktif (Godmode, AFK, Farm, Aura, dll)\n\nMini panel di kiri layar juga selalu update realtime.",
+            Color = "Grey"
+        })
+
+        healthTab:Button({
+            Title = "Refresh Status Sekarang",
+            Icon = "activity",
+            Callback = function()
+                if scriptDisabled then return end
+                local msg = getStatusSummary()
+                notifyUI("Status Script", msg, 7, "activity")
+                print("[PapiDimz] Status:\n" .. msg)
+            end
+        })
+
+        -- Hotkey toggle UI
         UserInputService.InputBegan:Connect(function(input, gp)
             if gp or scriptDisabled then return end
             if input.KeyCode == Enum.KeyCode.P then
-                pcall(function() Window:Toggle() end)
+                pcall(function()
+                    if Window then
+                        Window:Toggle()
+                    end
+                end)
             end
         end)
-        Window:OnDestroy(resetAll)
-    end
-end
+
+        -- OPTIONAL SAFE GUARD (sebenarnya tidak wajib)
+        pcall(function()
+            if Window and Window.OnDestroy then
+                Window:OnDestroy(resetAll)
+            end
+        end)
+
 
 -- INITIAL NON-BLOCKING RESOURCE WATCHERS
 backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
