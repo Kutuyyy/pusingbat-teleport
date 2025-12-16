@@ -14,6 +14,13 @@ local HttpService = game:GetService("HttpService")
 local Lighting = game:GetService("Lighting")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+local ItemsFolder = Workspace:WaitForChild("Items")
+local RemoteEvents = ReplicatedStorage:WaitForChild("RemoteEvents")
+local RequestStartDragging = RemoteEvents:WaitForChild("RequestStartDraggingItem")
+local RequestStopDragging = RemoteEvents:WaitForChild("StopDraggingItem")
+
 local Camera = Workspace.CurrentCamera
 ---------------------------------------------------------
 -- UTIL: NON-BLOCKING FIND HELPERS
@@ -164,8 +171,12 @@ local MAX_RECENT_SECS = 5
 local fishingLoopThread = nil
 -- UI & HUD
 local Window
-local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
+local mainTab, localTab, fishingTab,BringTab, TeleportTab, farmTab, utilTab, nightTab, webhookTab, healthTab
 local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFps
+
+-- Default height
+local BringHeight = 20
+local selectedLocation = "Player"
 
 local scriptStartTime = os.clock()
 local currentFPS = 0
