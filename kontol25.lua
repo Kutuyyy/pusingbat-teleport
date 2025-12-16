@@ -820,15 +820,11 @@ end)
 -- Get target position untuk Bring
 local function getTargetPosition(location)
     if location == "Player" then
-        return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0)
+        return rootPart.Position + Vector3.new(0, BringHeight + 3, 0)
 
     elseif location == "Workbench" then
-        local scrapperPart = getScrapperTarget()
-        if scrapperPart then
-            return scrapperPart.Position + Vector3.new(0, BringHeight, 0)
-        else
-            WindUI:Notify({Title="Warning", Content="Scrapper tidak ditemukan! Default ke Player", Icon="alert-circle", Duration=6})
-            return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0)
+        if ensureScrapperTarget() and ScrapperTarget then
+            return ScrapperTarget.Position + Vector3.new(0, BringHeight, 0)
         end
 
     elseif location == "Fire" then
@@ -840,11 +836,11 @@ local function getTargetPosition(location)
             return firePath.Position + Vector3.new(0, BringHeight, 0)
         else
             WindUI:Notify({Title="Warning", Content="Fire tidak ditemukan! Default ke Player", Icon="alert-circle", Duration=6})
-            return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0)
+            return rootPart.Position + Vector3.new(0, BringHeight + 3, 0)
         end
     end
 
-    return HumanoidRootPart.Position + Vector3.new(0, BringHeight + 3, 0)
+    return rootPart.Position + Vector3.new(0, BringHeight + 3, 0)
 end
 
 -- Circular drop untuk Bring
@@ -1991,7 +1987,7 @@ backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
     ConsumeItemRemote = re:FindFirstChild("RequestConsumeItem")
     NightSkipRemote = re:FindFirstChild("RequestActivateNightSkipMachine")
     ToolDamageRemote = re:FindFirstChild("ToolDamageObject")
-    EquipHandleRemote = re:FindFirstChild(" EquipItemHandle")
+    EquipHandleRemote = re:FindFirstChild("EquipItemHandle")
     tryHookDayDisplay()
 end)
 backgroundFind(Workspace, "Items", function(it)
@@ -2010,6 +2006,7 @@ startGodmodeLoop()
 -- INIT
 ---------------------------------------------------------
 LocalPlayer.CharacterAdded:Connect(function(char)
+    Character = char
     task.wait(0.5)
     humanoid = char:WaitForChild("Humanoid")
     rootPart = char:WaitForChild("HumanoidRootPart")
