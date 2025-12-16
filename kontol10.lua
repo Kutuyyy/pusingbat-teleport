@@ -18,8 +18,12 @@ local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 local ItemsFolder = Workspace:WaitForChild("Items")
 local RemoteEvents = ReplicatedStorage:WaitForChild("RemoteEvents")
-local RequestStartDragging = RemoteEvents:WaitForChild("RequestStartDraggingItem")
-local RequestStopDragging = RemoteEvents:WaitForChild("StopDraggingItem")
+
+-- Remotes / folders
+local RemoteEvents = ReplicatedStorage:FindFirstChild("RemoteEvents")
+local RequestStartDragging, RequestStopDragging, CollectCoinRemote, ConsumeItemRemote, NightSkipRemote, ToolDamageRemote, EquipHandleRemote
+local ItemsFolder = Workspace:FindFirstChild("Items")
+local Structures = Workspace:FindFirstChild("Structures")
 
 local Camera = Workspace.CurrentCamera
 ---------------------------------------------------------
@@ -75,11 +79,6 @@ end
 -- STATE & CONFIG
 ---------------------------------------------------------
 local scriptDisabled = false
--- Remotes / folders
-local RemoteEvents = ReplicatedStorage:FindFirstChild("RemoteEvents")
-local RequestStartDragging, RequestStopDragging, CollectCoinRemote, ConsumeItemRemote, NightSkipRemote, ToolDamageRemote, EquipHandleRemote
-local ItemsFolder = Workspace:FindFirstChild("Items")
-local Structures = Workspace:FindFirstChild("Structures")
 -- Original features state
 local CookingStations = {}
 local ScrapperTarget = nil
@@ -173,10 +172,6 @@ local fishingLoopThread = nil
 local Window
 local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
 local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFps
-
--- Default height
-local BringHeight = 20
-local selectedLocation = "Player"
 
 local scriptStartTime = os.clock()
 local currentFPS = 0
