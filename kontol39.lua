@@ -1020,6 +1020,17 @@ end
 ---------------------------------------------------------
 -- Bring item to target location
 ---------------------------------------------------------
+local function teleportToCFrame(cf)
+    if not cf then
+        notifyUI("Teleport", "CFrame tidak valid.", 3, "alert-triangle")
+        return
+    end
+    local hrp = getRoot()
+    if not hrp then return end
+    hrp.CFrame = cf + Vector3.new(0, 4, 0)
+end
+
+
 local function getBringTargetPosition(location)
     local hrp = LocalPlayer.Character
         and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
