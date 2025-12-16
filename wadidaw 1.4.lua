@@ -51,7 +51,7 @@ local function createFallbackNotify(msg)
 end
 do
     local ok, res = pcall(function()
-        return loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+        return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/main.lua"))() -- <--- Mencoba URL alternatif
     end)
     if ok and res then
         WindUI = res
@@ -59,8 +59,10 @@ do
             WindUI:SetTheme("Dark")
             WindUI.TransparencyValue = 0.2
         end)
+        notifyUI("Init", "WindUI loaded successfully.", 3, "check-circle-2") -- <--- Notifikasi sukses
     else
-        warn("[UI] Gagal load WindUI. Menggunakan fallback minimal.")
+        warn("[UI] Gagal load WindUI dari GitHub. Menggunakan fallback minimal.")
+        notifyUI("Init Error", "WindUI failed to load, using fallback.", 5, "alert-triangle") -- <--- Notifikasi error, tapi aman karena fallback
         WindUI = nil
     end
 end
@@ -2051,10 +2053,13 @@ Mini panel di kiri layar juga selalu update realtime.", Color = "Grey" })
         Window:OnDestroy(resetAll)
     end
 end
+---------------------------------------------------------
 -- INITIAL NON-BLOCKING RESOURCE WATCHERS
+---------------------------------------------------------
 backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
+    if scriptDisabled then return end -- Tambahkan pengecekan scriptDisabled
     RemoteEvents = re
-    notifyUI("Init", "RemoteEvents ditemukan.", 3, "radio")
+    notifyUI("Init", "RemoteEvents ditemukan.", 3, "radio") -- <--- Aman karena notifyUI menangani WindUI = nil
     RequestStartDragging = re:FindFirstChild("RequestStartDraggingItem")
     RequestStopDragging = re:FindFirstChild("StopDraggingItem")
     CollectCoinRemote = re:FindFirstChild("RequestCollectCoints")
@@ -2065,20 +2070,23 @@ backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
     tryHookDayDisplay()
 end)
 backgroundFind(Workspace, "Items", function(it)
+    if scriptDisabled then return end -- Tambahkan pengecekan scriptDisabled
     ItemsFolder = it
-    notifyUI("Init", "Items folder ditemukan.", 3, "archive")
+    notifyUI("Init", "Items folder ditemukan.", 3, "archive") -- <--- Aman
 end)
 backgroundFind(Workspace, "Structures", function(st)
+    if scriptDisabled then return end -- Tambahkan pengecekan scriptDisabled
     Structures = st
-    notifyUI("Init", "Structures ditemukan.", 3, "layers")
+    notifyUI("Init", "Structures ditemukan.", 3, "layers") -- <--- Aman
     TemporalAccelerometer = st:FindFirstChild("Temporal Accelerometer")
 end)
-task.spawn(function() tryHookDayDisplay() end)
+task.spawn(function() if not scriptDisabled then tryHookDayDisplay() end end) -- Tambahkan pengecekan scriptDisabled
 startGodmodeLoop()
 ---------------------------------------------------------
 -- INIT
 ---------------------------------------------------------
 LocalPlayer.CharacterAdded:Connect(function(char)
+    if scriptDisabled then return end -- Tambahkan pengecekan scriptDisabled
     task.wait(0.5)
     humanoid = char:WaitForChild("Humanoid")
     rootPart = char:WaitForChild("HumanoidRootPart")
@@ -2090,15 +2098,22 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     if flyEnabled then task.delay(0.2, startFly) end
 end)
 if LocalPlayer.Character then
+    if scriptDisabled then return end -- Tambahkan pengecekan scriptDisabled
     humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
     rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if humanoid then defaultWalkSpeed = humanoid.WalkSpeed; defaultHipHeight = humanoid.HipHeight end
 end
 print("[PapiDimz] HUB Loaded - All-in-One (with Bring & Teleport)")
 splashScreen()
-createMainUI()
-createMiniHud()
-startMiniHudLoop()
+if WindUI then -- <--- Hanya buat UI jika WindUI berhasil dimuat
+    createMainUI()
+    createMiniHud()
+    startMiniHudLoop()
+else
+    print("[PapiDimz] WindUI gagal dimuat, UI tidak dibuat. Fungsi utama masih aktif jika tidak menggunakan UI.")
+    -- Opsional: Tambahkan notifikasi fallback bahwa UI tidak muncul
+    createFallbackNotify("WindUI failed, UI not created. Check console.")
+end
 initAntiAFK()
 -- (all original background watchers and loops start here)
-notifyUI("Papi Dimz |HUB", "Semua fitur loaded: Main, Local Player, Fishing, Farm, Bring, Teleport, Tools, Night, Webhook, Health", 6, "sparkles")
+notifyUI("Papi Dimz |HUB", "Semua fitur loaded: Main, Local Player, Fishing, Farm, Bring, Teleport, Tools, Night, Webhook, Health", 6, "sparkles") -- <--- Aman karena mengecek WindUI di dalam notifyUI
