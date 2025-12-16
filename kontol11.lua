@@ -13,24 +13,8 @@ local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
 local Lighting = game:GetService("Lighting")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
-
--- WAJIB pakai WaitForChild untuk object penting
-local ItemsFolder = Workspace:WaitForChild("Items")
-local RemoteEvents = ReplicatedStorage:WaitForChild("RemoteEvents")
-local Structures = Workspace:WaitForChild("Structures")
-
--- Remotes
-local RequestStartDragging = RemoteEvents:WaitForChild("RequestStartDraggingItem")
-local RequestStopDragging  = RemoteEvents:WaitForChild("StopDraggingItem")
-local CollectCoinRemote    = RemoteEvents:WaitForChild("RequestCollectCoints")
-local ConsumeItemRemote    = RemoteEvents:WaitForChild("RequestConsumeItem")
-local NightSkipRemote      = RemoteEvents:WaitForChild("RequestActivateNightSkipMachine")
-local ToolDamageRemote     = RemoteEvents:WaitForChild("ToolDamageObject")
-local EquipHandleRemote    = RemoteEvents:WaitForChild(" EquipItemHandle")
 
 local Camera = Workspace.CurrentCamera
 ---------------------------------------------------------
@@ -86,6 +70,11 @@ end
 -- STATE & CONFIG
 ---------------------------------------------------------
 local scriptDisabled = false
+-- Remotes / folders
+local RemoteEvents = ReplicatedStorage:FindFirstChild("RemoteEvents")
+local RequestStartDragging, RequestStopDragging, CollectCoinRemote, ConsumeItemRemote, NightSkipRemote, ToolDamageRemote, EquipHandleRemote
+local ItemsFolder = Workspace:FindFirstChild("Items")
+local Structures = Workspace:FindFirstChild("Structures")
 -- Original features state
 local CookingStations = {}
 local ScrapperTarget = nil
