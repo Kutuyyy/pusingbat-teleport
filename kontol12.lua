@@ -168,12 +168,8 @@ local MAX_RECENT_SECS = 5
 local fishingLoopThread = nil
 -- UI & HUD
 local Window
-local mainTab, localTab, fishingTab, BringTab, TeleportTab, farmTab, utilTab, nightTab, webhookTab, healthTab
+local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
 local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFps
-
--- Default height
-local BringHeight = 20
-local selectedLocation = "Player"
 
 local scriptStartTime = os.clock()
 local currentFPS = 0
@@ -372,7 +368,6 @@ local function startMiniHudLoop()
         end
     end)
 end
-
 ---------------------------------------------------------
 -- LOCAL PLAYER FUNCTIONS
 ---------------------------------------------------------
