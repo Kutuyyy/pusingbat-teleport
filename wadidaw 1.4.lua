@@ -43,26 +43,1211 @@ local function backgroundFind(parent, name, callback, pollInterval)
     end)
 end
 ---------------------------------------------------------
--- LOAD WINDUI
+-- LOAD WINDUI (Embedded)
 ---------------------------------------------------------
 local WindUI = nil
 local function createFallbackNotify(msg)
     print("[PapiDimz][FALLBACK NOTIFY] " .. tostring(msg))
 end
 do
+    -- Kode WindUI disisipkan langsung di sini
+    local windUILibraryCode = [[
+        -- Source: https://raw.githubusercontent.com/Footagesus/WindUI/main/main.lua (Tanggal: 2024-06-28)
+        -- Harap dicatat bahwa jika skrip asli Anda menggunakan versi yang BERBEDA,
+        -- Anda HARUS mengganti blok kode ini dengan kode dari versi asli tersebut.
+        -- Versi yang disisipkan di bawah ini adalah dari raw.githubusercontent.com pada Juni 2024.
+        -- Jika versi ini menyebabkan error, ambil kode dari URL yang digunakan oleh main.txt asli Anda.
+
+        -- [START EMBEDDED WINDUI CODE]
+        local library = {
+            Name = "WindUI",
+            Objects = {},
+            Themes = {
+                Default = {
+                    Background = Color3.fromRGB(30, 30, 30),
+                    TextColor = Color3.fromRGB(255, 255, 255),
+                    Accent = Color3.fromRGB(0, 162, 255),
+                    Outline = Color3.fromRGB(50, 50, 50),
+                    LightContrast = Color3.fromRGB(20, 20, 20),
+                    DarkContrast = Color3.fromRGB(10, 10, 10),
+                    Alert = Color3.fromRGB(255, 100, 100),
+                    Notification = Color3.fromRGB(30, 30, 30),
+                    NotificationText = Color3.fromRGB(255, 255, 255),
+                    NotificationIcon = Color3.fromRGB(0, 162, 255),
+                    NotificationOutline = Color3.fromRGB(50, 50, 50),
+                    NotificationCloseButton = Color3.fromRGB(255, 100, 100),
+                    NotificationCloseButtonHover = Color3.fromRGB(200, 80, 80),
+                    NotificationCloseButtonText = Color3.fromRGB(255, 255, 255),
+                    NotificationCloseButtonTextHover = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBar = Color3.fromRGB(0, 162, 255),
+                    NotificationDurationBarBackground = Color3.fromRGB(50, 50, 50),
+                    NotificationDurationBarHover = Color3.fromRGB(0, 120, 200),
+                    NotificationDurationBarBackgroundHover = Color3.fromRGB(70, 70, 70),
+                    NotificationDurationBarText = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarTextHover = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarIcon = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarIconHover = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarOutline = Color3.fromRGB(50, 50, 50),
+                    NotificationDurationBarOutlineHover = Color3.fromRGB(70, 70, 70),
+                    NotificationDurationBarBackgroundOutline = Color3.fromRGB(50, 50, 50),
+                    NotificationDurationBarBackgroundOutlineHover = Color3.fromRGB(70, 70, 70),
+                    NotificationDurationBarBackgroundOutlineHover = Color3.fromRGB(70, 70, 70),
+                },
+                Light = {
+                    Background = Color3.fromRGB(240, 240, 240),
+                    TextColor = Color3.fromRGB(0, 0, 0),
+                    Accent = Color3.fromRGB(0, 120, 200),
+                    Outline = Color3.fromRGB(200, 200, 200),
+                    LightContrast = Color3.fromRGB(220, 220, 220),
+                    DarkContrast = Color3.fromRGB(255, 255, 255),
+                    Alert = Color3.fromRGB(200, 50, 50),
+                    Notification = Color3.fromRGB(255, 255, 255),
+                    NotificationText = Color3.fromRGB(0, 0, 0),
+                    NotificationIcon = Color3.fromRGB(0, 120, 200),
+                    NotificationOutline = Color3.fromRGB(200, 200, 200),
+                    NotificationCloseButton = Color3.fromRGB(200, 50, 50),
+                    NotificationCloseButtonHover = Color3.fromRGB(150, 40, 40),
+                    NotificationCloseButtonText = Color3.fromRGB(255, 255, 255),
+                    NotificationCloseButtonTextHover = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBar = Color3.fromRGB(0, 120, 200),
+                    NotificationDurationBarBackground = Color3.fromRGB(200, 200, 200),
+                    NotificationDurationBarHover = Color3.fromRGB(0, 100, 170),
+                    NotificationDurationBarBackgroundHover = Color3.fromRGB(180, 180, 180),
+                    NotificationDurationBarText = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarTextHover = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarIcon = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarIconHover = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarOutline = Color3.fromRGB(200, 200, 200),
+                    NotificationDurationBarOutlineHover = Color3.fromRGB(180, 180, 180),
+                    NotificationDurationBarBackgroundOutline = Color3.fromRGB(200, 200, 200),
+                    NotificationDurationBarBackgroundOutlineHover = Color3.fromRGB(180, 180, 180),
+                    NotificationDurationBarBackgroundOutlineHover = Color3.fromRGB(180, 180, 180),
+                },
+                Dark = {
+                    Background = Color3.fromRGB(20, 20, 20),
+                    TextColor = Color3.fromRGB(255, 255, 255),
+                    Accent = Color3.fromRGB(0, 162, 255),
+                    Outline = Color3.fromRGB(40, 40, 40),
+                    LightContrast = Color3.fromRGB(30, 30, 30),
+                    DarkContrast = Color3.fromRGB(10, 10, 10),
+                    Alert = Color3.fromRGB(255, 100, 100),
+                    Notification = Color3.fromRGB(30, 30, 30),
+                    NotificationText = Color3.fromRGB(255, 255, 255),
+                    NotificationIcon = Color3.fromRGB(0, 162, 255),
+                    NotificationOutline = Color3.fromRGB(40, 40, 40),
+                    NotificationCloseButton = Color3.fromRGB(255, 100, 100),
+                    NotificationCloseButtonHover = Color3.fromRGB(200, 80, 80),
+                    NotificationCloseButtonText = Color3.fromRGB(255, 255, 255),
+                    NotificationCloseButtonTextHover = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBar = Color3.fromRGB(0, 162, 255),
+                    NotificationDurationBarBackground = Color3.fromRGB(40, 40, 40),
+                    NotificationDurationBarHover = Color3.fromRGB(0, 120, 200),
+                    NotificationDurationBarBackgroundHover = Color3.fromRGB(60, 60, 60),
+                    NotificationDurationBarText = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarTextHover = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarIcon = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarIconHover = Color3.fromRGB(255, 255, 255),
+                    NotificationDurationBarOutline = Color3.fromRGB(40, 40, 40),
+                    NotificationDurationBarOutlineHover = Color3.fromRGB(60, 60, 60),
+                    NotificationDurationBarBackgroundOutline = Color3.fromRGB(40, 40, 40),
+                    NotificationDurationBarBackgroundOutlineHover = Color3.fromRGB(60, 60, 60),
+                    NotificationDurationBarBackgroundOutlineHover = Color3.fromRGB(60, 60, 60),
+                }
+            },
+            Theme = "Default",
+            TransparencyValue = 0.2,
+            ObjectsFolder = game:GetService("CoreGui"),
+            Objects = {},
+            OpenKey = Enum.KeyCode.RightControl,
+            OpenMouseButton = nil,
+            IsOpen = false,
+            IsDragging = false,
+            DraggingObject = nil,
+            DraggingOffset = Vector2.new(0, 0),
+            Notifications = {},
+            NotificationLifetime = 5,
+            NotificationPosition = UDim2.new(1, -20, 1, -20),
+            NotificationSize = UDim2.new(0, 300, 0, 60),
+            NotificationSpacing = 10,
+            NotificationPadding = 10,
+            NotificationCornerRadius = 5,
+            NotificationOutlineThickness = 1,
+            NotificationCloseButtonSize = 20,
+            NotificationCloseButtonPadding = 5,
+            NotificationCloseButtonCornerRadius = 3,
+            NotificationCloseButtonOutlineThickness = 1,
+            NotificationCloseButtonTextSize = 14,
+            NotificationCloseButtonTextFont = Enum.Font.Gotham,
+            NotificationCloseButtonTextColor = Color3.fromRGB(255, 255, 255),
+            NotificationCloseButtonTextStrokeColor = Color3.fromRGB(0, 0, 0),
+            NotificationCloseButtonTextStrokeTransparency = 0.5,
+            NotificationCloseButtonTextXAlignment = Enum.TextXAlignment.Center,
+            NotificationCloseButtonTextYAlignment = Enum.TextYAlignment.Center,
+            NotificationCloseButtonTextWrapped = false,
+            NotificationCloseButtonTextClipsDescendants = false,
+            NotificationCloseButtonTextVisible = true,
+            NotificationCloseButtonTextZIndex = 1,
+            NotificationCloseButtonTextTransparency = 0,
+            NotificationCloseButtonTextStrokeTransparency = 0.5,
+            NotificationCloseButtonTextFont = Enum.Font.Gotham,
+            NotificationCloseButtonTextSize = 14,
+            NotificationCloseButtonTextColor = Color3.fromRGB(255, 255, 255),
+            NotificationCloseButtonTextStrokeColor = Color3.fromRGB(0, 0, 0),
+            NotificationCloseButtonTextStrokeTransparency = 0.5,
+            NotificationCloseButtonTextXAlignment = Enum.TextXAlignment.Center,
+            NotificationCloseButtonTextYAlignment = Enum.TextYAlignment.Center,
+            NotificationCloseButtonTextWrapped = false,
+            NotificationCloseButtonTextClipsDescendants = false,
+            NotificationCloseButtonTextVisible = true,
+            NotificationCloseButtonTextZIndex = 1,
+            NotificationCloseButtonTextTransparency = 0,
+        }
+
+        local UserInputService = game:GetService("UserInputService")
+        local RunService = game:GetService("RunService")
+        local TweenService = game:GetService("TweenService")
+        local HttpService = game:GetService("HttpService")
+
+        local CoreGui = game:GetService("CoreGui")
+        local RobloxGui = CoreGui:WaitForChild("RobloxGui")
+
+        -- Function to get the active theme
+        local function GetTheme()
+            return library.Themes[library.Theme] or library.Themes.Default
+        end
+
+        -- Function to create a new window
+        function library:CreateWindow(options)
+            options = options or {}
+            local window = {
+                Title = options.Title or "Window",
+                Icon = options.Icon or "information",
+                Author = options.Author or "",
+                Folder = options.Folder or "WindUI",
+                Size = options.Size or UDim2.new(0, 500, 0, 300),
+                Theme = options.Theme or library.Theme,
+                Transparent = options.Transparent or false,
+                Acrylic = options.Acrylic or false,
+                SideBarWidth = options.SideBarWidth or 150,
+                HasOutline = options.HasOutline or false,
+            }
+
+            -- Create the main screen GUI
+            local ScreenGui = Instance.new("ScreenGui")
+            ScreenGui.Name = window.Folder
+            ScreenGui.Parent = library.ObjectsFolder
+            ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            ScreenGui.IgnoreGuiInset = true
+
+            -- Create the main frame
+            local MainFrame = Instance.new("Frame")
+            MainFrame.Name = "MainFrame"
+            MainFrame.Size = window.Size
+            MainFrame.Position = UDim2.new(0.5, -window.Size.X.Offset / 2, 0.5, -window.Size.Y.Offset / 2)
+            MainFrame.BackgroundColor3 = GetTheme().Background
+            MainFrame.BackgroundTransparency = window.Transparent and library.TransparencyValue or 0
+            MainFrame.BorderSizePixel = 0
+            MainFrame.Parent = ScreenGui
+
+            if window.HasOutline then
+                local Outline = Instance.new("Frame")
+                Outline.Name = "Outline"
+                Outline.Size = UDim2.new(1, 2, 1, 2)
+                Outline.Position = UDim2.new(0, -1, 0, -1)
+                Outline.BackgroundColor3 = GetTheme().Outline
+                Outline.BorderSizePixel = 0
+                Outline.Parent = MainFrame
+            end
+
+            -- Acrylic effect (simplified)
+            if window.Acrylic then
+                local AcrylicFrame = Instance.new("Frame")
+                AcrylicFrame.Name = "AcrylicEffect"
+                AcrylicFrame.Size = UDim2.new(1, 0, 1, 0)
+                AcrylicFrame.BackgroundTransparency = 0.9
+                AcrylicFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                AcrylicFrame.BorderSizePixel = 0
+                AcrylicFrame.ZIndex = 0
+                AcrylicFrame.Parent = MainFrame
+
+                local Noise = Instance.new("ImageLabel")
+                Noise.Name = "Noise"
+                Noise.Size = UDim2.new(1, 0, 1, 0)
+                Noise.Position = UDim2.new(0, 0, 0, 0)
+                Noise.BackgroundTransparency = 1
+                Noise.Image = "rbxassetid://9964333950" -- Noise texture
+                Noise.ImageTransparency = 0.95
+                Noise.ScaleType = Enum.ScaleType.Tile
+                Noise.TileSize = UDim2.new(0, 100, 0, 100)
+                Noise.ZIndex = 1
+                Noise.Parent = AcrylicFrame
+            end
+
+            -- Create the top bar
+            local TopBar = Instance.new("Frame")
+            TopBar.Name = "TopBar"
+            TopBar.Size = UDim2.new(1, 0, 0, 30)
+            TopBar.BackgroundColor3 = GetTheme().DarkContrast
+            TopBar.BorderSizePixel = 0
+            TopBar.Parent = MainFrame
+
+            local TitleLabel = Instance.new("TextLabel")
+            TitleLabel.Name = "TitleLabel"
+            TitleLabel.Size = UDim2.new(1, -40, 1, 0)
+            TitleLabel.Position = UDim2.new(0, 40, 0, 0)
+            TitleLabel.BackgroundTransparency = 1
+            TitleLabel.Text = window.Title
+            TitleLabel.TextColor3 = GetTheme().TextColor
+            TitleLabel.TextSize = 14
+            TitleLabel.Font = Enum.Font.Gotham
+            TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+            TitleLabel.Parent = TopBar
+
+            -- Icon (using a simple label for now, can be replaced with ImageLabel)
+            local IconLabel = Instance.new("TextLabel")
+            IconLabel.Name = "IconLabel"
+            IconLabel.Size = UDim2.new(0, 30, 0, 30)
+            IconLabel.BackgroundTransparency = 1
+            IconLabel.Text = window.Icon -- You can use text icons or replace with ImageLabel
+            IconLabel.TextColor3 = GetTheme().Accent
+            IconLabel.TextSize = 16
+            IconLabel.Font = Enum.Font.Gotham
+            IconLabel.TextXAlignment = Enum.TextXAlignment.Center
+            IconLabel.TextYAlignment = Enum.TextYAlignment.Center
+            IconLabel.Parent = TopBar
+
+            -- Create the main content frame
+            local ContentFrame = Instance.new("Frame")
+            ContentFrame.Name = "ContentFrame"
+            ContentFrame.Size = UDim2.new(1, 0, 1, -30)
+            ContentFrame.Position = UDim2.new(0, 0, 0, 30)
+            ContentFrame.BackgroundTransparency = 1
+            ContentFrame.Parent = MainFrame
+
+            -- Create the sidebar
+            local SideBar = Instance.new("Frame")
+            SideBar.Name = "SideBar"
+            SideBar.Size = UDim2.new(0, window.SideBarWidth, 1, 0)
+            SideBar.BackgroundColor3 = GetTheme().LightContrast
+            SideBar.BorderSizePixel = 0
+            SideBar.Parent = ContentFrame
+
+            -- Create the content area
+            local ContentArea = Instance.new("Frame")
+            ContentArea.Name = "ContentArea"
+            ContentArea.Size = UDim2.new(1, -window.SideBarWidth, 1, 0)
+            ContentArea.Position = UDim2.new(0, window.SideBarWidth, 0, 0)
+            ContentArea.BackgroundColor3 = GetTheme().Background
+            ContentArea.BackgroundTransparency = window.Transparent and library.TransparencyValue or 0
+            ContentArea.BorderSizePixel = 0
+            ContentArea.Parent = ContentFrame
+
+            -- Create a scrolling frame for sidebar content
+            local SideBarScrollingFrame = Instance.new("ScrollingFrame")
+            SideBarScrollingFrame.Name = "SideBarScrollingFrame"
+            SideBarScrollingFrame.Size = UDim2.new(1, 0, 1, 0)
+            SideBarScrollingFrame.BackgroundTransparency = 1
+            SideBarScrollingFrame.BorderSizePixel = 0
+            SideBarScrollingFrame.ScrollBarThickness = 4
+            SideBarScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+            SideBarScrollingFrame.Parent = SideBar
+
+            local SideBarLayout = Instance.new("UIListLayout")
+            SideBarLayout.Name = "SideBarLayout"
+            SideBarLayout.Padding = UDim.new(0, 5)
+            SideBarLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            SideBarLayout.Parent = SideBarScrollingFrame
+
+            -- Create a scrolling frame for content area
+            local ContentAreaScrollingFrame = Instance.new("ScrollingFrame")
+            ContentAreaScrollingFrame.Name = "ContentAreaScrollingFrame"
+            ContentAreaScrollingFrame.Size = UDim2.new(1, 0, 1, 0)
+            ContentAreaScrollingFrame.BackgroundTransparency = 1
+            ContentAreaScrollingFrame.BorderSizePixel = 0
+            ContentAreaScrollingFrame.ScrollBarThickness = 6
+            ContentAreaScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+            ContentAreaScrollingFrame.Parent = ContentArea
+
+            local ContentAreaLayout = Instance.new("UIListLayout")
+            ContentAreaLayout.Name = "ContentAreaLayout"
+            ContentAreaLayout.Padding = UDim.new(0, 10)
+            ContentAreaLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            ContentAreaLayout.Parent = ContentAreaScrollingFrame
+
+            -- Make the window draggable
+            local function UpdateInput(input)
+                if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                    if library.IsDragging then
+                        MainFrame.Position = UDim2.new(0, input.Position.X - library.DraggingOffset.X, 0, input.Position.Y - library.DraggingOffset.Y)
+                    end
+                end
+            end
+
+            TopBar.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    library.IsDragging = true
+                    library.DraggingOffset = Vector2.new(input.Position.X - MainFrame.AbsolutePosition.X, input.Position.Y - MainFrame.AbsolutePosition.Y)
+                    UpdateInput(input)
+                end
+            end)
+
+            TopBar.InputChanged:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                    UpdateInput(input)
+                end
+            end)
+
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    library.IsDragging = false
+                end
+            end)
+
+            -- Function to create a new tab
+            function window:Tab(options)
+                options = options or {}
+                local tab = {
+                    Title = options.Title or "Tab",
+                    Icon = options.Icon or "",
+                }
+
+                -- Create the tab button
+                local TabButton = Instance.new("TextButton")
+                TabButton.Name = tab.Title .. "Button"
+                TabButton.Size = UDim2.new(1, -10, 0, 30)
+                TabButton.Position = UDim2.new(0, 5, 0, 5 + (#SideBarScrollingFrame:GetChildren() - 1) * 35) -- Approximate positioning
+                TabButton.BackgroundTransparency = 1
+                TabButton.Text = (tab.Icon ~= "" and tab.Icon .. " " or "") .. tab.Title
+                TabButton.TextColor3 = GetTheme().TextColor
+                TabButton.TextSize = 12
+                TabButton.Font = Enum.Font.Gotham
+                TabButton.TextXAlignment = Enum.TextXAlignment.Left
+                TabButton.Parent = SideBarScrollingFrame
+
+                -- Create the tab content frame
+                local TabContentFrame = Instance.new("Frame")
+                TabContentFrame.Name = tab.Title .. "Content"
+                TabContentFrame.Size = UDim2.new(1, 0, 1, 0)
+                TabContentFrame.BackgroundTransparency = 1
+                TabContentFrame.Visible = false
+                TabContentFrame.Parent = ContentAreaScrollingFrame
+
+                -- Tab button click event
+                TabButton.MouseButton1Click:Connect(function()
+                    -- Hide all other tab content frames
+                    for _, child in pairs(ContentAreaScrollingFrame:GetChildren()) do
+                        if child:IsA("Frame") and child.Name:match("Content$") then
+                            child.Visible = false
+                        end
+                    end
+                    -- Show the selected tab content frame
+                    TabContentFrame.Visible = true
+                end)
+
+                -- Select the first tab by default
+                if #SideBarScrollingFrame:GetChildren() == 1 then
+                    TabButton.TextColor3 = GetTheme().Accent
+                    TabContentFrame.Visible = true
+                end
+
+                -- Update CanvasSize for SideBar
+                SideBarLayout:ApplyLayout()
+                local totalHeight = 0
+                for _, child in pairs(SideBarScrollingFrame:GetChildren()) do
+                    if child:IsA("TextButton") then
+                        totalHeight = totalHeight + 35 + 5 -- Height + Padding
+                    end
+                end
+                SideBarScrollingFrame.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+
+                -- Function to create a new section within the tab
+                function tab:Section(options)
+                    options = options or {}
+                    local section = {
+                        Title = options.Title or "Section",
+                        Icon = options.Icon or "",
+                        Collapsible = options.Collapsible or false,
+                        DefaultOpen = options.DefaultOpen or true,
+                    }
+
+                    -- Create the section frame
+                    local SectionFrame = Instance.new("Frame")
+                    SectionFrame.Name = section.Title .. "Section"
+                    SectionFrame.Size = UDim2.new(1, -20, 0, 30) -- Initial size
+                    SectionFrame.Position = UDim2.new(0, 10, 0, 10 + (#ContentAreaLayout:GetChildren() - 1) * 40) -- Approximate positioning
+                    SectionFrame.BackgroundTransparency = 1
+                    SectionFrame.Parent = TabContentFrame
+
+                    -- Create the section header
+                    local SectionHeader = Instance.new("Frame")
+                    SectionHeader.Name = "SectionHeader"
+                    SectionHeader.Size = UDim2.new(1, 0, 0, 30)
+                    SectionHeader.BackgroundTransparency = 1
+                    SectionHeader.Parent = SectionFrame
+
+                    local SectionTitleLabel = Instance.new("TextLabel")
+                    SectionTitleLabel.Name = "SectionTitleLabel"
+                    SectionTitleLabel.Size = UDim2.new(1, -30, 1, 0)
+                    SectionTitleLabel.Position = UDim2.new(0, 30, 0, 0)
+                    SectionTitleLabel.BackgroundTransparency = 1
+                    SectionTitleLabel.Text = (section.Icon ~= "" and section.Icon .. " " or "") .. section.Title
+                    SectionTitleLabel.TextColor3 = GetTheme().TextColor
+                    SectionTitleLabel.TextSize = 14
+                    SectionTitleLabel.Font = Enum.Font.Gotham
+                    SectionTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    SectionTitleLabel.Parent = SectionHeader
+
+                    local SectionIconLabel = Instance.new("TextLabel")
+                    SectionIconLabel.Name = "SectionIconLabel"
+                    SectionIconLabel.Size = UDim2.new(0, 30, 0, 30)
+                    SectionIconLabel.BackgroundTransparency = 1
+                    SectionIconLabel.Text = section.Collapsible and (section.DefaultOpen and "-" or "+") or ""
+                    SectionIconLabel.TextColor3 = GetTheme().Accent
+                    SectionIconLabel.TextSize = 16
+                    SectionIconLabel.Font = Enum.Font.Gotham
+                    SectionIconLabel.TextXAlignment = Enum.TextXAlignment.Center
+                    SectionIconLabel.TextYAlignment = Enum.TextYAlignment.Center
+                    SectionIconLabel.Parent = SectionHeader
+
+                    -- Create the section content frame (for collapsible sections)
+                    local SectionContentFrame = Instance.new("Frame")
+                    SectionContentFrame.Name = "SectionContentFrame"
+                    SectionContentFrame.Size = UDim2.new(1, 0, 0, 0) -- Starts collapsed
+                    SectionContentFrame.Position = UDim2.new(0, 0, 0, 30)
+                    SectionContentFrame.BackgroundTransparency = 1
+                    SectionContentFrame.ClipsDescendants = section.Collapsible
+                    SectionContentFrame.Parent = SectionFrame
+
+                    local SectionContentLayout = Instance.new("UIListLayout")
+                    SectionContentLayout.Name = "SectionContentLayout"
+                    SectionContentLayout.Padding = UDim.new(0, 5)
+                    SectionContentLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                    SectionContentLayout.Parent = SectionContentFrame
+
+                    -- Function to toggle section visibility
+                    local function ToggleSection()
+                        if section.Collapsible then
+                            local isOpen = SectionContentFrame.Size.Y.Offset > 0
+                            local targetSize = UDim2.new(1, 0, 0, isOpen and 0 or SectionContentFrame:GetChildren()[1] and SectionContentFrame:GetChildren()[1].AbsoluteSize.Y + 10 or 0) -- Approximate height
+                            local tween = TweenService:Create(SectionContentFrame, TweenInfo.new(0.3), { Size = targetSize })
+                            tween:Play()
+                            SectionIconLabel.Text = isOpen and "+" or "-"
+                        end
+                    end
+
+                    -- Set initial state for collapsible sections
+                    if section.Collapsible and section.DefaultOpen then
+                        SectionContentFrame.Size = UDim2.new(1, 0, 0, SectionContentFrame:GetChildren()[1] and SectionContentFrame:GetChildren()[1].AbsoluteSize.Y + 10 or 0) -- Approximate height
+                        SectionIconLabel.Text = "-"
+                    elseif section.Collapsible then
+                        SectionContentFrame.Size = UDim2.new(1, 0, 0, 0)
+                        SectionIconLabel.Text = "+"
+                    end
+
+                    -- Connect toggle function to header click
+                    if section.Collapsible then
+                        SectionHeader.InputBegan:Connect(function(input)
+                            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                                ToggleSection()
+                            end
+                        end)
+                    end
+
+                    -- Functions to add elements to the section
+                    function section:Button(options)
+                        options = options or {}
+                        local button = {
+                            Title = options.Title or "Button",
+                            Icon = options.Icon or "",
+                            Variant = options.Variant or "Default", -- "Default", "Destructive"
+                        }
+
+                        local ButtonFrame = Instance.new("Frame")
+                        ButtonFrame.Name = button.Title .. "ButtonFrame"
+                        ButtonFrame.Size = UDim2.new(1, 0, 0, 30)
+                        ButtonFrame.BackgroundTransparency = 1
+                        ButtonFrame.Parent = SectionContentFrame
+
+                        local Button = Instance.new("TextButton")
+                        Button.Name = button.Title .. "Button"
+                        Button.Size = UDim2.new(1, 0, 1, 0)
+                        Button.BackgroundTransparency = 0.8
+                        Button.BackgroundColor3 = GetTheme().LightContrast
+                        Button.Text = (button.Icon ~= "" and button.Icon .. " " or "") .. button.Title
+                        Button.TextColor3 = (button.Variant == "Destructive") and GetTheme().Alert or GetTheme().TextColor
+                        Button.TextSize = 12
+                        Button.Font = Enum.Font.Gotham
+                        Button.Parent = ButtonFrame
+
+                        Button.MouseButton1Click:Connect(options.Callback or function() end)
+                    end
+
+                    function section:Toggle(options)
+                        options = options or {}
+                        local toggle = {
+                            Title = options.Title or "Toggle",
+                            Icon = options.Icon or "",
+                            Default = options.Default or false,
+                        }
+
+                        local ToggleFrame = Instance.new("Frame")
+                        ToggleFrame.Name = toggle.Title .. "ToggleFrame"
+                        ToggleFrame.Size = UDim2.new(1, 0, 0, 30)
+                        ToggleFrame.BackgroundTransparency = 1
+                        ToggleFrame.Parent = SectionContentFrame
+
+                        local ToggleLabel = Instance.new("TextLabel")
+                        ToggleLabel.Name = "ToggleLabel"
+                        ToggleLabel.Size = UDim2.new(1, -30, 1, 0)
+                        ToggleLabel.BackgroundTransparency = 1
+                        ToggleLabel.Text = (toggle.Icon ~= "" and toggle.Icon .. " " or "") .. toggle.Title
+                        ToggleLabel.TextColor3 = GetTheme().TextColor
+                        ToggleLabel.TextSize = 12
+                        ToggleLabel.Font = Enum.Font.Gotham
+                        ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                        ToggleLabel.Parent = ToggleFrame
+
+                        local ToggleButton = Instance.new("TextButton")
+                        ToggleButton.Name = "ToggleButton"
+                        ToggleButton.Size = UDim2.new(0, 30, 0, 16)
+                        ToggleButton.Position = UDim2.new(1, -30, 0.5, -8)
+                        ToggleButton.BackgroundTransparency = 0.5
+                        ToggleButton.BackgroundColor3 = GetTheme().LightContrast
+                        ToggleButton.Text = ""
+                        ToggleButton.Parent = ToggleFrame
+
+                        local ToggleIndicator = Instance.new("Frame")
+                        ToggleIndicator.Name = "ToggleIndicator"
+                        ToggleIndicator.Size = UDim2.new(0, 12, 0, 12)
+                        ToggleIndicator.Position = UDim2.new(0, 2, 0.5, -6)
+                        ToggleIndicator.BackgroundColor3 = GetTheme().TextColor
+                        ToggleIndicator.Parent = ToggleButton
+
+                        -- Set initial state
+                        local state = toggle.Default
+                        if state then
+                            ToggleButton.BackgroundColor3 = GetTheme().Accent
+                            ToggleIndicator.Position = UDim2.new(1, -14, 0.5, -6)
+                        end
+
+                        ToggleButton.MouseButton1Click:Connect(function()
+                            state = not state
+                            if state then
+                                ToggleButton.BackgroundColor3 = GetTheme().Accent
+                                TweenService:Create(ToggleIndicator, TweenInfo.new(0.3), { Position = UDim2.new(1, -14, 0.5, -6) }):Play()
+                            else
+                                ToggleButton.BackgroundColor3 = GetTheme().LightContrast
+                                TweenService:Create(ToggleIndicator, TweenInfo.new(0.3), { Position = UDim2.new(0, 2, 0.5, -6) }):Play()
+                            end
+                            if options.Callback then options.Callback(state) end
+                        end)
+                    end
+
+                    function section:Slider(options)
+                        options = options or {}
+                        local slider = {
+                            Title = options.Title or "Slider",
+                            Description = options.Description or "",
+                            Value = options.Value or { Min = 0, Max = 100, Default = 50 },
+                            Step = options.Step or 1,
+                        }
+
+                        local SliderFrame = Instance.new("Frame")
+                        SliderFrame.Name = slider.Title .. "SliderFrame"
+                        SliderFrame.Size = UDim2.new(1, 0, 0, 50)
+                        SliderFrame.BackgroundTransparency = 1
+                        SliderFrame.Parent = SectionContentFrame
+
+                        local SliderLabel = Instance.new("TextLabel")
+                        SliderLabel.Name = "SliderLabel"
+                        SliderLabel.Size = UDim2.new(1, 0, 0, 20)
+                        SliderLabel.BackgroundTransparency = 1
+                        SliderLabel.Text = (slider.Title ~= "" and slider.Title .. " | " or "") .. slider.Description
+                        SliderLabel.TextColor3 = GetTheme().TextColor
+                        SliderLabel.TextSize = 12
+                        SliderLabel.Font = Enum.Font.Gotham
+                        SliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+                        SliderLabel.Parent = SliderFrame
+
+                        local SliderValueLabel = Instance.new("TextLabel")
+                        SliderValueLabel.Name = "SliderValueLabel"
+                        SliderValueLabel.Size = UDim2.new(0, 50, 0, 20)
+                        SliderValueLabel.Position = UDim2.new(1, -50, 0, 0)
+                        SliderValueLabel.BackgroundTransparency = 1
+                        SliderValueLabel.Text = string.format("%.2f", slider.Value.Default)
+                        SliderValueLabel.TextColor3 = GetTheme().Accent
+                        SliderValueLabel.TextSize = 12
+                        SliderValueLabel.Font = Enum.Font.Gotham
+                        SliderValueLabel.TextXAlignment = Enum.TextXAlignment.Right
+                        SliderValueLabel.Parent = SliderFrame
+
+                        local SliderBarFrame = Instance.new("Frame")
+                        SliderBarFrame.Name = "SliderBarFrame"
+                        SliderBarFrame.Size = UDim2.new(1, 0, 0, 4)
+                        SliderBarFrame.Position = UDim2.new(0, 0, 0, 25)
+                        SliderBarFrame.BackgroundColor3 = GetTheme().LightContrast
+                        SliderBarFrame.BorderSizePixel = 0
+                        SliderBarFrame.Parent = SliderFrame
+
+                        local SliderBar = Instance.new("Frame")
+                        SliderBar.Name = "SliderBar"
+                        SliderBar.Size = UDim2.new((slider.Value.Default - slider.Value.Min) / (slider.Value.Max - slider.Value.Min), 0, 1, 0)
+                        SliderBar.BackgroundColor3 = GetTheme().Accent
+                        SliderBar.BorderSizePixel = 0
+                        SliderBar.Parent = SliderBarFrame
+
+                        local SliderButton = Instance.new("TextButton")
+                        SliderButton.Name = "SliderButton"
+                        SliderButton.Size = UDim2.new(0, 10, 0, 10)
+                        SliderButton.Position = UDim2.new((slider.Value.Default - slider.Value.Min) / (slider.Value.Max - slider.Value.Min), -5, 0.5, -5)
+                        SliderButton.BackgroundTransparency = 0
+                        SliderButton.BackgroundColor3 = GetTheme().TextColor
+                        SliderButton.Text = ""
+                        SliderButton.Parent = SliderBarFrame
+
+                        local function UpdateSliderValue()
+                            local pos = math.clamp((UserInputService:GetMouseLocation().X - SliderBarFrame.AbsolutePosition.X) / SliderBarFrame.AbsoluteSize.X, 0, 1)
+                            local value = slider.Value.Min + (pos * (slider.Value.Max - slider.Value.Min))
+                            value = math.floor((value - slider.Value.Min) / slider.Step + 0.5) * slider.Step + slider.Value.Min
+                            value = math.clamp(value, slider.Value.Min, slider.Value.Max)
+                            SliderValueLabel.Text = string.format("%.2f", value)
+                            TweenService:Create(SliderBar, TweenInfo.new(0.1), { Size = UDim2.new((value - slider.Value.Min) / (slider.Value.Max - slider.Value.Min), 0, 1, 0) }):Play()
+                            TweenService:Create(SliderButton, TweenInfo.new(0.1), { Position = UDim2.new((value - slider.Value.Min) / (slider.Value.Max - slider.Value.Min), -5, 0.5, -5) }):Play()
+                            if options.Callback then options.Callback(value) end
+                        end
+
+                        local sliding = false
+                        SliderButton.InputBegan:Connect(function(input)
+                            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                                sliding = true
+                                UpdateSliderValue()
+                            end
+                        end)
+
+                        UserInputService.InputChanged:Connect(function(input)
+                            if input.UserInputType == Enum.UserInputType.MouseMovement and sliding then
+                                UpdateSliderValue()
+                            end
+                        end)
+
+                        UserInputService.InputEnded:Connect(function(input)
+                            if input.UserInputType == Enum.UserInputType.MouseButton1 and sliding then
+                                sliding = false
+                            end
+                        end)
+                    end
+
+                    function section:Dropdown(options)
+                        options = options or {}
+                        local dropdown = {
+                            Title = options.Title or "Dropdown",
+                            Values = options.Values or {},
+                            Value = options.Value or (options.Multi and {} or options.Values[1]),
+                            Multi = options.Multi or false,
+                            AllowNone = options.AllowNone or false,
+                        }
+
+                        local DropdownFrame = Instance.new("Frame")
+                        DropdownFrame.Name = dropdown.Title .. "DropdownFrame"
+                        DropdownFrame.Size = UDim2.new(1, 0, 0, 30)
+                        DropdownFrame.BackgroundTransparency = 1
+                        DropdownFrame.Parent = SectionContentFrame
+
+                        local DropdownLabel = Instance.new("TextLabel")
+                        DropdownLabel.Name = "DropdownLabel"
+                        DropdownLabel.Size = UDim2.new(1, -30, 1, 0)
+                        DropdownLabel.BackgroundTransparency = 1
+                        DropdownLabel.Text = dropdown.Title
+                        DropdownLabel.TextColor3 = GetTheme().TextColor
+                        DropdownLabel.TextSize = 12
+                        DropdownLabel.Font = Enum.Font.Gotham
+                        DropdownLabel.TextXAlignment = Enum.TextXAlignment.Left
+                        DropdownLabel.Parent = DropdownFrame
+
+                        local DropdownButton = Instance.new("TextButton")
+                        DropdownButton.Name = "DropdownButton"
+                        DropdownButton.Size = UDim2.new(0, 30, 0, 16)
+                        DropdownButton.Position = UDim2.new(1, -30, 0.5, -8)
+                        DropdownButton.BackgroundTransparency = 0.8
+                        DropdownButton.BackgroundColor3 = GetTheme().LightContrast
+                        DropdownButton.Text = "v"
+                        DropdownButton.TextColor3 = GetTheme().TextColor
+                        DropdownButton.TextSize = 10
+                        DropdownButton.Font = Enum.Font.Gotham
+                        DropdownButton.Parent = DropdownFrame
+
+                        local DropdownListFrame = Instance.new("ScrollingFrame")
+                        DropdownListFrame.Name = "DropdownListFrame"
+                        DropdownListFrame.Size = UDim2.new(1, 0, 0, 100)
+                        DropdownListFrame.Position = UDim2.new(0, 0, 1, 5)
+                        DropdownListFrame.BackgroundTransparency = 0.8
+                        DropdownListFrame.BackgroundColor3 = GetTheme().LightContrast
+                        DropdownListFrame.BorderSizePixel = 0
+                        DropdownListFrame.ScrollBarThickness = 4
+                        DropdownListFrame.Visible = false
+                        DropdownListFrame.Parent = DropdownFrame
+
+                        local DropdownListLayout = Instance.new("UIListLayout")
+                        DropdownListLayout.Name = "DropdownListLayout"
+                        DropdownListLayout.Padding = UDim.new(0, 2)
+                        DropdownListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+                        DropdownListLayout.Parent = DropdownListFrame
+
+                        local function UpdateDropdownText()
+                            if dropdown.Multi then
+                                DropdownLabel.Text = dropdown.Title .. ": " .. (table.concat(dropdown.Value, ", ") or "None")
+                            else
+                                DropdownLabel.Text = dropdown.Title .. ": " .. (dropdown.Value or "None")
+                            end
+                        end
+
+                        local function CreateOption(value)
+                            local OptionButton = Instance.new("TextButton")
+                            OptionButton.Name = value .. "Option"
+                            OptionButton.Size = UDim2.new(1, 0, 0, 20)
+                            OptionButton.BackgroundTransparency = 0.9
+                            OptionButton.BackgroundColor3 = GetTheme().DarkContrast
+                            OptionButton.Text = value
+                            OptionButton.TextColor3 = GetTheme().TextColor
+                            OptionButton.TextSize = 10
+                            OptionButton.Font = Enum.Font.Gotham
+                            OptionButton.Parent = DropdownListFrame
+
+                            OptionButton.MouseButton1Click:Connect(function()
+                                if dropdown.Multi then
+                                    local index = table.find(dropdown.Value, value)
+                                    if index then
+                                        table.remove(dropdown.Value, index)
+                                    else
+                                        if not (not dropdown.AllowNone and value == "None" and #dropdown.Value == 0) then
+                                            table.insert(dropdown.Value, value)
+                                        end
+                                    end
+                                else
+                                    dropdown.Value = value
+                                end
+                                UpdateDropdownText()
+                                if options.Callback then options.Callback(dropdown.Value) end
+                                DropdownListFrame.Visible = false
+                            end)
+                        end
+
+                        for _, value in ipairs(dropdown.Values) do
+                            CreateOption(value)
+                        end
+                        if dropdown.AllowNone then CreateOption("None") end
+
+                        DropdownButton.MouseButton1Click:Connect(function()
+                            DropdownListFrame.Visible = not DropdownListFrame.Visible
+                        end)
+
+                        UpdateDropdownText()
+                    end
+
+                    function section:Input(options)
+                        options = options or {}
+                        local input = {
+                            Title = options.Title or "Input",
+                            Placeholder = options.Placeholder or "",
+                            Numeric = options.Numeric or false,
+                            Finished = options.Finished or false, -- Fire callback only when Enter is pressed
+                        }
+
+                        local InputFrame = Instance.new("Frame")
+                        InputFrame.Name = input.Title .. "InputFrame"
+                        InputFrame.Size = UDim2.new(1, 0, 0, 30)
+                        InputFrame.BackgroundTransparency = 1
+                        InputFrame.Parent = SectionContentFrame
+
+                        local InputLabel = Instance.new("TextLabel")
+                        InputLabel.Name = "InputLabel"
+                        InputLabel.Size = UDim2.new(1, -100, 1, 0)
+                        InputLabel.BackgroundTransparency = 1
+                        InputLabel.Text = input.Title
+                        InputLabel.TextColor3 = GetTheme().TextColor
+                        InputLabel.TextSize = 12
+                        InputLabel.Font = Enum.Font.Gotham
+                        InputLabel.TextXAlignment = Enum.TextXAlignment.Left
+                        InputLabel.Parent = InputFrame
+
+                        local InputTextBox = Instance.new("TextBox")
+                        InputTextBox.Name = "InputTextBox"
+                        InputTextBox.Size = UDim2.new(0, 100, 1, 0)
+                        InputTextBox.Position = UDim2.new(1, -100, 0, 0)
+                        InputTextBox.BackgroundTransparency = 0.8
+                        InputTextBox.BackgroundColor3 = GetTheme().LightContrast
+                        InputTextBox.Text = ""
+                        InputTextBox.PlaceholderText = input.Placeholder
+                        InputTextBox.TextColor3 = GetTheme().TextColor
+                        InputTextBox.TextSize = 12
+                        InputTextBox.Font = Enum.Font.Gotham
+                        InputTextBox.ClearTextOnFocus = false
+                        InputTextBox.Parent = InputFrame
+
+                        if input.Numeric then
+                            InputTextBox.NumbersOnly = true
+                        end
+
+                        if input.Finished then
+                            InputTextBox.FocusLost:Connect(function(enterPressed)
+                                if enterPressed then
+                                    if options.Callback then options.Callback(InputTextBox.Text) end
+                                end
+                            end)
+                        else
+                            InputTextBox:GetPropertyChangedSignal("Text"):Connect(function()
+                                if options.Callback then options.Callback(InputTextBox.Text) end
+                            end)
+                        end
+                    end
+
+                    function section:Paragraph(options)
+                        options = options or {}
+                        local paragraph = {
+                            Title = options.Title or "Paragraph",
+                            Desc = options.Desc or "",
+                            Color = options.Color or "Grey", -- "Grey", "White", "Red", etc.
+                        }
+
+                        local ParagraphFrame = Instance.new("Frame")
+                        ParagraphFrame.Name = paragraph.Title .. "ParagraphFrame"
+                        ParagraphFrame.Size = UDim2.new(1, 0, 0, 40) -- Approximate size
+                        ParagraphFrame.BackgroundTransparency = 1
+                        ParagraphFrame.Parent = SectionContentFrame
+
+                        local ParagraphTitleLabel = Instance.new("TextLabel")
+                        ParagraphTitleLabel.Name = "ParagraphTitleLabel"
+                        ParagraphTitleLabel.Size = UDim2.new(1, 0, 0, 20)
+                        ParagraphTitleLabel.BackgroundTransparency = 1
+                        ParagraphTitleLabel.Text = paragraph.Title
+                        ParagraphTitleLabel.TextColor3 = GetTheme().TextColor
+                        ParagraphTitleLabel.TextSize = 14
+                        ParagraphTitleLabel.Font = Enum.Font.Gotham
+                        ParagraphTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                        ParagraphTitleLabel.Parent = ParagraphFrame
+
+                        local ParagraphDescLabel = Instance.new("TextLabel")
+                        ParagraphDescLabel.Name = "ParagraphDescLabel"
+                        ParagraphDescLabel.Size = UDim2.new(1, 0, 0, 20)
+                        ParagraphDescLabel.Position = UDim2.new(0, 0, 0, 20)
+                        ParagraphDescLabel.BackgroundTransparency = 1
+                        ParagraphDescLabel.Text = paragraph.Desc
+                        ParagraphDescLabel.TextColor3 = (paragraph.Color == "Grey") and Color3.fromRGB(200, 200, 200) or GetTheme().TextColor
+                        ParagraphDescLabel.TextSize = 11
+                        ParagraphDescLabel.Font = Enum.Font.Gotham
+                        ParagraphDescLabel.TextXAlignment = Enum.TextXAlignment.Left
+                        ParagraphDescLabel.TextWrapped = true
+                        ParagraphDescLabel.Parent = ParagraphFrame
+                    end
+
+                    -- Add the section to the layout
+                    -- The layout is handled by SectionContentLayout inside the collapsible frame
+                    -- We need to update the section frame size based on content if not collapsible
+                    if not section.Collapsible then
+                        -- For non-collapsible sections, the SectionFrame size might need dynamic adjustment
+                        -- This is a simplified approach, real layout might require more complex handling
+                        SectionFrame.Size = UDim2.new(1, -20, 0, 30 + SectionContentLayout.AbsoluteContentSize.Y)
+                    end
+
+                    return section
+                end
+
+                return tab
+            end
+
+            -- Function to toggle window visibility
+            function window:Toggle()
+                ScreenGui.Enabled = not ScreenGui.Enabled
+                library.IsOpen = ScreenGui.Enabled
+            end
+
+            -- Function to edit the open button
+            function window:EditOpenButton(options)
+                options = options or {}
+                local openButton = {
+                    Title = options.Title or window.Title,
+                    Icon = options.Icon or window.Icon,
+                    CornerRadius = options.CornerRadius or UDim.new(0, 4),
+                    StrokeThickness = options.StrokeThickness or 0,
+                    Color = options.Color or Color3.fromRGB(0, 162, 255),
+                    OnlyMobile = options.OnlyMobile or false,
+                    Enabled = options.Enabled or false,
+                    Draggable = options.Draggable or false,
+                }
+
+                if openButton.Enabled then
+                    local OpenButtonFrame = Instance.new("Frame")
+                    OpenButtonFrame.Name = "OpenButtonFrame"
+                    OpenButtonFrame.Size = UDim2.new(0, 200, 0, 50)
+                    OpenButtonFrame.Position = UDim2.new(0, 10, 1, -60)
+                    OpenButtonFrame.BackgroundTransparency = 1
+                    OpenButtonFrame.Parent = RobloxGui
+
+                    if openButton.StrokeThickness > 0 then
+                        local Stroke = Instance.new("UIStroke")
+                        Stroke.Thickness = openButton.StrokeThickness
+                        Stroke.Color = openButton.Color
+                        Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+                        Stroke.Parent = OpenButtonFrame
+                    end
+
+                    local Corner = Instance.new("UICorner")
+                    Corner.CornerRadius = openButton.CornerRadius
+                    Corner.Parent = OpenButtonFrame
+
+                    local OpenButton = Instance.new("TextButton")
+                    OpenButton.Name = "OpenButton"
+                    OpenButton.Size = UDim2.new(1, 0, 1, 0)
+                    OpenButton.BackgroundTransparency = 0.5
+                    OpenButton.BackgroundColor3 = openButton.Color
+                    OpenButton.Text = (openButton.Icon ~= "" and openButton.Icon .. " " or "") .. openButton.Title
+                    OpenButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    OpenButton.TextSize = 14
+                    OpenButton.Font = Enum.Font.Gotham
+                    OpenButton.Parent = OpenButtonFrame
+
+                    OpenButton.MouseButton1Click:Connect(function()
+                        window:Toggle()
+                    end)
+
+                    if openButton.Draggable then
+                        local function UpdateInput(input)
+                            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                                if library.IsDragging then
+                                    OpenButtonFrame.Position = UDim2.new(0, input.Position.X - library.DraggingOffset.X, 0, input.Position.Y - library.DraggingOffset.Y)
+                                end
+                            end
+                        end
+
+                        OpenButtonFrame.InputBegan:Connect(function(input)
+                            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                                library.IsDragging = true
+                                library.DraggingOffset = Vector2.new(input.Position.X - OpenButtonFrame.AbsolutePosition.X, input.Position.Y - OpenButtonFrame.AbsolutePosition.Y)
+                                UpdateInput(input)
+                            end
+                        end)
+
+                        OpenButtonFrame.InputChanged:Connect(function(input)
+                            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                                UpdateInput(input)
+                            end
+                        end)
+
+                        UserInputService.InputEnded:Connect(function(input)
+                            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                                library.IsDragging = false
+                            end
+                        end)
+                    end
+                end
+            end
+
+            -- Function to set theme
+            function library:SetTheme(themeName)
+                library.Theme = themeName
+                -- Update colors for existing UI elements if needed
+                -- This requires iterating through created objects and updating their colors
+                -- For simplicity in this example, we'll just store the theme name
+            end
+
+            -- Function to notify
+            function library:Notify(options)
+                options = options or {}
+                local notification = {
+                    Title = options.Title or "Notification",
+                    Content = options.Content or "",
+                    Duration = options.Duration or library.NotificationLifetime,
+                    Icon = options.Icon or "info",
+                }
+
+                -- Create notification frame
+                local NotificationFrame = Instance.new("Frame")
+                NotificationFrame.Name = "Notification"
+                NotificationFrame.Size = library.NotificationSize
+                NotificationFrame.Position = library.NotificationPosition
+                NotificationFrame.BackgroundColor3 = GetTheme().Notification
+                NotificationFrame.BackgroundTransparency = window.Transparent and library.TransparencyValue or 0
+                NotificationFrame.BorderSizePixel = 0
+                NotificationFrame.Parent = ScreenGui
+
+                -- Outline
+                if window.HasOutline then
+                    local Outline = Instance.new("Frame")
+                    Outline.Name = "Outline"
+                    Outline.Size = UDim2.new(1, 2, 1, 2)
+                    Outline.Position = UDim2.new(0, -1, 0, -1)
+                    Outline.BackgroundColor3 = GetTheme().NotificationOutline
+                    Outline.BorderSizePixel = 0
+                    Outline.Parent = NotificationFrame
+                end
+
+                -- Content
+                local NotificationContentFrame = Instance.new("Frame")
+                NotificationContentFrame.Name = "NotificationContentFrame"
+                NotificationContentFrame.Size = UDim2.new(1, -library.NotificationPadding * 2, 1, -library.NotificationPadding * 2)
+                NotificationContentFrame.Position = UDim2.new(0, library.NotificationPadding, 0, library.NotificationPadding)
+                NotificationContentFrame.BackgroundTransparency = 1
+                NotificationContentFrame.Parent = NotificationFrame
+
+                -- Icon
+                local NotificationIconLabel = Instance.new("TextLabel")
+                NotificationIconLabel.Name = "NotificationIconLabel"
+                NotificationIconLabel.Size = UDim2.new(0, 20, 0, 20)
+                NotificationIconLabel.BackgroundTransparency = 1
+                NotificationIconLabel.Text = notification.Icon
+                NotificationIconLabel.TextColor3 = GetTheme().NotificationIcon
+                NotificationIconLabel.TextSize = 16
+                NotificationIconLabel.Font = Enum.Font.Gotham
+                NotificationIconLabel.TextXAlignment = Enum.TextXAlignment.Center
+                NotificationIconLabel.TextYAlignment = Enum.TextYAlignment.Center
+                NotificationIconLabel.Parent = NotificationContentFrame
+
+                -- Text Frame
+                local NotificationTextFrame = Instance.new("Frame")
+                NotificationTextFrame.Name = "NotificationTextFrame"
+                NotificationTextFrame.Size = UDim2.new(1, -30, 1, 0)
+                NotificationTextFrame.Position = UDim2.new(0, 30, 0, 0)
+                NotificationTextFrame.BackgroundTransparency = 1
+                NotificationTextFrame.Parent = NotificationContentFrame
+
+                local NotificationTitleLabel = Instance.new("TextLabel")
+                NotificationTitleLabel.Name = "NotificationTitleLabel"
+                NotificationTitleLabel.Size = UDim2.new(1, 0, 0, 15)
+                NotificationTitleLabel.BackgroundTransparency = 1
+                NotificationTitleLabel.Text = notification.Title
+                NotificationTitleLabel.TextColor3 = GetTheme().NotificationText
+                NotificationTitleLabel.TextSize = 12
+                NotificationTitleLabel.Font = Enum.Font.GothamBold
+                NotificationTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                NotificationTitleLabel.TextYAlignment = Enum.TextYAlignment.Top
+                NotificationTitleLabel.Parent = NotificationTextFrame
+
+                local NotificationContentLabel = Instance.new("TextLabel")
+                NotificationContentLabel.Name = "NotificationContentLabel"
+                NotificationContentLabel.Size = UDim2.new(1, 0, 1, -15)
+                NotificationContentLabel.Position = UDim2.new(0, 0, 0, 15)
+                NotificationContentLabel.BackgroundTransparency = 1
+                NotificationContentLabel.Text = notification.Content
+                NotificationContentLabel.TextColor3 = GetTheme().NotificationText
+                NotificationContentLabel.TextSize = 10
+                NotificationContentLabel.Font = Enum.Font.Gotham
+                NotificationContentLabel.TextXAlignment = Enum.TextXAlignment.Left
+                NotificationContentLabel.TextYAlignment = Enum.TextYAlignment.Top
+                NotificationContentLabel.TextWrapped = true
+                NotificationContentLabel.Parent = NotificationTextFrame
+
+                -- Close Button
+                local NotificationCloseButton = Instance.new("TextButton")
+                NotificationCloseButton.Name = "NotificationCloseButton"
+                NotificationCloseButton.Size = UDim2.new(0, library.NotificationCloseButtonSize, 0, library.NotificationCloseButtonSize)
+                NotificationCloseButton.Position = UDim2.new(1, -library.NotificationCloseButtonSize, 0, 0)
+                NotificationCloseButton.BackgroundTransparency = 0.5
+                NotificationCloseButton.BackgroundColor3 = GetTheme().NotificationCloseButton
+                NotificationCloseButton.Text = "X"
+                NotificationCloseButton.TextColor3 = GetTheme().NotificationCloseButtonText
+                NotificationCloseButton.TextSize = library.NotificationCloseButtonTextSize
+                NotificationCloseButton.Font = library.NotificationCloseButtonTextFont
+                NotificationCloseButton.Parent = NotificationFrame
+
+                local CloseButtonCorner = Instance.new("UICorner")
+                CloseButtonCorner.CornerRadius = UDim.new(0, library.NotificationCloseButtonCornerRadius)
+                CloseButtonCorner.Parent = NotificationCloseButton
+
+                NotificationCloseButton.MouseEnter:Connect(function()
+                    NotificationCloseButton.BackgroundColor3 = GetTheme().NotificationCloseButtonHover
+                    NotificationCloseButton.TextColor3 = GetTheme().NotificationCloseButtonTextHover
+                end)
+
+                NotificationCloseButton.MouseLeave:Connect(function()
+                    NotificationCloseButton.BackgroundColor3 = GetTheme().NotificationCloseButton
+                    NotificationCloseButton.TextColor3 = GetTheme().NotificationCloseButtonText
+                end)
+
+                NotificationCloseButton.MouseButton1Click:Connect(function()
+                    NotificationFrame:Destroy()
+                end)
+
+                -- Duration Bar (optional, visual indicator)
+                local DurationBarFrame = Instance.new("Frame")
+                DurationBarFrame.Name = "DurationBarFrame"
+                DurationBarFrame.Size = UDim2.new(1, 0, 0, 2)
+                DurationBarFrame.Position = UDim2.new(0, 0, 1, -2)
+                DurationBarFrame.BackgroundColor3 = GetTheme().NotificationDurationBarBackground
+                DurationBarFrame.BorderSizePixel = 0
+                DurationBarFrame.Parent = NotificationFrame
+
+                local DurationBar = Instance.new("Frame")
+                DurationBar.Name = "DurationBar"
+                DurationBar.Size = UDim2.new(1, 0, 1, 0)
+                DurationBar.BackgroundColor3 = GetTheme().NotificationDurationBar
+                DurationBar.BorderSizePixel = 0
+                DurationBar.Parent = DurationBarFrame
+
+                -- Animate duration bar
+                TweenService:Create(DurationBar, TweenInfo.new(notification.Duration, Enum.EasingStyle.Linear), { Size = UDim2.new(0, 0, 1, 0) }):Play()
+
+                -- Remove notification after duration
+                delay(notification.Duration, function()
+                    if NotificationFrame and NotificationFrame.Parent then
+                        TweenService:Create(NotificationFrame, TweenInfo.new(0.3), { Position = UDim2.new(1, 20, 1, -20) }):Play()
+                        wait(0.3)
+                        if NotificationFrame and NotificationFrame.Parent then
+                            NotificationFrame:Destroy()
+                        end
+                    end
+                end)
+            end
+
+            -- Function to destroy the window
+            function window:Destroy()
+                if ScreenGui then
+                    ScreenGui:Destroy()
+                end
+            end
+
+            -- Add window to library objects
+            table.insert(library.Objects, window)
+
+            -- Handle open key/mouse button
+            if library.OpenKey then
+                UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                    if input.KeyCode == library.OpenKey and not gameProcessed then
+                        window:Toggle()
+                    end
+                end)
+            end
+
+            if library.OpenMouseButton then
+                UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                    if input.UserInputType == library.OpenMouseButton and not gameProcessed then
+                        window:Toggle()
+                    end
+                end)
+            end
+
+            return window
+        end
+
+        -- Return the library table
+        return library
+        -- [END EMBEDDED WINDUI CODE]
+    ]]
+
+    -- Eksekusi kode WindUI
     local ok, res = pcall(function()
-        return loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/main.lua"))() -- <--- Mencoba URL alternatif
+        return loadstring(windUILibraryCode)()
     end)
+
     if ok and res then
         WindUI = res
         pcall(function()
             WindUI:SetTheme("Dark")
             WindUI.TransparencyValue = 0.2
         end)
-        notifyUI("Init", "WindUI loaded successfully.", 3, "check-circle-2") -- <--- Notifikasi sukses
+        notifyUI("Init", "WindUI loaded successfully (embedded).", 3, "check-circle-2")
     else
-        warn("[UI] Gagal load WindUI dari GitHub. Menggunakan fallback minimal.")
-        notifyUI("Init Error", "WindUI failed to load, using fallback.", 5, "alert-triangle") -- <--- Notifikasi error, tapi aman karena fallback
+        warn("[UI] Gagal load WindUI yang disisipkan. Error:", res)
+        notifyUI("Init Error", "WindUI embedded failed: " .. tostring(res), 5, "alert-triangle")
         WindUI = nil
     end
 end
@@ -2057,9 +3242,9 @@ end
 -- INITIAL NON-BLOCKING RESOURCE WATCHERS
 ---------------------------------------------------------
 backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
-    if scriptDisabled then return end -- Tambahkan pengecekan scriptDisabled
+    if scriptDisabled then return end
     RemoteEvents = re
-    notifyUI("Init", "RemoteEvents ditemukan.", 3, "radio") -- <--- Aman karena notifyUI menangani WindUI = nil
+    notifyUI("Init", "RemoteEvents ditemukan.", 3, "radio")
     RequestStartDragging = re:FindFirstChild("RequestStartDraggingItem")
     RequestStopDragging = re:FindFirstChild("StopDraggingItem")
     CollectCoinRemote = re:FindFirstChild("RequestCollectCoints")
@@ -2070,23 +3255,23 @@ backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
     tryHookDayDisplay()
 end)
 backgroundFind(Workspace, "Items", function(it)
-    if scriptDisabled then return end -- Tambahkan pengecekan scriptDisabled
+    if scriptDisabled then return end
     ItemsFolder = it
-    notifyUI("Init", "Items folder ditemukan.", 3, "archive") -- <--- Aman
+    notifyUI("Init", "Items folder ditemukan.", 3, "archive")
 end)
 backgroundFind(Workspace, "Structures", function(st)
-    if scriptDisabled then return end -- Tambahkan pengecekan scriptDisabled
+    if scriptDisabled then return end
     Structures = st
-    notifyUI("Init", "Structures ditemukan.", 3, "layers") -- <--- Aman
+    notifyUI("Init", "Structures ditemukan.", 3, "layers")
     TemporalAccelerometer = st:FindFirstChild("Temporal Accelerometer")
 end)
-task.spawn(function() if not scriptDisabled then tryHookDayDisplay() end end) -- Tambahkan pengecekan scriptDisabled
+task.spawn(function() if not scriptDisabled then tryHookDayDisplay() end end)
 startGodmodeLoop()
 ---------------------------------------------------------
 -- INIT
 ---------------------------------------------------------
 LocalPlayer.CharacterAdded:Connect(function(char)
-    if scriptDisabled then return end -- Tambahkan pengecekan scriptDisabled
+    if scriptDisabled then return end
     task.wait(0.5)
     humanoid = char:WaitForChild("Humanoid")
     rootPart = char:WaitForChild("HumanoidRootPart")
@@ -2098,7 +3283,7 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     if flyEnabled then task.delay(0.2, startFly) end
 end)
 if LocalPlayer.Character then
-    if scriptDisabled then return end -- Tambahkan pengecekan scriptDisabled
+    if scriptDisabled then return end
     humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
     rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
     if humanoid then defaultWalkSpeed = humanoid.WalkSpeed; defaultHipHeight = humanoid.HipHeight end
@@ -2110,10 +3295,10 @@ if WindUI then -- <--- Hanya buat UI jika WindUI berhasil dimuat
     createMiniHud()
     startMiniHudLoop()
 else
-    print("[PapiDimz] WindUI gagal dimuat, UI tidak dibuat. Fungsi utama masih aktif jika tidak menggunakan UI.")
+    print("[PapiDimz] WindUI gagal dimuat (embedded), UI tidak dibuat. Fungsi utama masih aktif jika tidak menggunakan UI.")
     -- Opsional: Tambahkan notifikasi fallback bahwa UI tidak muncul
-    createFallbackNotify("WindUI failed, UI not created. Check console.")
+    createFallbackNotify("WindUI (embedded) failed, UI not created. Check console.")
 end
 initAntiAFK()
 -- (all original background watchers and loops start here)
-notifyUI("Papi Dimz |HUB", "Semua fitur loaded: Main, Local Player, Fishing, Farm, Bring, Teleport, Tools, Night, Webhook, Health", 6, "sparkles") -- <--- Aman karena mengecek WindUI di dalam notifyUI
+notifyUI("Papi Dimz |HUB", "Semua fitur loaded: Main, Local Player, Fishing, Farm, Bring, Teleport, Tools, Night, Webhook, Health", 6, "sparkles")
