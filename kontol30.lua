@@ -164,6 +164,10 @@ local lastRecastAt = 0
 local RECAST_DELAY = 2
 local MAX_RECENT_SECS = 5
 local fishingLoopThread = nil
+
+local BringHeight = 20
+local selectedLocation = "Player"
+
 -- UI & HUD
 local Window
 local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
@@ -1086,8 +1090,21 @@ function bringItems(masterList, selectedList, location)
         return
     end
 
+    -- ✅ TAMBAHKAN BLOK INI
+    if not RequestStartDragging or not RequestStopDragging then
+        notifyUI(
+            "Bring Item",
+            "Remote dragging belum siap, coba lagi sebentar.",
+            3,
+            "alert-triangle"
+        )
+        return
+    end
+    -- ✅ SAMPAI SINI
+
     selectedLocation = location or selectedLocation
     local targetCF = getBringTargetCFrame()
+
     if not targetCF then
         notifyUI("Bring Item", "Target lokasi tidak ditemukan.", 3, "alert-triangle")
         return
