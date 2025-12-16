@@ -166,7 +166,7 @@ local fishingLoopThread = nil
 local Window
 local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
 local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFps
-
+local uiVisible = true
 local scriptStartTime = os.clock()
 local currentFPS = 0
 local auraHeartbeatConnection = nil
@@ -2207,12 +2207,14 @@ local function createMainUI()
             if gp or scriptDisabled then return end
             if input.KeyCode == Enum.KeyCode.P then
                 pcall(function()
-                    if Window then
-                        Window:Toggle()
+                    if Window and Window.SetVisible then
+                        uiVisible = not uiVisible
+                        Window:SetVisible(uiVisible)
                     end
                 end)
             end
         end)
+
 
         -- OPTIONAL SAFE GUARD (sebenarnya tidak wajib)
         pcall(function()
