@@ -1020,121 +1020,89 @@ end
 ---------------------------------------------------------
 -- Bring item to target location
 ---------------------------------------------------------
-local function teleportToCFrame(cf)
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp or not cf then return end
+local function getBringTargetPosition(location)
+    local hrp = LocalPlayer.Character
+        and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 
-    -- aman & instant
-    hrp.CFrame = cf
-end
+    if not hrp then return nil end
 
+    if location == "Player" then
+        return hrp.Position + Vector3.new(0, BringHeight + 3, 0)
 
-local function getBringTargetCFrame()
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-
-    if selectedLocation == "Player" then
-        if not hrp then return nil end
-        return hrp.CFrame * CFrame.new(0, BringHeight, 0)
-
-    elseif selectedLocation == "Workbench" then
-        if ensureScrapperTarget() and ScrapperTarget then
-            return ScrapperTarget.CFrame * CFrame.new(0, BringHeight, 0)
+    elseif location == "Workbench" then
+        local s = ensureScrapperTarget and ensureScrapperTarget()
+        if s then
+            return s.Position + Vector3.new(0, BringHeight, 0)
         end
 
-    elseif selectedLocation == "Fire" then
+    elseif location == "Fire" then
         local fire = Workspace:FindFirstChild("Map")
             and Workspace.Map:FindFirstChild("Campground")
             and Workspace.Map.Campground:FindFirstChild("MainFire")
             and Workspace.Map.Campground.MainFire:FindFirstChild("OuterTouchZone")
         if fire then
-            return fire.CFrame * CFrame.new(0, BringHeight, 0)
+            return fire.Position + Vector3.new(0, BringHeight, 0)
         end
     end
 
-    return nil
+    return hrp.Position + Vector3.new(0, BringHeight + 3, 0)
 end
 
-local function isItemAllowed(item, allowedList, selectedList)
-    if not item or not item:IsA("Model") or not item.PrimaryPart then return false end
-
-    -- kalau pilih "All"
-    if table.find(selectedList, "All") then
-        return table.find(allowedList, item.Name) ~= nil
-    end
-
-    return table.find(selectedList, item.Name) ~= nil
+local function getBringDropCFrame(basePos, index)
+    local angle = (index - 1) * (math.pi * 2 / 10)
+    local radius = 3
+    local offset = Vector3.new(
+        math.cos(angle) * radius,
+        0,
+        math.sin(angle) * radius
+    )
+    return CFrame.new(basePos + offset)
 end
 
 local function bringItems(masterList, selectedList, location)
     if scriptDisabled then return end
-    if not ItemsFolder then
-        notifyUI("Bring Item", "Items folder belum siap.", 3, "alert-triangle")
-        return
+    if not ItemsFolder then return end
+    if not RequestStartDragging or not RequestStopDragging then return end
+
+    -- ✅ NORMALISASI selectedList (INI PENTING)
+    if type(selectedList) ~= "table" or #selectedList == 0 then
+        selectedList = {"All"}
     end
 
-    -- ✅ TAMBAHKAN BLOK INI
-    if not RequestStartDragging or not RequestStopDragging then
-        notifyUI(
-            "Bring Item",
-            "Remote dragging belum siap, coba lagi sebentar.",
-            3,
-            "alert-triangle"
-        )
-        return
-    end
-    -- ✅ SAMPAI SINI
+    local basePos = getBringTargetPosition(location or "Player")
+    if not basePos then return end
 
-    selectedLocation = location or selectedLocation
-    local targetCF = getBringTargetCFrame()
-
-    if not targetCF then
-        notifyUI("Bring Item", "Target lokasi tidak ditemukan.", 3, "alert-triangle")
-        return
+    -- resolve wanted names
+    local wanted = {}
+    if table.find(selectedList, "All") then
+        for _, n in ipairs(masterList) do
+            if n ~= "All" then table.insert(wanted, n) end
+        end
+    else
+        wanted = selectedList
     end
 
-    local count = 0
-    local offsetIndex = 0
-
+    local targets = {}
     for _, item in ipairs(ItemsFolder:GetChildren()) do
-        if isItemAllowed(item, masterList, selectedList) then
-            offsetIndex += 1
-            count += 1
-
-            local spread = 2
-            local angle = (offsetIndex - 1) * (math.pi / 4)
-            local offset = Vector3.new(
-                math.cos(angle) * spread,
-                BringHeight,
-                math.sin(angle) * spread
-            )
-
-            task.spawn(function()
-                pcall(function()
-                    if RequestStartDragging then
-                        RequestStartDragging:FireServer(item)
-                    end
-                    task.wait(0.03)
-
-                    item:PivotTo(targetCF * CFrame.new(offset))
-
-                    task.wait(0.03)
-                    if RequestStopDragging then
-                        RequestStopDragging:FireServer(item)
-                    end
-                end)
-            end)
+        if item:IsA("Model") and item.PrimaryPart then
+            if table.find(wanted, item.Name) then
+                table.insert(targets, item)
+            end
         end
     end
 
-    notifyUI(
-        "Bring Item",
-        string.format("Berhasil memindahkan %d item ke %s.", count, selectedLocation),
-        4,
-        "package"
-    )
+    for i, item in ipairs(targets) do
+        task.spawn(function()
+            local cf = getBringDropCFrame(basePos, i)
+            pcall(function() RequestStartDragging:FireServer(item) end)
+            task.wait(0.03)
+            pcall(function() item:PivotTo(cf) end)
+            task.wait(0.03)
+            pcall(function() RequestStopDragging:FireServer(item) end)
+        end)
+    end
 end
+
 
 ---------------------------------------------------------
 -- GODMODE & ANTI AFK
