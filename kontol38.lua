@@ -1033,8 +1033,6 @@ local function getBringTargetPosition(location)
         if ensureScrapperTarget() and ScrapperTarget then
             return ScrapperTarget.Position + Vector3.new(0, BringHeight, 0)
         end
-    end
-
 
     elseif location == "Fire" then
         local fire = Workspace:FindFirstChild("Map")
@@ -1046,8 +1044,10 @@ local function getBringTargetPosition(location)
         end
     end
 
+    -- fallback aman
     return hrp.Position + Vector3.new(0, BringHeight + 3, 0)
 end
+
 
 local function getBringDropCFrame(basePos, index)
     local angle = (index - 1) * (math.pi * 2 / 10)
