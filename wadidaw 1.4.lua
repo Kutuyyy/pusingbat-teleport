@@ -230,10 +230,19 @@ local function getTargetPosition(location)
     elseif location == "Workbench" then
         local s = getScrapperTarget()
         if s then return s.Position + Vector3.new(0, BringHeight, 0) end
+
     elseif location == "Fire" then
-        local fire = Workspace.Map.Campground.MainFire.OuterTouchZone
-        if fire then return fire.Position + Vector3.new(0, BringHeight, 0) end
+        local fire =
+            Workspace:FindFirstChild("Map")
+            and Workspace.Map:FindFirstChild("Campground")
+            and Workspace.Map.Campground:FindFirstChild("MainFire")
+            and Workspace.Map.Campground.MainFire:FindFirstChild("OuterTouchZone")
+
+        if fire and fire:IsA("BasePart") then
+            return fire.Position + Vector3.new(0, BringHeight, 0)
+        end
     end
+
     local hrp = getRoot()
     if not hrp then return Vector3.zero end
     return hrp.Position + Vector3.new(0, BringHeight + 3, 0)
@@ -301,13 +310,16 @@ local function bringItems(sectionItemList, selectedItems, location)
 
     for i, item in ipairs(candidates) do
         pcall(function()
-            RequestStartDragging:FireServer(item)
+            if RequestStartDragging then
+                RequestStartDragging:FireServer(item)
+            end
             task.wait(0.03)
             item:PivotTo(getDropCFrame(targetPos, i))
             task.wait(0.03)
-            RequestStopDragging:FireServer(item)
+            if RequestStopDragging then
+                RequestStopDragging:FireServer(item)
+            end
         end)
-        task.wait(0.02)
     end
 end
 
@@ -316,15 +328,14 @@ end
 ---------------------------------------------------------
 local function teleportToCFrame(cf)
     if not cf then
-        WindUI:Notify({Title="Error", Content="Lokasi tidak ditemukan!", Icon="alert-triangle"})
+        notifyUI("Error", "Lokasi tidak ditemukan!", 4, "alert-triangle")
         return
     end
     local hrp = getRoot()
     if hrp then
         hrp.CFrame = cf + Vector3.new(0,4,0)
     end
-
-    WindUI:Notify({Title="Teleport!", Content="Berhasil teleport!", Icon="navigation", Duration=4})
+    notifyUI("Teleport!", "Berhasil teleport!", 4, "navigation")
 end
 
 ---------------------------------------------------------
@@ -1211,7 +1222,9 @@ local function GetBestAxe(forTree)
 end
 local function EquipAxe(tool)
     if tool and EquipHandleRemote then
-        pcall(function() EquipHandleRemote:FireServer("FireAllClients", tool) end)
+        pcall(function()
+            EquipHandleRemote:FireServer("FireAllClients", tool)
+        end)
     end
 end
 local function buildTreeCache()
@@ -2053,13 +2066,23 @@ local function createMainUI()
         christmasSec:Button({
             Title="Teleport to Santa's Sack",
             Callback=function()
-                local sled = Workspace.Map.Landmarks["Santa's Sack"].SantaSack.Sled
-                teleportToCFrame(
-                    (sled.Rail and sled.Rail.Part and sled.Rail.Part.CFrame)
-                    or (sled.Engine and sled.Engine.CFrame)
-                )
+                local sled =
+                    Workspace:FindFirstChild("Map")
+                    and Workspace.Map:FindFirstChild("Landmarks")
+                    and Workspace.Map.Landmarks:FindFirstChild("Santa's Sack")
+                    and Workspace.Map.Landmarks["Santa's Sack"]:FindFirstChild("SantaSack")
+                    and Workspace.Map.Landmarks["Santa's Sack"].SantaSack:FindFirstChild("Sled")
+
+                local target =
+                    sled
+                    and sled:FindFirstChild("Rail")
+                    and sled.Rail:FindFirstChild("Part")
+                    or sled and sled:FindFirstChild("Engine")
+
+                teleportToCFrame(target and target.CFrame)
             end
         })
+
 
         local optList={"North Pole","Elf Tree","Elf Ice Lake","Elf Ice Race"}
         local selectedOpt="North Pole"
@@ -2076,19 +2099,42 @@ local function createMainUI()
             Callback=function()
                 local t=nil
                 if selectedOpt=="North Pole" then
-                    local np = Workspace.Map.Landmarks:FindFirstChild("North Pole")
+                    local np =
+                        Workspace:FindFirstChild("Map")
+                        and Workspace.Map:FindFirstChild("Landmarks")
+                        and Workspace.Map.Landmarks:FindFirstChild("North Pole")
                         and Workspace.Map.Landmarks["North Pole"]:FindFirstChild("Festive Carpet Blueprint")
-
                     t =
                         np and np:FindFirstChild("GraphLines")
                         or np and np:FindFirstChild("Star")
                 elseif selectedOpt=="Elf Tree" then
-                    t=Workspace.Map.Landmarks["Elf Tree"].Trees["Northern Pine"].TrunkPart
+                    t =
+                        Workspace:FindFirstChild("Map")
+                        and Workspace.Map:FindFirstChild("Landmarks")
+                        and Workspace.Map.Landmarks:FindFirstChild("Elf Tree")
+                        and Workspace.Map.Landmarks["Elf Tree"]:FindFirstChild("Trees")
+                        and Workspace.Map.Landmarks["Elf Tree"].Trees:FindFirstChild("Northern Pine")
+                        and Workspace.Map.Landmarks["Elf Tree"].Trees["Northern Pine"]:FindFirstChild("TrunkPart")
+
                 elseif selectedOpt=="Elf Ice Lake" then
-                    local l=Workspace.Map.Landmarks["Elf Ice Lake"]
-                    t=l:FindFirstChild("Main") or l.GrassFolder:FindFirstChild("Grass")
+                    local l =
+                        Workspace:FindFirstChild("Map")
+                        and Workspace.Map:FindFirstChild("Landmarks")
+                        and Workspace.Map.Landmarks:FindFirstChild("Elf Ice Lake")
+
+                    t =
+                        l and l:FindFirstChild("Main")
+                        or l and l:FindFirstChild("GrassFolder")
+                            and l.GrassFolder:FindFirstChild("Grass")
+
                 elseif selectedOpt=="Elf Ice Race" then
-                    t=Workspace.Map.Landmarks["Elf Ice Race"].Obstacles.SnowStoneTall.Part
+                    t =
+                        Workspace:FindFirstChild("Map")
+                        and Workspace.Map:FindFirstChild("Landmarks")
+                        and Workspace.Map.Landmarks:FindFirstChild("Elf Ice Race")
+                        and Workspace.Map.Landmarks["Elf Ice Race"]:FindFirstChild("Obstacles")
+                        and Workspace.Map.Landmarks["Elf Ice Race"].Obstacles:FindFirstChild("SnowStoneTall")
+                        and Workspace.Map.Landmarks["Elf Ice Race"].Obstacles.SnowStoneTall:FindFirstChild("Part")
                 end
                 teleportToCFrame(t and t.CFrame)
             end
@@ -2132,7 +2178,7 @@ backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
     ConsumeItemRemote = re:FindFirstChild("RequestConsumeItem")
     NightSkipRemote = re:FindFirstChild("RequestActivateNightSkipMachine")
     ToolDamageRemote = re:FindFirstChild("ToolDamageObject")
-    EquipHandleRemote = re:FindFirstChild(" EquipItemHandle")
+    EquipHandleRemote = re:FindFirstChild("EquipItemHandle")
     tryHookDayDisplay()
 end)
 backgroundFind(Workspace, "Items", function(it)
@@ -2144,7 +2190,6 @@ backgroundFind(Workspace, "Structures", function(st)
     notifyUI("Init", "Structures ditemukan.", 3, "layers")
     TemporalAccelerometer = st:FindFirstChild("Temporal Accelerometer")
 end)
-task.spawn(function() tryHookDayDisplay() end)
 startGodmodeLoop()
 
 ---------------------------------------------------------
