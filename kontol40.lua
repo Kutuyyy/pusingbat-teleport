@@ -164,14 +164,9 @@ local lastRecastAt = 0
 local RECAST_DELAY = 2
 local MAX_RECENT_SECS = 5
 local fishingLoopThread = nil
-
-local BringHeight = 20
-local selectedLocation = "Player"
-
 -- UI & HUD
 local Window
 local mainTab, localTab, fishingTab, farmTab, utilTab, nightTab, webhookTab, healthTab
-local BringTab, TeleportTab
 local miniHudGui, miniHudFrame, miniUptimeLabel, miniLavaLabel, miniPingFps
 
 local scriptStartTime = os.clock()
@@ -1016,105 +1011,6 @@ local function startScrapLoop()
         print("[Scrap] Auto Scrapper stop.")
     end)
 end
-
----------------------------------------------------------
--- Bring item to target location
----------------------------------------------------------
-local function teleportToCFrame(cf)
-    if not cf then
-        notifyUI("Teleport", "CFrame tidak valid.", 3, "alert-triangle")
-        return
-    end
-    local hrp = getRoot()
-    if not hrp then return end
-    hrp.CFrame = cf + Vector3.new(0, 4, 0)
-end
-
-
-local function getBringTargetPosition(location)
-    local hrp = LocalPlayer.Character
-        and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-
-    if not hrp then return nil end
-
-    if location == "Player" then
-        return hrp.Position + Vector3.new(0, BringHeight + 3, 0)
-
-    elseif location == "Workbench" then
-        if ensureScrapperTarget() and ScrapperTarget then
-            return ScrapperTarget.Position + Vector3.new(0, BringHeight, 0)
-        end
-
-    elseif location == "Fire" then
-        local fire = Workspace:FindFirstChild("Map")
-            and Workspace.Map:FindFirstChild("Campground")
-            and Workspace.Map.Campground:FindFirstChild("MainFire")
-            and Workspace.Map.Campground.MainFire:FindFirstChild("OuterTouchZone")
-        if fire then
-            return fire.Position + Vector3.new(0, BringHeight, 0)
-        end
-    end
-
-    -- fallback aman
-    return hrp.Position + Vector3.new(0, BringHeight + 3, 0)
-end
-
-
-local function getBringDropCFrame(basePos, index)
-    local angle = (index - 1) * (math.pi * 2 / 10)
-    local radius = 3
-    local offset = Vector3.new(
-        math.cos(angle) * radius,
-        0,
-        math.sin(angle) * radius
-    )
-    return CFrame.new(basePos + offset)
-end
-
-local function bringItems(masterList, selectedList, location)
-    if scriptDisabled then return end
-    if not ItemsFolder then return end
-    if not RequestStartDragging or not RequestStopDragging then return end
-
-    -- ✅ NORMALISASI selectedList (INI PENTING)
-    if type(selectedList) ~= "table" or #selectedList == 0 then
-        selectedList = {"All"}
-    end
-
-    local basePos = getBringTargetPosition(location or "Player")
-    if not basePos then return end
-
-    -- resolve wanted names
-    local wanted = {}
-    if table.find(selectedList, "All") then
-        for _, n in ipairs(masterList) do
-            if n ~= "All" then table.insert(wanted, n) end
-        end
-    else
-        wanted = selectedList
-    end
-
-    local targets = {}
-    for _, item in ipairs(ItemsFolder:GetChildren()) do
-        if item:IsA("Model") and item.PrimaryPart then
-            if table.find(wanted, item.Name) then
-                table.insert(targets, item)
-            end
-        end
-    end
-
-    for i, item in ipairs(targets) do
-        task.spawn(function()
-            local cf = getBringDropCFrame(basePos, i)
-            pcall(function() RequestStartDragging:FireServer(item) end)
-            task.wait(0.03)
-            pcall(function() item:PivotTo(cf) end)
-            task.wait(0.03)
-            pcall(function() RequestStopDragging:FireServer(item) end)
-        end)
-    end
-end
-
 
 ---------------------------------------------------------
 -- GODMODE & ANTI AFK
@@ -1999,11 +1895,11 @@ backgroundFind(ReplicatedStorage, "RemoteEvents", function(re)
     notifyUI("Init", "RemoteEvents ditemukan.", 3, "radio")
     RequestStartDragging = re:FindFirstChild("RequestStartDraggingItem")
     RequestStopDragging = re:FindFirstChild("StopDraggingItem")
-    CollectCoinRemote = re:FindFirstChild("RequestCollectCoins")
+    CollectCoinRemote = re:FindFirstChild("RequestCollectCoints")
     ConsumeItemRemote = re:FindFirstChild("RequestConsumeItem")
     NightSkipRemote = re:FindFirstChild("RequestActivateNightSkipMachine")
     ToolDamageRemote = re:FindFirstChild("ToolDamageObject")
-    EquipHandleRemote = re:FindFirstChild("EquipItemHandle")
+    EquipHandleRemote = re:FindFirstChild(" EquipItemHandle")
     tryHookDayDisplay()
 end)
 backgroundFind(Workspace, "Items", function(it)
