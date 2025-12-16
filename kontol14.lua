@@ -15,7 +15,7 @@ local Lighting = game:GetService("Lighting")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local ItemsFolder = Workspace:WaitForChild("Items")
+
 local Camera = Workspace.CurrentCamera
 ---------------------------------------------------------
 -- UTIL: NON-BLOCKING FIND HELPERS
