@@ -1030,10 +1030,11 @@ local function getBringTargetPosition(location)
         return hrp.Position + Vector3.new(0, BringHeight + 3, 0)
 
     elseif location == "Workbench" then
-        local s = ensureScrapperTarget and ensureScrapperTarget()
-        if s then
-            return s.Position + Vector3.new(0, BringHeight, 0)
+        if ensureScrapperTarget() and ScrapperTarget then
+            return ScrapperTarget.Position + Vector3.new(0, BringHeight, 0)
         end
+    end
+
 
     elseif location == "Fire" then
         local fire = Workspace:FindFirstChild("Map")
