@@ -3568,10 +3568,9 @@ local function createUI()
             Color3.fromHex("FF0F7B"),
             Color3.fromHex("F89B29")
         ),
-        OnlyMobile = false,
+        OnlyMobile = true,
         Enabled = true,
         Draggable = true,
-        Floating = true,
     })
     ---------------------------------------------------------
     --// TAB 1 : INFORMATION
