@@ -122,8 +122,9 @@ local State = {
         ["Good Axe"] = "112_7367831688",
         ["Strong Axe"] = "116_7367831688",
         ["Infernal Sword"] = "1_8838463626",
-        Chainsaw = "647_8992824875",
-        Spear = "196_8999010016"
+        ["Ice Sword"] = "11_8838463626",
+        ["Chainsaw"] = "647_8992824875",
+        ["Spear"] = "196_8999010016"
     },
     TreeCache = {},
     SelectedTreeCategories = {"Small Tree"},
@@ -133,7 +134,6 @@ local State = {
     treeScanRadius = 900,
     treeCacheRefreshThread = nil,
     treeCacheRefreshInterval = 5,
-
 
     -- LOCAL PLAYER EXTRAS
     tpWalkEnabled = false,
@@ -170,6 +170,7 @@ local State = {
     autoStrongholdRunning = false,
     cachedTriggerZoneCFrame = nil,
     triggerZoneReady = false,
+    savedPositionBeforeStronghold = nil,
 
     -- Spiral
     spiralActive = false,
@@ -246,7 +247,16 @@ local State = {
     WebhookEnabled = true,
     WebhookUsername = (LocalPlayer and LocalPlayer.Name) or "Player",
     currentDayCached = "N/A",
-    previousDayCached = "N/A"
+    previousDayCached = "N/A",
+
+    LocationCache = {
+    Camp = nil,
+    Stronghold = nil,
+    StrongholdTriggerZone = nil,
+    StrongholdChest = nil,
+    Anvil = nil,
+    CultistGenerator = nil
+    },
 }
 State.isSettingKeybind = false
 State.lastKeybindSet = nil
@@ -369,6 +379,21 @@ local function teleportKeepXZ(targetY)
 
     local pos = root.Position
     root.CFrame = CFrame.new(pos.X, targetY, pos.Z)
+end
+
+local function savePlayerPosition()
+    local hrp = getRoot()
+    if hrp then
+        State.savedPositionBeforeStronghold = hrp.CFrame
+    end
+end
+
+local function restorePlayerPosition()
+    local hrp = getRoot()
+    if hrp and State.savedPositionBeforeStronghold then
+        hrp.CFrame = State.savedPositionBeforeStronghold
+        State.savedPositionBeforeStronghold = nil
+    end
 end
 
 local function setAnchored(v)
@@ -517,6 +542,74 @@ local function disableNoClip()
     end
 end
 
+local function sendStrongholdChat()
+    pcall(function()
+        game:GetService("TextChatService").ChatInputBarConfiguration.TargetTextChannel:SendAsync(
+            "HexaCore.. Go to Stronghold"
+        )
+    end)
+end
+
+local function pingStronghold()
+    local rs = game:GetService("ReplicatedStorage")
+    local players = game:GetService("Players")
+    local lp = players.LocalPlayer
+
+    local stronghold =
+        game:GetService("Workspace")
+        :FindFirstChild("Map")
+        and game.Workspace.Map:FindFirstChild("Landmarks")
+        and game.Workspace.Map.Landmarks:FindFirstChild("Stronghold")
+
+    if not stronghold then return end
+
+    -- ambil posisi stronghold (dinamis)
+    local pos
+    local part = stronghold:FindFirstChildWhichIsA("BasePart", true)
+    if part then
+        pos = part.Position
+    else
+        pos = stronghold:GetPivot().Position
+    end
+
+    local remote = rs:FindFirstChild("RemoteEvents")
+        and rs.RemoteEvents:FindFirstChild("RequestBroadcastPing")
+
+    if not remote then return end
+
+    -- kirim 2x (seperti client asli)
+    for i = 1, 2 do
+        pcall(function()
+            remote:FireServer({
+                Model = stronghold,
+                Player = lp,
+                Position = pos
+            })
+        end)
+        task.wait(0.1)
+    end
+end
+
+local function collectAllDiamonds()
+    local rs = game:GetService("ReplicatedStorage")
+    local remote = rs:FindFirstChild("RemoteEvents")
+        and rs.RemoteEvents:FindFirstChild("RequestTakeDiamonds")
+
+    if not remote then return end
+
+    local items = Services.Workspace:FindFirstChild("Items")
+    if not items then return end
+
+    for _, v in ipairs(items:GetChildren()) do
+        if v.Name == "Diamond" then
+            pcall(function()
+                remote:FireServer(v)
+            end)
+            task.wait(0.15)
+        end
+    end
+end
+
 -- === STRONGHOLD REFERENCE POSITION ===
 local function getStrongholdReferencePosition()
     local sign =
@@ -529,6 +622,149 @@ local function getStrongholdReferencePosition()
 
     return sign and sign.Position or nil
 end
+
+local function getStronghold()
+    if State.LocationCache.Stronghold then
+        return State.LocationCache.Stronghold
+    end
+
+    local sign =
+        Services.Workspace:FindFirstChild("Map")
+        and Services.Workspace.Map:FindFirstChild("Landmarks")
+        and Services.Workspace.Map.Landmarks:FindFirstChild("Stronghold")
+        and Services.Workspace.Map.Landmarks.Stronghold
+            :FindFirstChild("Building")
+            :FindFirstChild("Sign")
+            :FindFirstChild("Main")
+
+    if sign then
+        State.LocationCache.Stronghold = sign
+    end
+
+    return sign
+end
+
+local function getStrongholdTriggerZone()
+    if State.LocationCache.StrongholdTriggerZone then
+        return State.LocationCache.StrongholdTriggerZone
+    end
+
+    local tz = ensureStrongholdTriggerZone()
+    if tz then
+        State.LocationCache.StrongholdTriggerZone = tz
+    end
+
+    return tz
+end
+
+local function getStrongholdDiamondChest()
+    if State.LocationCache.StrongholdChest then
+        return State.LocationCache.StrongholdChest
+    end
+
+    local items = Services.Workspace:FindFirstChild("Items")
+    local chest = items and items:FindFirstChild("Stronghold Diamond Chest")
+
+    if chest then
+        State.LocationCache.StrongholdChest = chest
+    end
+
+    return chest
+end
+
+local function getSacrificeLavaPosition()
+    local map = Services.Workspace:FindFirstChild("Map")
+    local lava =
+        map and map:FindFirstChild("Landmarks")
+        and map.Landmarks:FindFirstChild("Sacrifice Lava")
+
+    local part = lava and (lava.PrimaryPart or lava:FindFirstChildWhichIsA("BasePart", true))
+    return part and part.Position or nil
+end
+
+local function findCultistGeneratorBase()
+    local lavaPos = getSacrificeLavaPosition()
+    if not lavaPos then return nil end
+
+    local closest, closestDist = nil, math.huge
+
+    for _, v in ipairs(Services.Workspace:GetDescendants()) do
+        if v:IsA("MeshPart") and v.Name == "banner" then
+            local dist = (v.Position - lavaPos).Magnitude
+            if dist < closestDist then
+                closest = v
+                closestDist = dist
+            end
+        end
+    end
+
+    return closest, closestDist
+end
+
+local function getCultistGeneratorBase()
+    if State.LocationCache.CultistGenerator
+       and State.LocationCache.CultistGenerator.Parent then
+        return State.LocationCache.CultistGenerator
+    end
+
+    local part =
+        Services.Workspace:FindFirstChild("Map")
+        and Services.Workspace.Map:FindFirstChild("Landmarks")
+        and Services.Workspace.Map.Landmarks:FindFirstChild("Volcano")
+        and Services.Workspace.Map.Landmarks.Volcano:FindFirstChild("Models")
+        and Services.Workspace.Map.Landmarks.Volcano.Models:FindFirstChild("Basalt Pile1")
+        and Services.Workspace.Map.Landmarks.Volcano.Models["Basalt Pile1"]:FindFirstChild("Part")
+
+    if part then
+        State.LocationCache.CultistGenerator = part
+        return part
+    end
+
+    return nil
+end
+
+local function getAnvil()
+    if State.LocationCache.Anvil and State.LocationCache.Anvil.Parent then
+        return State.LocationCache.Anvil
+    end
+
+    local anvil =
+        Services.Workspace:FindFirstChild("Map")
+        and Services.Workspace.Map:FindFirstChild("Landmarks")
+        and Services.Workspace.Map.Landmarks:FindFirstChild("ToolWorkshop")
+        and Services.Workspace.Map.Landmarks.ToolWorkshop
+            :FindFirstChild("Functional")
+            :FindFirstChild("ToolBench")
+            :FindFirstChild("Hammer")
+
+    if anvil then
+        State.LocationCache.Anvil = anvil
+        return anvil
+    end
+
+    return nil
+end
+
+local function getCamp()
+    if State.LocationCache.Camp and State.LocationCache.Camp.Parent then
+        return State.LocationCache.Camp
+    end
+
+    local fire =
+        Services.Workspace:FindFirstChild("Map")
+        and Services.Workspace.Map:FindFirstChild("Campground")
+        and Services.Workspace.Map.Campground:FindFirstChild("MainFire")
+        and Services.Workspace.Map.Campground.MainFire:FindFirstChild("OuterTouchZone")
+
+    if fire then
+        State.LocationCache.Camp = fire
+        return fire
+    end
+
+    return nil
+end
+
+
 
 local function findStrongholdTriggerZoneByHeuristic()
     local strongholdPos = getStrongholdReferencePosition()
@@ -561,39 +797,56 @@ local function findStrongholdTriggerZoneByHeuristic()
 end
 
 local function ensureStrongholdTriggerZone()
-    if State.triggerZoneReady and State.cachedTriggerZoneCFrame then
+    -- sudah pernah ketemu → pakai cache
+    if State.cachedTriggerZoneCFrame then
         return true
     end
 
-    -- teleport dulu biar asset ke-load
-    teleportToStronghold()
-    task.wait(1.2)
+    local hrp = getRoot()
+    if not hrp then return false end
 
-    local tz, dist = findStrongholdTriggerZoneByHeuristic()
+    -- 1️⃣ simpan posisi awal
+    savePlayerPosition()
+
+    -- 2️⃣ teleport ke stronghold
+    local stronghold =
+        Services.Workspace:FindFirstChild("Map")
+        and Services.Workspace.Map:FindFirstChild("Landmarks")
+        and Services.Workspace.Map.Landmarks:FindFirstChild("Stronghold")
+
+    if not stronghold then
+        restorePlayerPosition()
+        return false
+    end
+
+    local part = stronghold:FindFirstChildWhichIsA("BasePart", true)
+    if part then
+        hrp.CFrame = part.CFrame * CFrame.new(0, 5, 0)
+    end
+
+    -- 3️⃣ tunggu map settle
+    task.wait(1.5)
+
+    -- 4️⃣ scan TriggerZone (sekali sampai ketemu)
+    local tz
+    for _, v in ipairs(stronghold:GetDescendants()) do
+        if v:IsA("BasePart") and v.Name == "TriggerZone" then
+            tz = v
+            break
+        end
+    end
+
     if tz then
         State.cachedTriggerZoneCFrame = tz.CFrame
-        State.triggerZoneReady = true
-
-        notifyUI(
-            "Auto Stronghold",
-            string.format(
-                "✅ TriggerZone ditemukan\nDist: %.1f\nSizeY: %.1f",
-                dist, tz.Size.Y
-            ),
-            5,
-            "check"
-        )
+        restorePlayerPosition()
         return true
     end
 
-    notifyUI(
-        "Auto Stronghold",
-        "❌ TriggerZone Stronghold belum ditemukan",
-        4,
-        "alert-triangle"
-    )
+    -- gagal → balikin posisi juga
+    restorePlayerPosition()
     return false
 end
+
 
 local function getFootPosition()
     local root = getRoot()
@@ -2303,7 +2556,7 @@ end
 -- AURA logic (heartbeat)
 local function GetBestAxe(forTree)
     for name, id in pairs(State.AxeIDs) do
-        if (not forTree) or (name ~= "Infernal Sword" and name ~= "Spear" and name ~= "Chainsaw") then
+        if (not forTree) or (name ~= "Infernal Sword" and name ~= "Spear" and name ~= "Chainsaw" and name ~= "Ice Sword") then
             local inv = LocalPlayer:FindFirstChild("Inventory")
             if inv then
                 local tool = inv:FindFirstChild(name)
@@ -3305,6 +3558,21 @@ local function createUI()
         HasOutline = true,
     })
     State.WindUIWindow = Window
+
+    State.WindUIWindow:EditOpenButton({
+        Title = "HexaCore Hub",
+        Icon = "monitor",
+        CornerRadius = UDim.new(0, 16),
+        StrokeThickness = 2,
+        Color = ColorSequence.new(
+            Color3.fromHex("FF0F7B"),
+            Color3.fromHex("F89B29")
+        ),
+        OnlyMobile = false,
+        Enabled = true,
+        Draggable = true,
+        Floating = true,
+    })
     ---------------------------------------------------------
     --// TAB 1 : INFORMATION
     ---------------------------------------------------------
@@ -3508,8 +3776,11 @@ local function createUI()
                 -------------------------------------------------
                 -- FLOOR 1 : TRIGGERZONE
                 -------------------------------------------------
+                sendStrongholdChat()
+                pingStronghold()
+                task.wait(0.5)
                 hrp.Anchored = false
-                hrp.CFrame = State.cachedTriggerZoneCFrame * CFrame.new(0, 1, 0)
+                hrp.CFrame = State.cachedTriggerZoneCFrame * CFrame.new(0, 5, 0)
                 task.wait(0.6)
 
                 jumpOnce()
@@ -3525,28 +3796,31 @@ local function createUI()
                 -------------------------------------------------
                 local cleanTimer = 0
                 local MAX_CLEAN = 10
+                local lastTween = 0
 
                 disableNoClip()
-
-                local lastTween = 0
 
                 while State.autoStrongholdEnabled do
                     local cultist = findNearestCultist(200)
 
                     if cultist then
-                        noCultistTime = 0
+                        cleanTimer = 0
 
                         if os.clock() - lastTween >= 1.2 then
                             enableNoClip()
                             tweenAroundCultist(cultist)
                             lastTween = os.clock()
                         end
+
+                        task.wait(0.1)
                     else
                         disableNoClip()
-                        noCultistTime += 1
-                        if noCultistTime >= 10 then
+                        cleanTimer += 1
+
+                        if cleanTimer >= MAX_CLEAN then
                             break
                         end
+
                         task.wait(1)
                     end
                 end
@@ -3583,18 +3857,8 @@ local function createUI()
                 openScannedStrongholdChests(chests)
                 task.wait(1)
 
-                if State.CollectCoinRemote then
-                    local items = Services.Workspace:FindFirstChild("Items")
-                    if items then
-                        for _, item in ipairs(items:GetChildren()) do
-                            if item.Name == "Diamond" then
-                                pcall(function()
-                                    State.CollectCoinRemote:InvokeServer(item)
-                                end)
-                            end
-                        end
-                    end
-                end
+                collectAllDiamonds()
+                task.wait(1)
 
                 -- END CYCLE
                 finish()
@@ -3608,23 +3872,30 @@ local function createUI()
         -- TOGGLE
         -------------------------------------------------
         autoStrongholdSec:Toggle({
-            Title = "Auto Stronghold",
-            Callback = function(v)
-                State.autoStrongholdEnabled = v
-                if v then
-                    task.spawn(function()
-                        if not ensureStrongholdTriggerZone() then
-                            notifyUI(
-                                "Auto Stronghold",
-                                "❌ Gagal menemukan TriggerZone Stronghold",
-                                4,
-                                "alert-triangle"
-                            )
-                        end
-                    end)
-                end
+        Title = "Auto Stronghold",
+        Callback = function(v)
+            State.autoStrongholdEnabled = v
+
+            if v then
+                task.spawn(function()
+                    if ensureStrongholdTriggerZone() then
+                        notifyUI(
+                            "Auto Stronghold",
+                            "✅ TriggerZone Stronghold ditemukan",
+                            3,
+                            "check"
+                        )
+                    else
+                        notifyUI(
+                            "Auto Stronghold",
+                            "❌ Gagal menemukan TriggerZone Stronghold",
+                            4,
+                            "alert-triangle"
+                        )
+                    end
+                end)
             end
-        })
+        end})
 
         -- =========================================
         -- 🔍 REVEAL MAP (RAPIH & COLLAPSIBLE)
@@ -4210,29 +4481,61 @@ local function createUI()
             teleportToCFrame(hrp and hrp.CFrame)
         end })
 
-        local structureSec = TeleportTab:Section({ Title = "Structure Teleport", Icon = "castle", Collapsible = true, DefaultOpen = false })
-        structureSec:Button({ Title = "Teleport to Camp", Callback = function()
-            local fire = Services.Workspace:FindFirstChild("Map") and Services.Workspace.Map:FindFirstChild("Campground") and Services.Workspace.Map.Campground:FindFirstChild("MainFire") and Services.Workspace.Map.Campground.MainFire:FindFirstChild("OuterTouchZone")
-            teleportToCFrame(fire and fire.CFrame)
-        end })
-        structureSec:Button({ Title = "Teleport to Cultist Generator Base", Callback = function()
-            local cg = Services.Workspace:FindFirstChild("Map") and Services.Workspace.Map:FindFirstChild("Landmarks") and Services.Workspace.Map.Landmarks:FindFirstChild("CultistGenerator")
-            teleportToCFrame(cg and cg.PrimaryPart and cg.PrimaryPart.CFrame)
-        end })
-        structureSec:Button({ Title = "Teleport to Stronghold", Callback = function()
-            local sign = Services.Workspace:FindFirstChild("Map") and Services.Workspace.Map:FindFirstChild("Landmarks") and Services.Workspace.Map.Landmarks:FindFirstChild("Stronghold") and Services.Workspace.Map.Landmarks.Stronghold:FindFirstChild("Building") and Services.Workspace.Map.Landmarks.Stronghold.Building:FindFirstChild("Sign") and Services.Workspace.Map.Landmarks.Stronghold.Building.Sign:FindFirstChild("Main")
-            teleportToCFrame(sign and sign.CFrame)
-        end })
+       local structureSec = TeleportTab:Section({
+            Title = "Structure Teleport",
+            Icon = "castle",
+            Collapsible = true,
+            DefaultOpen = false
+        })
+
+        -- CAMP
+        structureSec:Button({
+            Title = "Teleport to Camp",
+            Callback = function()
+                local camp = getCamp()
+                if camp then
+                    teleportToCFrame(camp.CFrame)
+                else
+                    notifyUI("Teleport", "Camp tidak ditemukan", 3, "alert-triangle")
+                end
+            end
+        })
+
+        -- CULTIST GENERATOR BASE (cached)
+        structureSec:Button({
+            Title = "Teleport to Cultist Generator Base",
+            Callback = function()
+                local part = getCultistGeneratorBase()
+                if not part then
+                    notifyUI("Teleport", "Cultist Generator Base tidak ditemukan", 3, "alert-triangle")
+                    return
+                end
+
+                teleportToCFrame(part.CFrame * CFrame.new(0, 2, 0))
+            end
+        })
+
+        -- STRONGHOLD
+        structureSec:Button({
+            Title = "Teleport to Stronghold",
+            Callback = function()
+                local sign = getStronghold()
+                if sign then
+                    teleportToCFrame(sign.CFrame)
+                end
+            end
+        })
+
+        -- STRONGHOLD DIAMOND CHEST
         structureSec:Button({
             Title = "Teleport to Stronghold Diamond Chest",
             Callback = function()
-                local items = Services.Workspace:FindFirstChild("Items")
-                local chestModel = items and items:FindFirstChild("Stronghold Diamond Chest")
-                if not chestModel then return end
+                local chest = getStrongholdDiamondChest()
+                if not chest then return end
 
                 local part =
-                    chestModel.PrimaryPart
-                    or chestModel:FindFirstChildWhichIsA("BasePart", true)
+                    chest.PrimaryPart
+                    or chest:FindFirstChildWhichIsA("BasePart", true)
 
                 if part then
                     teleportToCFrame(part.CFrame * CFrame.new(0, 4, 0))
@@ -4240,18 +4543,52 @@ local function createUI()
             end
         })
 
-        structureSec:Button({ Title = "Teleport to Caravan", Callback = function()
-            local caravan = Services.Workspace:FindFirstChild("Map") and Services.Workspace.Map:FindFirstChild("Landmarks") and Services.Workspace.Map.Landmarks:FindFirstChild("Caravan")
-            teleportToCFrame(caravan and caravan.PrimaryPart and caravan.PrimaryPart.CFrame)
-        end })
-        structureSec:Button({ Title = "Teleport to Fairy", Callback = function()
-            local fairy = Services.Workspace:FindFirstChild("Map") and Services.Workspace.Map:FindFirstChild("Landmarks") and Services.Workspace.Map.Landmarks:FindFirstChild("Fairy House") and Services.Workspace.Map.Landmarks["Fairy House"]:FindFirstChild("Fairy") and Services.Workspace.Map.Landmarks["Fairy House"].Fairy:FindFirstChild("HumanoidRootPart")
-            teleportToCFrame(fairy and fairy.CFrame)
-        end })
-        structureSec:Button({ Title = "Teleport to Anvil", Callback = function()
-            local anvil = Services.Workspace:FindFirstChild("Map") and Services.Workspace.Map:FindFirstChild("Landmarks") and Services.Workspace.Map.Landmarks:FindFirstChild("ToolWorkshop") and Services.Workspace.Map.Landmarks.ToolWorkshop:FindFirstChild("Functional") and Services.Workspace.Map.Landmarks.ToolWorkshop.Functional:FindFirstChild("ToolBench") and Services.Workspace.Map.Landmarks.ToolWorkshop.Functional.ToolBench:FindFirstChild("Hammer")
-            teleportToCFrame(anvil and anvil.CFrame)
-        end })
+        -- CARAVAN
+        structureSec:Button({
+            Title = "Teleport to Caravan",
+            Callback = function()
+                local map = Services.Workspace:FindFirstChild("Map")
+                local caravan = map and map:FindFirstChild("Landmarks")
+                    and map.Landmarks:FindFirstChild("Caravan")
+
+                if caravan and caravan.PrimaryPart then
+                    teleportToCFrame(caravan.PrimaryPart.CFrame)
+                end
+            end
+        })
+
+        -- FAIRY
+        structureSec:Button({
+            Title = "Teleport to Fairy",
+            Callback = function()
+                local fairy =
+                    Services.Workspace:FindFirstChild("Map")
+                    and Services.Workspace.Map:FindFirstChild("Landmarks")
+                    and Services.Workspace.Map.Landmarks:FindFirstChild("Fairy House")
+                    and Services.Workspace.Map.Landmarks["Fairy House"]
+                        :FindFirstChild("Fairy")
+                        :FindFirstChild("HumanoidRootPart")
+
+                if fairy then
+                    teleportToCFrame(fairy.CFrame)
+                end
+            end
+        })
+
+        -- ANVIL (cached)
+        structureSec:Button({
+            Title = "Teleport to Anvil",
+            Callback = function()
+                local anvil = getAnvil()
+                if not anvil then
+                    notifyUI("Teleport", "Anvil tidak ditemukan", 3, "alert-triangle")
+                    return
+                end
+
+                teleportToCFrame(anvil.CFrame)
+            end
+        })
+
     end
     ---------------------------------------------------------
     -- TAB 7: UPDATE FOCUSED
@@ -4481,10 +4818,6 @@ task.spawn(function()
     if State.WindUI then
         createUI()
         task.wait(3)
-        local initialCount = rescanChests()
-        if initialCount > 0 then
-            warn("[FRENESIS] Found " .. initialCount .. " chests on startup")
-        end
     end
 end)
 
