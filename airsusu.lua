@@ -3556,22 +3556,23 @@ local function createUI()
         Acrylic = true,
         SideBarWidth = 180,
         HasOutline = true,
+        OpenButton = {
+            Title = "HexaCore Hub",
+            Icon = "monitor",
+            CornerRadius = UDim.new(0, 16),
+            StrokeThickness = 2,
+            Color = ColorSequence.new(
+                Color3.fromHex("FF0F7B"),
+                Color3.fromHex("F89B29")
+            ),
+            OnlyMobile = false,
+            Enabled = true,
+            Draggable = true,
+        }
     })
-    State.WindUIWindow = Window
 
-    State.WindUIWindow:EditOpenButton({
-        Title = "HexaCore Hub",
-        Icon = "monitor",
-        CornerRadius = UDim.new(0, 16),
-        StrokeThickness = 2,
-        Color = ColorSequence.new(
-            Color3.fromHex("FF0F7B"),
-            Color3.fromHex("F89B29")
-        ),
-        OnlyMobile = true,
-        Enabled = true,
-        Draggable = true,
-    })
+    State.WindUIWindow = Window
+    
     ---------------------------------------------------------
     --// TAB 1 : INFORMATION
     ---------------------------------------------------------
@@ -4274,7 +4275,7 @@ local function createUI()
                 if Window then
                     pcall(function() Window:Destroy() end)
                 end
-                warn("[PapiDimz x FRENESIS] Script deactivated")
+                warn("[PapiDimz] Script deactivated")
             end
         })
     end
@@ -4777,7 +4778,7 @@ local function createUI()
     task.wait(1)
     notifyUI("✅ HexaCore Ready!", "All systems loaded.", 8, "check-circle")
     print([[
-[PapiDimz x FRENESIS] MERGE COMPLETE
+[PapiDimz] MERGE COMPLETE
 ===========================
 - Fun System: READY
 - Bring Item System: READY
@@ -4894,7 +4895,7 @@ end)
 task.wait(1)
 notifyUI("✅ HexaCore Ready!", "All systems loaded.", 8, "check-circle")
 print([[
-[PapiDimz x FRENESIS] MERGE COMPLETE
+[PapiDimz] MERGE COMPLETE
 ===========================
 - Fun System: READY
 - Bring Item System: READY
